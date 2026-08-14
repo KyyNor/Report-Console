@@ -107,7 +107,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   mysqlHost: '127.0.0.1',
   mysqlPort: '3306',
   mysqlUser: 'root',
-  mysqlPassword: '',
+  mysqlPassword: 'taosha123',
   mysqlDatabase: 'whjcbb',
   llmProvider: 'openai',
   llmBaseUrl: 'https://api.openai.com/v1',

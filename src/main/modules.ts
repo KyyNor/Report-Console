@@ -88,9 +88,11 @@ export function saveDataset(moduleName: string, input: {
   }
   const d = getDb()
   const params = JSON.stringify(input.params ?? [])
-  if (expectId) {
+  const existing = d.prepare('SELECT id FROM datasets WHERE module_id=? AND name=?').get(mod.id, input.name) as { id: number } | undefined
+  const targetId = expectId ?? existing?.id
+  if (targetId) {
     d.prepare(`UPDATE datasets SET name=?, kind=?, comment=?, params=?, sql=?, updated_at=datetime('now','localtime') WHERE id=? AND module_id=?`)
-      .run(input.name, input.kind ?? 'other', input.comment ?? '', params, input.sql ?? '', expectId, mod.id)
+      .run(input.name, input.kind ?? 'other', input.comment ?? '', params, input.sql ?? '', targetId, mod.id)
   } else {
     d.prepare('INSERT INTO datasets(module_id, name, kind, comment, params, sql) VALUES(?,?,?,?,?,?)')
       .run(mod.id, input.name, input.kind ?? 'other', input.comment ?? '', params, input.sql ?? '')

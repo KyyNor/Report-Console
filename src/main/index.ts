@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { registerIpc } from './ipc'
 import { createMainWindow } from './windows'
+import { runSelftest } from './selftest'
 
 // 禁用同源策略引起的 localhost 拉取问题不影响本应用；保持默认安全策略
 app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests')
@@ -25,6 +26,16 @@ function bootstrap(): void {
         app.quit()
       }, 2500)
     })
+    return
+  }
+
+  // 自检模式：--selftest —— 用平台服务对真实帆软/MySQL 跑完整链路
+  if (process.argv.includes('--selftest')) {
+    void (async () => {
+      const r = await runSelftest(win)
+      console.log('[selftest] ' + JSON.stringify(r, null, 2))
+      app.exit(r.ok ? 0 : 1)
+    })()
   }
 }
 

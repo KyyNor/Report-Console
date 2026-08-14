@@ -52,7 +52,7 @@ export async function pingMysql(): Promise<{ reachable: boolean; latencyMs: numb
 const READONLY_PREFIX = /^\s*(select|show|describe|desc|explain|with)\b/i
 
 /** 只读 SQL 执行：拒绝非查询语句；自动补 LIMIT；行数/时长受限 */
-export async function readOnlyQuery(sql: string, database?: string, maxRows = 100): Promise<{ columns: string[]; rows: Array<Record<string, unknown>>; durationMs: number; truncated: boolean }> {
+export async function readOnlyQuery(sql: string, database?: string, maxRows = 100, values: unknown[] = []): Promise<{ columns: string[]; rows: Array<Record<string, unknown>>; durationMs: number; truncated: boolean }> {
   if (!READONLY_PREFIX.test(sql)) {
     throw new Error(`只读通道拒绝该语句（仅 SELECT/SHOW/DESCRIBE/EXPLAIN/WITH）：${sql.slice(0, 80)}`)
   }
@@ -66,7 +66,7 @@ export async function readOnlyQuery(sql: string, database?: string, maxRows = 10
   }
   const started = Date.now()
   const conn = getPool()
-  const [result] = await conn.query(finalSql, undefined)
+  const [result] = await conn.query(finalSql, values)
   const durationMs = Date.now() - started
   if (Array.isArray(result)) {
     const rows = result as Array<Record<string, unknown>>

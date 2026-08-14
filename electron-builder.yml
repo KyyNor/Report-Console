@@ -1,0 +1,17 @@
+appId: com.kyynor.frconsole
+productName: FR Console
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+  - "!**/.DS_Store"
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+  - "**/node_modules/esbuild/**"
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dir
+  artifactName: FR-Console-${version}-${arch}.${ext}
+npmRebuild: true

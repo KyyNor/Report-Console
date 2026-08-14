@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WorkBook xmlVersion="20211223" releaseVersion="11.5.0">
+<ReportWebAttr>
+<ServerPrinter/>
+<WebWriteContent>
+<Listener event="afterload">
+<JavaScript class="com.fr.js.JavaScriptImpl">
+<Parameters/>
+<Content><![CDATA[
+/* ================================================================
+   fr-console 生成的展示层 CPT。请勿手改本文件 —— 修改同名 .jsx 后
+   在控制台重新构建。三段结构：
+     PREAMBLE   固定引导（React/antd 兜底加载、PATH、隐藏帆软框架）
+     开发者代码区  ← .jsx 编译产物注入
+     （无 POSTAMBLE，PREAMBLE 为自闭合 IIFE）
+   ================================================================ */
+
+(function() {
+    'use strict';
+
+    // antd 样式（内网静态资源）
+    var antdCSS = document.createElement('link');
+    antdCSS.rel = 'stylesheet';
+    antdCSS.href = '/webroot/help/lib/antd/antd.min.css';
+    document.head.appendChild(antdCSS);
+
+    // React / antd 全局库兜底：平台已注入则跳过，否则从内网静态目录同步加载
+    function __frLoadSync(url) {
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, false);
+            xhr.send(null);
+            if (xhr.status >= 200 && xhr.status < 300) {
+                (0, eval)(xhr.responseText + '\n//# sourceURL=' + url);
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+    if (typeof React === 'undefined' || typeof antd === 'undefined') {
+        var __lib = '/webroot/help/lib/antd/';
+        __frLoadSync(__lib + 'react.min.js');
+        __frLoadSync(__lib + 'react-dom.min.js');
+        __frLoadSync(__lib + 'dayjs.min.js');
+        __frLoadSync(__lib + 'antd.min.js');
+    }
+
+    // PATH 路径基础设施（挂到 window，业务代码直接使用，禁止重新声明）
+    var PATH = {
+        currentDir: (function() {
+            var name = FR.remoteEvaluate('=reportName');
+            return name.substring(0, name.lastIndexOf('/') + 1);
+        })(),
+        apiBase: (function() {
+            var servletURL = FR.remoteEvaluate('=servletURL');
+            var parts = servletURL.split('/');
+            return '/' + parts[1] + '/' + parts[2];
+        })(),
+        getDataTemplate: function(filename) {
+            return this.currentDir.replace('/pages/', '/data/') + filename;
+        },
+        getTemplatePath: function(filename) {
+            return this.currentDir + filename;
+        }
+    };
+    window.PATH = PATH;
+
+    // 隐藏帆软原生框架
+    var hideStyle = document.createElement('style');
+    hideStyle.innerHTML =
+        '.fr-report{position:absolute!important;left:-9999px!important;visibility:hidden!important}' +
+        '.content-container,.fr-content,.reportPane{height:0!important;overflow:hidden!important;pointer-events:none!important}' +
+        'body>.textbox-container,body>#textboxContainer,body>.widget-container{display:none!important}';
+    document.head.appendChild(hideStyle);
+    document.body.setAttribute('style',
+        'margin:0;padding:0;min-height:100vh;box-sizing:border-box;overflow-y:auto;background:#f5f6f8;');
+
+    // 业务挂载点
+    var appRoot = document.createElement('div');
+    appRoot.id = 'app-root';
+    document.body.insertBefore(appRoot, document.body.firstChild);
+})();
+
+/* ===== 开发者代码区 START ===== */
+/* 此处由 fr-console 构建时注入（.jsx → esbuild → 净化），请勿手改 */
+/* ===== 开发者代码区 END ===== */
+]]></Content>
+</JavaScript>
+</Listener>
+<ToolBars/>
+<EditRowColor setColor="false"/>
+<WebWrite SheetPosition="3"/>
+<RptLocation isShowAtLeft="true"/>
+<UnloadCheck check="false"/>
+<ShowWidgets/>
+<OtherAttr autoStash="false"/>
+</WebWriteContent>
+</ReportWebAttr>
+<Report class="com.fr.report.worksheet.WorkSheet" name="sheet1">
+<ReportPageAttr>
+<HR/>
+<FR/>
+<HC/>
+<FC/>
+<USE REPEAT="false" PAGE="false" WRITE="false"/>
+</ReportPageAttr>
+<ColumnPrivilegeControl/>
+<RowPrivilegeControl/>
+<RowHeight defaultValue="723900">
+<![CDATA[723900,723900,723900,723900,723900,723900,723900,723900,723900,723900,723900]]></RowHeight>
+<ColumnWidth defaultValue="2743200">
+<![CDATA[2743200,2743200,2743200,2743200,2743200,2743200,2743200,2743200,2743200,2743200,2743200]]></ColumnWidth>
+<CellElementList>
+<C c="0" r="0" s="0">
+<PrivilegeControl/>
+<Expand>
+<cellSortAttr/>
+</Expand>
+</C>
+</CellElementList>
+<ReportAttrSet>
+<ReportSettings headerHeight="0" footerHeight="0">
+<PaperSetting/>
+<FollowingTheme background="true"/>
+<Background name="ColorBackground">
+<color>
+<FineColor color="-1" hor="-1" ver="-1"/>
+</color>
+</Background>
+</ReportSettings>
+</ReportAttrSet>
+<PrivilegeControl/>
+</Report>
+<ReportParameterAttr>
+<Attributes showWindow="true" delayPlaying="true" windowPosition="1" align="0" useParamsTemplate="true" currentIndex="0"/>
+<PWTitle>
+<![CDATA[参数]]></PWTitle>
+</ReportParameterAttr>
+<StyleList>
+<Style style_name="默认" full="true" border_source="-1" imageLayout="1">
+<FRFont name="simhei" style="0" size="72"/>
+<Background name="NullBackground"/>
+<Border/>
+</Style>
+</StyleList>
+<DesensitizationList/>
+<DesignerVersion DesignerVersion="LAA"/>
+<PreviewType PreviewType="1"/>
+<StrongestControlAttr class="com.fr.widgettheme.control.attr.WidgetDisplayEnhanceMarkAttr">
+<StrongestControlAttr widgetEnhance="false"/>
+</StrongestControlAttr>
+<TemplateThemeAttrMark class="com.fr.base.iofile.attr.TemplateThemeAttrMark">
+<TemplateThemeAttrMark name="经典浅灰" dark="false"/>
+</TemplateThemeAttrMark>
+<ForkIdAttrMark class="com.fr.base.iofile.attr.ForkIdAttrMark">
+<ForkIdAttrMark forkId="8d4b5c6d-2222-4333-8444-bbbbccccdddd"/>
+</ForkIdAttrMark>
+<TemplateIdAttMark class="com.fr.base.iofile.attr.TemplateIdAttMark">
+<TemplateIdAttMark TemplateId="8d4b5c6d-2222-4333-8444-bbbbccccdddd"/>
+</TemplateIdAttMark>
+</WorkBook>

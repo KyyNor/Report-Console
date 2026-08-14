@@ -15,8 +15,11 @@ const pageTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_page.cpt'), 'utf-8'
 const GOLDEN_PY = '/tmp/frtoolchain-test/frdemo_data.cpt'
 
 const fxParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', parseTagValue: false })
-const asArray = <T,>(v: T | T[] | undefined | null): T[] =>
-  v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]
+const asArray = (v: unknown): Array<Record<string, unknown>> => {
+  if (v === undefined || v === null) return []
+  if (Array.isArray(v)) return v as Array<Record<string, unknown>>
+  return [v as Record<string, unknown>]
+}
 
 describe('dataWriter', () => {
   const input = {
@@ -42,17 +45,17 @@ describe('dataWriter', () => {
   it('生成 XML 可解析且结构正确', () => {
     const xml = generateDataCpt(dataTemplate, input)
     const parsed = fxParser.parse(xml)
-    const arr = asArray<Record<string, unknown>>(parsed.WorkBook.TableDataMap.TableData)
+    const arr = asArray(parsed.WorkBook.TableDataMap.TableData)
     expect(arr).toHaveLength(2)
     expect(arr[0]['@_name']).toBe('book_qry')
     expect(arr[0].Query).toContain('frdemo_book')
     expect(arr[0].Query).toContain('${if(len(p_keyword)')
     // 参数形态：integer 带 t="I"
-    const ps = asArray<Record<string, unknown>>((arr[0].Parameters as Record<string, unknown>).Parameter)
+    const ps = asArray((arr[0].Parameters as Record<string, unknown>).Parameter)
     expect((ps[0].Attributes as Record<string, unknown>)['@_name']).toBe('p_page')
     expect((ps[0].O as Record<string, unknown>)['@_t']).toBe('I')
     // formula 参数形态
-    const p2 = asArray<Record<string, unknown>>((arr[1].Parameters as Record<string, unknown>).Parameter)
+    const p2 = asArray((arr[1].Parameters as Record<string, unknown>).Parameter)
     expect((p2[0].O as Record<string, unknown>)['@_class']).toBe('com.fr.base.Formula')
   })
 
@@ -68,8 +71,8 @@ describe('dataWriter', () => {
         datasets: task.database.datasets
       })
     )
-    const ga = asArray<Record<string, unknown>>(golden.WorkBook.TableDataMap.TableData)
-    const ma = asArray<Record<string, unknown>>(mine.WorkBook.TableDataMap.TableData)
+    const ga = asArray(golden.WorkBook.TableDataMap.TableData)
+    const ma = asArray(mine.WorkBook.TableDataMap.TableData)
     expect(ga.length).toBe(ma.length)
     for (let i = 0; i < ga.length; i++) {
       expect(ma[i]['@_name']).toBe(ga[i]['@_name'])

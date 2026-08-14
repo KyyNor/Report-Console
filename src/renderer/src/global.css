@@ -1,0 +1,27 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* CodeMirror 高度自适应容器 */
+.cm-editor { height: 100%; font-size: 13px; }
+.cm-editor .cm-scroller { overflow: auto; }
+
+/* JSON 查看器 */
+.json-view {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 420px;
+  overflow: auto;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+/* Agent 消息流 */
+.agent-stream { max-height: 100%; overflow-y: auto; }
+.tool-card { border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 12px; margin: 6px 0; background: #fafbfc; }

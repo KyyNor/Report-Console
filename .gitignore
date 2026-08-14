@@ -1,0 +1,8 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+smoke-*.png
+.env
+*.sqlite3-journal

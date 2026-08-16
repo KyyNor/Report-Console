@@ -10,6 +10,7 @@ import * as sql from './mysqlService'
 import { pingFrServer, callApiData } from './frClient'
 import { openPreviewWindow } from './windows'
 import * as agent from './agent/agentService'
+import { piToolDefs, piToolExec } from './agent/piBridge'
 import type { AppSettings, StatusPayload } from '@shared/types'
 import { existsSync, accessSync, constants } from 'fs'
 
@@ -117,4 +118,8 @@ export function registerIpc(): void {
     void agent.runAgentTurn(win, args.sessionId, args.text)
     return { ok: true }
   })
+
+  // ── pi Agent 桥（渲染层 Agent 的平台工具通道）──────────
+  handle('pi:toolDefs', () => piToolDefs())
+  handle('pi:toolExec', (a) => piToolExec((a as { name: string }).name, (a as { args: unknown }).args))
 }

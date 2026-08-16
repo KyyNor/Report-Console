@@ -24,8 +24,16 @@ const ITEMS: Array<{ key: ViewKey; icon: React.ReactNode; label: string }> = [
   { key: 'settings', icon: <SettingOutlined />, label: '设置' }
 ]
 
+const VALID_VIEWS: ViewKey[] = ['dashboard', 'datasets', 'procedures', 'pages', 'agent', 'settings']
+
+/** 支持以 #view 打开指定视图（如 #agent），供深链与冒烟验收使用 */
+function initialView(): ViewKey {
+  const h = window.location.hash.replace(/^#/, '')
+  return (VALID_VIEWS as string[]).includes(h) ? (h as ViewKey) : 'dashboard'
+}
+
 export default function App() {
-  const [view, setView] = useState<ViewKey>('dashboard')
+  const [view, setView] = useState<ViewKey>(initialView)
 
   return (
     <Layout style={{ height: '100vh' }}>

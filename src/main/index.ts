@@ -14,9 +14,13 @@ function bootstrap(): void {
   const smokeIdx = process.argv.indexOf('--smoke')
   if (smokeIdx !== -1) {
     const out = process.argv[smokeIdx + 1] || 'smoke.png'
+    // 转发渲染层 console，便于冒烟排查
+    win.webContents.on('console-message', (_e, _level, msg) => console.log('[renderer]', msg))
     win.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
         try {
+          const info = await win.webContents.executeJavaScript(`(() => { const p = document.querySelector('pi-chat-panel'); return p ? 'rendered:' + p.childNodes.length : 'no-panel' })()`).catch(() => '?')
+          console.log(`[smoke] agent panel: ${info}`)
           const img = await win.webContents.capturePage()
           require('fs').writeFileSync(out, img.toPNG())
           console.log(`[smoke] screenshot -> ${out}`)

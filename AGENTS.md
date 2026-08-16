@@ -40,13 +40,19 @@ src/main/               Electron 主进程
   mysqlService.ts       mysql2 连接池 + 只读守卫 + 存储过程管理（审计落 ddl_log）
   frClient.ts           帆软 /api/data 封装 + 连通探测 + 预览 URL
   cpt/                  核心资产：dataWriter / displayWriter / jsTransform / checker
-  agent/tools.ts        平台动作的模型侧暴露面（20+ 工具 + SYSTEM_PROMPT）
-  agent/agentService.ts Vercel AI SDK 流式会话，事件经 IPC 推渲染层
+  agent/tools.ts        平台动作的模型侧暴露面（20+ 工具；SYSTEM_PROMPT 在 @shared/agentPrompt）
+  agent/piBridge.ts     工具 JSON Schema 导出 + 受控执行（渲染层 pi Agent 经 pi:toolDefs/pi:toolExec 调用）
+  agent/agentService.ts 旧版 Vercel AI SDK 会话（保留待退役）
   selftest.ts           22 步全链路自检（建表→过程→契约→构建→实测→页面→预览）
   templates/            数据/页面 CPT 骨架（?raw 导入）+ 页面脚手架 blank/list/form
-src/renderer/           React 18 + antd 5 + CodeMirror，六个视图
+src/renderer/           React 19 + antd 5 + CodeMirror，六个视图
   （总览 / 数据接口 / 存储过程 / 页面 / Agent / 设置）
+  agent/piAgent.ts      pi Agent 工厂：@earendil-works/pi-agent-core 跑在渲染层，
+                        工具经 IPC 桥回主进程；无 Key 时回落 faux 演示模式
+  views/AgentView.tsx   官方 @earendil-works/pi-web-ui 组件（<pi-chat-panel>，light DOM），
+                        主题经 CSS 设计变量对齐 antd（见 global.css .rc-pi-agent）
 src/shared/types.ts     主进程/渲染层/Agent 工具共用的类型
+src/shared/agentPrompt.ts Agent 系统提示词（新旧引擎共用）
 tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 ```
 

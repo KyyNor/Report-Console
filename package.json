@@ -20,9 +20,13 @@
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.84.2",
+    "@earendil-works/pi-ai": "^0.84.2",
+    "@earendil-works/pi-web-ui": "^0.75.3",
     "better-sqlite3": "^11.10.0",
     "esbuild": "^0.25.0",
-    "mysql2": "^3.14.0"
+    "mysql2": "^3.14.0",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^1.2.12",

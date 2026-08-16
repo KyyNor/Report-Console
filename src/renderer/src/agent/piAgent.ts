@@ -17,6 +17,7 @@ import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messag
 import { SYSTEM_PROMPT } from '@shared/agentPrompt'
 import { call } from '../api'
 import type { AppSettings } from '@shared/types'
+import { initSessionStorage, restoreLatestSession, saveSessionSnapshot, newSessionId, titleFromMessages, type SaveSnapshot } from './piSessions'
 
 const OPENAI_DEFAULT = 'https://api.openai.com/v1'
 const ANTHROPIC_DEFAULT = 'https://api.anthropic.com'
@@ -99,25 +100,49 @@ function buildFauxModel() {
 export interface PiAgentHandle {
   agent: Agent
   mode: 'real' | 'faux'
+  sessionId: string
 }
 
-export async function createPiAgent(): Promise<PiAgentHandle> {
+/**
+ * 构建 pi Agent。
+ * @param fresh true = 跳过会话恢复，从空白会话开始（用于「新建会话」）
+ */
+export async function createPiAgent(fresh = false): Promise<PiAgentHandle> {
   const s = await call<AppSettings>('config:get')
   const tools = await buildPlatformTools()
+  await initSessionStorage()
 
   const { models, model } = s.llmApiKey
     ? buildCustomModel(s)
     : buildFauxModel()
 
+  // 恢复最近会话（messages/model/thinkingLevel 一并还原；无历史走全新会话）
+  const restored = fresh ? null : await restoreLatestSession()
+  const snapshot: SaveSnapshot = restored
+    ? { id: restored.id, title: restored.title, createdAt: restored.createdAt }
+    : { id: newSessionId(), title: '新会话', createdAt: new Date().toISOString() }
+
   const agent = new Agent({
+    sessionId: snapshot.id,
     streamFn: (m, ctx, opts) => models.streamSimple(m, ctx, opts),
     getApiKey: () => s.llmApiKey || undefined,
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
-      model,
+      model: (restored?.data.model as typeof model) ?? model,
+      thinkingLevel: restored?.data.thinkingLevel,
       tools,
-      messages: []
+      messages: (restored?.data.messages ?? []) as never[]
     }
   })
-  return { agent, mode: s.llmApiKey ? 'real' : 'faux' }
+
+  // 事件驱动自动保存：消息落定/回合结束即快照（标题沿用首条用户消息）
+  agent.subscribe((ev) => {
+    if (ev.type !== 'message_end' && ev.type !== 'agent_end') return
+    if (snapshot.title === '新会话' && agent.state.messages.length > 0) {
+      snapshot.title = titleFromMessages(agent.state.messages)
+    }
+    void saveSessionSnapshot(snapshot, agent.state)
+  })
+
+  return { agent, mode: s.llmApiKey ? 'real' : 'faux', sessionId: snapshot.id }
 }

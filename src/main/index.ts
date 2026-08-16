@@ -19,8 +19,31 @@ function bootstrap(): void {
     win.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
         try {
-          const info = await win.webContents.executeJavaScript(`(() => { const p = document.querySelector('pi-chat-panel'); return p ? 'rendered:' + p.childNodes.length : 'no-panel' })()`).catch(() => '?')
-          console.log(`[smoke] agent panel: ${info}`)
+          const info = await win.webContents.executeJavaScript(`(async () => {
+            const deepText = (el) => {
+              let t = (el.textContent || '')
+              if (el.shadowRoot) for (const c of el.shadowRoot.querySelectorAll('*')) t += deepText(c)
+              for (const c of el.querySelectorAll('*')) if (c.shadowRoot) t += deepText(c)
+              return t
+            }
+            const p = document.querySelector('pi-chat-panel')
+            const text = p ? deepText(p) : ''
+            const idb = await new Promise((res) => {
+              const r = indexedDB.open('report-console-pi')
+              r.onsuccess = () => {
+                const db = r.result
+                const names = Array.from(db.objectStoreNames)
+                const meta = names.find((n) => n.includes('metadata'))
+                if (!meta) return res('stores:' + names.join(','))
+                const req = db.transaction(meta, 'readonly').objectStore(meta).getAll()
+                req.onsuccess = () => res(JSON.stringify(req.result.map((m) => ({ title: m.title, count: m.messageCount }))))
+                req.onerror = () => res('read-err')
+              }
+              r.onerror = () => res('db-err')
+            })
+            return JSON.stringify({ hasProbeText: text.includes('冒烟自检'), textLen: text.length, idb })
+          })()`).catch((e: unknown) => `probe failed: ${(e as Error).message}`)
+          console.log(`[smoke] agent persist: ${info}`)
           const img = await win.webContents.capturePage()
           require('fs').writeFileSync(out, img.toPNG())
           console.log(`[smoke] screenshot -> ${out}`)

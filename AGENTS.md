@@ -49,6 +49,8 @@ src/renderer/           React 19 + antd 5 + CodeMirror，六个视图
   （总览 / 数据接口 / 存储过程 / 页面 / Agent / 设置）
   agent/piAgent.ts      pi Agent 工厂：@earendil-works/pi-agent-core 跑在渲染层，
                         工具经 IPC 桥回主进程；无 Key 时回落 faux 演示模式
+  agent/piSessions.ts   会话持久化：官方 SessionsStore + IndexedDB（随 userData 走），
+                        启动恢复最近会话、message_end/agent_end 自动快照
   views/AgentView.tsx   官方 @earendil-works/pi-web-ui 组件（<pi-chat-panel>，light DOM），
                         主题经 CSS 设计变量对齐 antd（见 global.css .rc-pi-agent）
 src/shared/types.ts     主进程/渲染层/Agent 工具共用的类型

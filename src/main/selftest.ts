@@ -96,7 +96,7 @@ export async function runSelftest(_win?: BrowserWindow): Promise<{ ok: boolean; 
 
   // 模块与接口契约（幂等 upsert）
   await step('契约：模块 frdemo', () => {
-    try { return modules.createModule('frdemo', 'whjcbb', 'FR Console 演示模块') } catch { return '已存在' }
+    try { return modules.createModule('frdemo', 'whjcbb', 'Report Console 演示模块') } catch { return '已存在' }
   })
 
   const datasets = [

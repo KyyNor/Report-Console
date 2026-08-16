@@ -31,7 +31,7 @@ export default function App() {
     <Layout style={{ height: '100vh' }}>
       <Sider width={190} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
         <div style={{ padding: '18px 16px 10px' }}>
-          <Typography.Text strong style={{ fontSize: 16 }}>FR Console</Typography.Text>
+          <Typography.Text strong style={{ fontSize: 16 }}>Report Console</Typography.Text>
           <div style={{ marginTop: 2 }}>
             <Tag color="blue" style={{ fontSize: 11 }}>帆软加壳开发控制台</Tag>
           </div>

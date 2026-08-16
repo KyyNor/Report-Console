@@ -1,11 +1,11 @@
-# FR Console — 帆软加壳开发控制台
+# Report Console — 帆软加壳开发控制台
 
 把「数据库（建表/存储过程）→ 数据层（_data.cpt）→ 页面（jsx → mjs → cpt）」三层开发收进一个 Electron 桌面应用，统一管理、原地构建、实测验证，并内置 AI Agent（OpenAI / Anthropic 兼容接口）代劳开发。
 
 原 Python 工具链（data_writer / display_writer / checker）已全部移植为应用内 TypeScript 实现，**无 Python 依赖、无双栈**。
 
 ```
-┌────────────────────────── FR Console (Electron) ──────────────────────────┐
+┌────────────────────────── Report Console (Electron) ──────────────────────────┐
 │  总览        帆软/MySQL/reportlets 状态 + 资产规模 + 构建历史               │
 │  数据接口    模块/数据集契约（SQLite）→ 构建 _data.cpt → /api/data 实测     │
 │  存储过程    MySQL 过程清单/定义编辑 → DROP+CREATE（审计落库）→ CALL 试执行 │

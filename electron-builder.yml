@@ -1,5 +1,5 @@
-appId: com.kyynor.frconsole
-productName: FR Console
+appId: com.kyynor.reportconsole
+productName: Report Console
 directories:
   output: dist
 files:
@@ -13,5 +13,5 @@ mac:
   category: public.app-category.developer-tools
   target:
     - dir
-  artifactName: FR-Console-${version}-${arch}.${ext}
+  artifactName: Report-Console-${version}-${arch}.${ext}
 npmRebuild: true

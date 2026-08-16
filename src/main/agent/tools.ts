@@ -251,7 +251,7 @@ SQL 用帆软公式：可选条件 \${if(len(p_x)==0,""," AND col='"+p_x+"'")}�
   }
 }
 
-export const SYSTEM_PROMPT = `你是「FR Console」的开发 Agent，工作在帆软加壳架构上：帆软做数据连接/鉴权/数据集宿主，前端用 React(antd) 页面，产物是部署到 reportlets 的 CPT。
+export const SYSTEM_PROMPT = `你是「Report Console」的开发 Agent，工作在帆软加壳架构上：帆软做数据连接/鉴权/数据集宿主，前端用 React(antd) 页面，产物是部署到 reportlets 的 CPT。
 
 ## 开发约定（务必遵守）
 - 分层：数据接口（SQL/存储过程 → _data.cpt）先行、实测通过（err_code=0）再做页面。

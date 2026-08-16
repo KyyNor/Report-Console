@@ -8,7 +8,7 @@
 <Parameters/>
 <Content><![CDATA[
 /* ================================================================
-   fr-console 生成的展示层 CPT。请勿手改本文件 —— 修改同名 .jsx 后
+   Report Console 生成的展示层 CPT。请勿手改本文件 —— 修改同名 .jsx 后
    在控制台重新构建。三段结构：
      PREAMBLE   固定引导（React/antd 兜底加载、PATH、隐藏帆软框架）
      开发者代码区  ← .jsx 编译产物注入
@@ -82,7 +82,7 @@
 })();
 
 /* ===== 开发者代码区 START ===== */
-/* 此处由 fr-console 构建时注入（.jsx → esbuild → 净化），请勿手改 */
+/* 此处由 Report Console 构建时注入（.jsx → esbuild → 净化），请勿手改 */
 /* ===== 开发者代码区 END ===== */
 ]]></Content>
 </JavaScript>

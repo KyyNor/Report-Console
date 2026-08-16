@@ -1,7 +1,7 @@
 /**
  * SQLite 存储（better-sqlite3）
  * - 契约（模块/数据集）与状态（构建/测试/审计/会话）的唯一持久层
- * - 库文件：~/Library/Application Support/fr-console/data.sqlite3
+ * - 库文件：~/Library/Application Support/report-console/data.sqlite3
  */
 
 import Database from 'better-sqlite3'

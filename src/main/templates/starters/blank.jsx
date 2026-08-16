@@ -12,7 +12,7 @@ function App() {
             React.createElement(antd.Typography.Title, { level: 4 }, '新页面'),
             React.createElement(antd.Button, {
                 type: 'primary',
-                onClick: function() { message.info('你好，fr-console！'); }
+                onClick: function() { message.info('你好，Report Console！'); }
             }, '点我')
         )
     );

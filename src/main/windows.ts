@@ -11,7 +11,7 @@ export function createMainWindow(): BrowserWindow {
     height: 880,
     minWidth: 1024,
     minHeight: 700,
-    title: 'FR Console — 帆软加壳开发控制台',
+    title: 'Report Console — 帆软加壳开发控制台',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

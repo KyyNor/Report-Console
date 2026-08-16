@@ -28,6 +28,7 @@ export function getPool(): mysql.Pool {
     database: s.mysqlDatabase,
     waitForConnections: true,
     connectionLimit: 5,
+    connectTimeout: 4000,
     charset: 'utf8mb4',
     dateStrings: true,
     multipleStatements: false
@@ -112,7 +113,7 @@ export async function describeTable(table: string, database?: string): Promise<A
 export async function listProcedures(database?: string): Promise<ProcedureMeta[]> {
   const db = database || getSettings().mysqlDatabase
   const [rows] = await getPool().query(
-    `SELECT routine_name AS name, routine_schema AS database, definer,
+    `SELECT routine_name AS name, routine_schema AS \`database\`, definer,
             created, last_altered AS altered, IFNULL(routine_comment,'') AS comment
      FROM information_schema.routines
      WHERE routine_schema = ? AND routine_type = 'PROCEDURE' ORDER BY routine_name`,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Col, Row, Statistic, Typography, Button, Space, Tag, Table, Descriptions } from 'antd'
+import { Card, Col, Row, Statistic, Typography, Button, Space, Tag, Table, Descriptions, Alert } from 'antd'
 import {
   ApiOutlined, DatabaseOutlined, CodeOutlined, CheckCircleFilled,
   CloseCircleFilled, RobotOutlined, ReloadOutlined
@@ -11,9 +11,11 @@ export default function DashboardView({ onNavigate }: { onNavigate: (v: string) 
   const [status, setStatus] = useState<StatusPayload | null>(null)
   const [builds, setBuilds] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const refresh = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [s, b] = await Promise.all([
         call<StatusPayload>('status:get'),
@@ -21,6 +23,8 @@ export default function DashboardView({ onNavigate }: { onNavigate: (v: string) 
       ])
       setStatus(s)
       setBuilds(b)
+    } catch (e) {
+      setLoadError((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -31,6 +35,15 @@ export default function DashboardView({ onNavigate }: { onNavigate: (v: string) 
   return (
     <div style={{ padding: 20 }}>
       <Typography.Title level={4} style={{ marginTop: 0 }}>总览</Typography.Title>
+
+      {loadError && (
+        <Alert
+          type="error" showIcon closable style={{ marginBottom: 12 }}
+          message="状态加载失败"
+          description={loadError}
+          action={<Button size="small" onClick={refresh}>重试</Button>}
+        />
+      )}
 
       <Row gutter={[12, 12]}>
         <Col span={6}>

@@ -39,8 +39,9 @@ function bootstrap(): void {
   }
 }
 
-// 单实例锁
+// 单实例锁：已有实例时本次静默退出并聚焦旧窗口（服务未启动不影响启动，窗口照常打开）
 if (!app.requestSingleInstanceLock()) {
+  console.log('[main] 已有实例在运行，本次启动退出（已聚焦已有窗口）')
   app.quit()
 } else {
   app.on('second-instance', () => {

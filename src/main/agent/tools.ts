@@ -43,7 +43,7 @@ export function buildTools() {
     }),
 
     create_module: tool({
-      description: '创建业务模块。name 为 reportlets 子目录名（小写字母/数字/下划线）；datasource 为帆软数据连接名（如 whjcbb）',
+      description: '创建业务模块。name 为 reportlets 子目录名（小写字母/数字/下划线）；datasource 为帆软数据连接名（与 FineReport 设计器中已建的数据连接同名）',
       parameters: z.object({
         name: z.string().regex(/^[a-z][a-z0-9_]*$/, '小写字母开头，仅字母/数字/下划线'),
         datasource: z.string().describe('帆软数据连接名（数据层 CPT 的 DatabaseName）'),

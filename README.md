@@ -16,7 +16,7 @@
 └────────────────────────────────────────────────────────────────────────────┘
         │                                    │
         ▼                                    ▼
-  FineReport :8075                    MySQL（whjcbb 等）
+  FineReport :8075                    MySQL 业务库
   /webroot/decision/api/data          表 + 存储过程（JSON 返回）
 ```
 
@@ -26,12 +26,14 @@
 npm install          # postinstall 自动 rebuild better-sqlite3
 npm run dev          # 开发模式
 npm test             # 核心库单元测试（CPT 生成/变换/质量门，含 python 黄金对照）
-npx electron . --selftest   # 集成自检：对真实帆软+MySQL 跑完整链路（幂等）
-npx electron . --smoke out.png  # 冒烟截图
+npm run selftest     # 集成自检：构建后对真实帆软+MySQL 跑完整链路（幂等，exit 0/1）
+npm run smoke        # 冒烟：构建后启动并截图 smoke.png
 npm run pack         # electron-builder 打包（dist/）
 ```
 
-首次使用在「设置」里确认三项环境值（已预填本机发现值）：帆软地址、reportlets 路径、MySQL 连接；在「Agent」页配置模型（OpenAI 兼容 `/v1/chat/completions` 或 Anthropic 兼容 `/v1/messages`）。
+代码内置默认值全部中性（无本机路径/账号/库名）。首次使用在「设置」页确认三项环境：帆软服务地址（默认 `http://localhost:8075`）、reportlets 目录、MySQL 连接（主机/端口/账号/密码/默认库）；在「Agent」页配置模型（OpenAI 兼容 `/v1/chat/completions` 或 Anthropic 兼容 `/v1/messages`）。所有配置持久化在本机 `~/Library/Application Support/report-console/data.sqlite3` 的 settings 表，不进入代码仓库。配置完成后建议跑一次 `npm run selftest` 验证环境。
+
+开发约定与代理指引见 [AGENTS.md](AGENTS.md)（命令、架构地图、质量门等不可破坏约束、已知坑）。
 
 ## 核心概念
 

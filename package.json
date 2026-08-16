@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "selftest": "electron-vite build && electron --smoke . ",
+    "selftest": "electron-vite build && electron . --selftest",
+    "smoke": "electron-vite build && electron . --smoke smoke.png",
     "postinstall": "electron-builder install-app-deps",
     "pack": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder"

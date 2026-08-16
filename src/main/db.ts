@@ -101,14 +101,17 @@ CREATE TABLE IF NOT EXISTS agent_messages (
 
 // ── 设置 ────────────────────────────────────────────────────────
 
+// 默认值保持中性：不含任何本机路径/账号/业务库名。
+// 机器相关配置（reportlets 路径、MySQL 账号密码、库名）首次使用时在「设置」页填写，
+// 持久化到上面的 SQLite（userData/data.sqlite3），不进入代码仓库。
 const DEFAULT_SETTINGS: AppSettings = {
   frServerUrl: 'http://localhost:8075',
-  reportletsPath: '/Applications/FineReport/webapps/webroot/WEB-INF/reportlets',
+  reportletsPath: '',
   mysqlHost: '127.0.0.1',
   mysqlPort: '3306',
   mysqlUser: 'root',
-  mysqlPassword: 'taosha123',
-  mysqlDatabase: 'whjcbb',
+  mysqlPassword: '',
+  mysqlDatabase: '',
   llmProvider: 'openai',
   llmBaseUrl: 'https://api.openai.com/v1',
   llmApiKey: '',

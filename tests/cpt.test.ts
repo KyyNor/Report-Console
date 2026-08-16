@@ -23,7 +23,7 @@ const asArray = (v: unknown): Array<Record<string, unknown>> => {
 
 describe('dataWriter', () => {
   const input = {
-    defaultDbName: 'whjcbb',
+    defaultDbName: 'frdemo_db',
     datasets: [
       {
         name: 'book_qry',
@@ -164,7 +164,7 @@ function cptInject(tpl: string, code: string): string {
 describe('checkDataCpt', () => {
   it('缺 Query 节点报 error；危险 SQL 报 warning', () => {
     const xml = generateDataCpt(dataTemplate, {
-      defaultDbName: 'whjcbb',
+      defaultDbName: 'frdemo_db',
       datasets: [{ name: 'bad', sql: 'DELETE FROM t', params: [] }]
     })
     // 手工摘掉 Query 节点模拟结构缺失

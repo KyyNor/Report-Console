@@ -13,6 +13,7 @@ import * as modules from './modules'
 import * as pages from './pagesService'
 import * as sql from './mysqlService'
 import { pingFrServer } from './frClient'
+import { getSettings } from './db'
 
 const DDL = `CREATE TABLE IF NOT EXISTS frdemo_book (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -96,7 +97,7 @@ export async function runSelftest(_win?: BrowserWindow): Promise<{ ok: boolean; 
 
   // 模块与接口契约（幂等 upsert）
   await step('契约：模块 frdemo', () => {
-    try { return modules.createModule('frdemo', 'whjcbb', 'Report Console 演示模块') } catch { return '已存在' }
+    try { return modules.createModule('frdemo', getSettings().mysqlDatabase, 'Report Console 演示模块') } catch { return '已存在' }
   })
 
   const datasets = [

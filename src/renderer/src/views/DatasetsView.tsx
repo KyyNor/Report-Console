@@ -298,7 +298,7 @@ export default function DatasetsView() {
               showArrow
               onDropdownVisibleChange={async (open) => { if (open && databases.length === 0) { try { setDatabases(await call<string[]>('sql:databases')) } catch { /* 忽略 */ } } }}
               options={databases.map((d) => ({ value: d, label: d }))}
-              placeholder="如 whjcbb（下拉来自 MySQL 库名，供参考）"
+              placeholder="选择或输入数据连接名（下拉来自 MySQL 库名，供参考）"
             />
           </Form.Item>
           <Form.Item name="comment" label="说明"><Input /></Form.Item>

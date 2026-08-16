@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Console · 外部 Coding Agent 选型评估</title>
+<style>
+  :root {
+    --blue: #1677ff; --green: #52c41a; --red: #ff4d4f; --amber: #faad14; --purple: #722ed1; --cyan: #13c2c2;
+    --text: #1f2329; --sub: #646a73; --line: #e5e6eb; --bg: #f5f6f8; --card: #fff;
+    --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 32px 16px 64px; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .hero { background: linear-gradient(135deg, #0a2a5e, #1677ff); color: #fff; border-radius: 14px; padding: 34px 40px; margin-bottom: 22px; }
+  .hero h1 { font-size: 25px; letter-spacing: .5px; }
+  .hero p { margin-top: 8px; opacity: .9; font-size: 14px; }
+  .hero .meta { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero .meta span { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); padding: 3px 12px; border-radius: 999px; font-size: 12.5px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 26px 30px; margin-bottom: 22px; }
+  section h2 { font-size: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  section h2 .no { background: var(--blue); color: #fff; width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+  h3 { font-size: 15px; margin: 16px 0 6px; }
+  p, li { font-size: 14px; }
+  ul, ol { padding-left: 22px; margin: 6px 0; }
+  li { margin: 4px 0; }
+  .sub { color: var(--sub); font-size: 13px; }
+  code { font-family: var(--mono); background: #f6f8fa; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 12.5px; }
+  pre { font-family: var(--mono); background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 12px 16px; font-size: 12.5px; line-height: 1.6; overflow-x: auto; margin: 10px 0; }
+  pre .c { color: #8b949e; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 10px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
+  .b-green { background: #f0fbe8; color: #389e0d; border: 1px solid #b7eb8f; }
+  .b-red { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+  .b-blue { background: #e6f4ff; color: #0958d9; border: 1px solid #91caff; }
+  .b-amber { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+  .b-grey { background: #f5f5f5; color: #595959; border: 1px solid #d9d9d9; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { border: 1px solid var(--line); padding: 7px 11px; text-align: left; vertical-align: top; }
+  th { background: #fafbfc; font-weight: 600; white-space: nowrap; }
+  .star { color: #faad14; letter-spacing: 1px; }
+  .note { border-left: 4px solid var(--blue); background: #f0f7ff; border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 12px 0; font-size: 13.5px; }
+  .warn { border-left-color: var(--amber); background: #fffbe6; }
+  .good { border-left-color: var(--green); background: #f6ffed; }
+  .cand { border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; }
+  .cand .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .cand .head b { font-size: 16px; }
+  .cand .head .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .flow { font-family: var(--mono); font-size: 12.5px; background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 16px 18px; overflow-x: auto; white-space: pre; margin: 10px 0; line-height: 1.8; }
+  .flow .dim { color: #8b949e; }
+  .flow .hi { color: #ffd866; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .rank { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 12px 0; }
+  .rk { border-radius: 10px; border: 1px solid var(--line); padding: 14px 16px; text-align: center; background: #fff; }
+  .rk .pos { font-size: 22px; font-weight: 800; }
+  .rk .nm { font-weight: 600; font-size: 14px; margin: 2px 0; }
+  .rk .ds { font-size: 12px; color: var(--sub); }
+  .rk.p1 { border-top: 4px solid var(--green); } .rk.p2 { border-top: 4px solid var(--blue); } .rk.p3 { border-top: 4px solid var(--amber); } .rk.p4 { border-top: 4px solid #b9c0c8; }
+  footer { text-align: center; color: var(--sub); font-size: 12.5px; margin-top: 30px; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  @media (max-width: 900px) { .rank { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <h1>外部 Coding Agent 选型评估</h1>
+  <p>用 pi / opencode / codex / prime-agent 替换或增强内置 Agent 的可行性 · 核心诉求：Web 界面</p>
+  <div class="meta">
+    <span>📅 2026-08-16</span>
+    <span>🧩 基于 report-console 源码与候选项目官方文档</span>
+    <span>🌐 资讯检索于 2026-08</span>
+  </div>
+</div>
+
+<!-- ═══════════ 结论 ═══════════ -->
+<section>
+  <h2><span class="no">◎</span>结论先行</h2>
+  <div class="rank">
+    <div class="rk p1"><div class="pos" style="color:var(--green)">①</div><div class="nm">opencode</div><div class="ds"><b>并列首选</b>·开箱即用：官方一等 Web UI + 本地运行 + MCP。最省事。</div></div>
+    <div class="rk p1"><div class="pos" style="color:var(--green)">①</div><div class="nm">pi（+生态 Web UI）</div><div class="ds"><b>并列首选</b>·贴合本产品：生态多个活跃 Web UI + 官方组件库 + SDK 内嵌，可让 Agent 界面长在应用里。</div></div>
+    <div class="rk p3"><div class="pos" style="color:var(--amber)">③</div><div class="nm">prime-agent</div><div class="ds">自进化 + 长时任务最激进，但 TUI/RPC 无 Web UI、MCP 未明确、太年轻。观察。</div></div>
+    <div class="rk p4"><div class="pos" style="color:#b9c0c8">④</div><div class="nm">codex</div><div class="ds">Web 在 OpenAI 云端沙箱，够不到本机帆软/MySQL；CLI 可以但无自托管 Web。不满足诉求。</div></div>
+  </div>
+  <div class="note good">
+    <b>最关键的架构事实：</b>本项目全部平台能力（20+ 工具）与安全约束（质量门、SQL 审计、confirm 确认）都实现在 <b>Electron 主进程的工具层</b>，不在 Agent 提示词里。所以「换大脑」成本很低——只要把工具层暴露为 <b>MCP Server</b>，任何 MCP 客户端 Agent 都能安全地驱动整个平台，四条安全底线一条不少。
+  </div>
+</section>
+
+<!-- ═══════════ 现状诊断 ═══════════ -->
+<section>
+  <h2><span class="no">一</span>现状诊断 — 内置 Agent 为什么「简陋」</h2>
+  <p>读 <code>agentService.ts</code>（147 行）就能定位问题——这是 <b>harness 能力缺失</b>，不是模型问题：</p>
+  <table>
+    <tr><th>短板</th><th>现状</th><th>成熟 Agent 的做法</th></tr>
+    <tr><td>工具结果不进上下文</td><td>工具调用存 SQLite，但下一轮只回放<b>文本</b>历史，多轮后模型忘记自己干过什么</td><td>完整回放 tool call/result 消息对</td></tr>
+    <tr><td>无上下文管理</td><td>历史无限堆积直到超限报错</td><td>自动 compaction（压缩摘要）</td></tr>
+    <tr><td>无会话分支</td><td>线性会话</td><td>会话树，从任意节点重试/分叉</td></tr>
+    <tr><td>步数死板</td><td><code>maxSteps: 12</code> 一刀切</td><td>无上限 + steering（运行中插话改方向）</td></tr>
+    <tr><td>UI 只有消息流</td><td>文本 + 工具调用展开</td><td>diff 预览、计划模式、任务清单</td></tr>
+  </table>
+  <p class="sub">结论：与其继续手写 harness，不如复用成熟项目——两条路：外接成熟 Agent（Web UI 现成）或内嵌成熟内核（UI 自己做）。</p>
+</section>
+
+<!-- ═══════════ 候选详评 ═══════════ -->
+<section>
+  <h2><span class="no">二</span>候选详评</h2>
+
+  <div class="cand">
+    <div class="head"><b>① opencode</b> <span class="badge b-green">推荐</span><div class="tags"><span class="badge b-grey">MIT</span><span class="badge b-grey">≈198k stars</span><span class="badge b-blue">TUI / 桌面 / IDE / Web</span></div></div>
+    <ul>
+      <li><b>Web 界面 ✅ 完全满足</b>：<code>opencode web</code> 一条命令起本地服务（127.0.0.1 随机端口，<code>--port/--hostname/--cors/--mdns</code> 可调），自动开浏览器；<code>OPENCODE_SERVER_PASSWORD</code> 加密码；<code>opencode attach</code> 让 TUI 和 Web 共享同一会话。</li>
+      <li><b>MCP 客户端 ✅</b>：配置里声明本地（stdio 命令）或远程（URL + headers + OAuth）MCP Server，工具自动暴露给模型，还能按 agent 粒度开关。</li>
+      <li><b>本地运行 ✅</b>：进程跑在本机，能访问 localhost:8075 帆软、本机 MySQL、reportlets 目录。</li>
+      <li><b>模型自带 Key</b>：支持 OpenAI/Anthropic 兼容网关——现有设置页那套 BaseURL/Key 直接能复用。</li>
+      <li><b>集成形态</b>：Electron 里 <code>BrowserWindow.loadURL('http://127.0.0.1:端口')</code> 即可把 Web 工作台嵌进应用，一个「打开 Agent 工作台」按钮的事。</li>
+    </ul>
+    <p class="sub">注意：Web UI 相对新（功能比 TUI 少许滞后）；自托管记得设密码。</p>
+  </div>
+
+  <div class="cand">
+    <div class="head"><b>① pi（+生态 Web UI）</b> <span class="badge b-green">并列首选</span><div class="tags"><span class="badge b-grey">MIT</span><span class="badge b-grey">≈91k stars</span><span class="badge b-blue">TUI / JSON / RPC / SDK · 生态 Web UI</span></div></div>
+    <ul>
+      <li><b>定位</b>：Mario Zechner（badlogic）的极简 Agent 内核，包结构：<code>pi-ai</code>（统一多厂商 LLM API）/ <code>pi-agent-core</code>（Agent 运行时）/ <code>pi-coding-agent</code>（CLI）/ <code>pi-tui</code>。</li>
+      <li><b>Web 界面 ✅ 经生态补齐（此前评估为短板，已修正）</b>：官方包目录 5300+，其中多个活跃维护的 Web UI——
+        <ul>
+          <li><code>pi-web-ui</code>（2026-08-16 更新）：pi SDK 驱动的 Web 聊天界面，一条命令运行，Docker/systemd/launchd 可部署，浏览器内嵌 xterm 终端</li>
+          <li><code>@earendil-works/pi-web-ui</code>：<b>pi 官方团队</b>的可复用 Web UI 组件库（含文档/PDF/表格查看器），可直接拿来升级我们自己的 AgentView</li>
+          <li><code>@hyperdreamer/pi-webui</code>（2026-08-16 更新，独立站 pi-webui.dev）：真实工作区持久会话 + CodeMirror 多语言编辑</li>
+          <li><code>@firstpick/pi-package-webui</code>：装进 pi 本体，<code>/webui-start</code> 一条斜杠命令起本地浏览器 UI（另有 LAN + 二维码的 remote 变体）</li>
+        </ul>
+      </li>
+      <li><b>四种模式</b>：Interactive（TUI）/ Print·JSON（<code>pi -p</code> 脚本化，事件流）/ <b>RPC</b>（stdio 上 JSON 协议，无头集成）/ <b>SDK</b>（直接嵌进你自己的应用，OpenClaw 是现成先例）。</li>
+      <li><b>MCP ✅ 经扩展机制</b>：子代理、计划模式、权限门、沙箱、MCP 集成都以 extension 方式实现。</li>
+      <li><b>集成形态</b>：重写 <code>agentService.ts</code> 为 pi SDK 调用，工具层从 <code>buildTools()</code> 适配为 pi 工具（或 MCP）。</li>
+    </ul>
+  </div>
+
+  <div class="cand">
+    <div class="head"><b>③ prime-agent</b> <span class="badge b-amber">观察</span><div class="tags"><span class="badge b-grey">MIT</span><span class="badge b-grey">≈16k stars · 2026-08-05 发布</span><span class="badge b-blue">构建于 pi 之上</span></div></div>
+    <ul>
+      <li><b>定位</b>：Prime Intellect 的「自进化 RLM Agent」——持久 IPython 内核当模型工具（一切皆代码）、子代理递归、<code>/refine</code> 自我改进指令、daemon 支撑的断线重连长时会话、心跳/定时任务。</li>
+      <li><b>接口形态</b>：TUI + JSON 模式 + RPC 模式（无头自动化）——<b>无 Web UI</b>，要用得自建界面（经 RPC）。</li>
+      <li><b>MCP ➖ 未明确</b>：README 未提 MCP；基于 pi 理论上可经扩展补，但需验证。</li>
+      <li><b>适配判断</b>：为长时自治/评测场景设计；我们的场景是交互式报表开发台，且平台是 TS 而 prime 是 Python/IPython 中心，跨进程集成成本偏高。发布仅一周多，成熟度待观察。</li>
+    </ul>
+  </div>
+
+  <div class="cand">
+    <div class="head"><b>④ codex</b> <span class="badge b-red">不满足诉求</span><div class="tags"><span class="badge b-grey">CLI Apache-2.0 · ≈106k stars</span><span class="badge b-blue">Web = OpenAI 云端</span></div></div>
+    <ul>
+      <li><b>Web 界面 ☁️ 有，但在云上</b>：ChatGPT 里的 Codex 标签 / Codex Remote（Business 工作区 GA，含移动端）。云端沙箱<b>够不到本机</b> localhost:8075 帆软、MySQL、reportlets。</li>
+      <li><b>MCP</b>：CLI 支持配 <code>mcp_servers</code>（本地可用）；ChatGPT 侧的 developer mode 已提供完整 MCP 客户端（beta）——但要让云端的它调用本机工具，得把 MCP Server 经隧道暴露公网 + OAuth，安全面和运维成本都大。</li>
+      <li><b>费用</b>：绑定 ChatGPT 订阅 / OpenAI API，不能像 opencode/pi 那样复用现有兼容网关配置。</li>
+      <li><b>适配判断</b>：适合「在源码层面协作改 report-console 这个项目本身」；不适合「驱动帆软+MySQL 平台开发报表」。</li>
+    </ul>
+  </div>
+
+  <h3>对比矩阵</h3>
+  <table>
+    <tr><th>维度</th><th>opencode</th><th>pi</th><th>prime-agent</th><th>codex</th></tr>
+    <tr><td><b>Web 界面（硬性诉求）</b></td><td><span class="badge b-green">✅ 官方内建</span></td><td><span class="badge b-green">✅ 生态多个（含官方组件库）</span></td><td><span class="badge b-amber">❌（RPC 自建）</span></td><td><span class="badge b-red">☁️ 仅云端</span></td></tr>
+    <tr><td>能访问本机帆软/MySQL</td><td>✅</td><td>✅</td><td>✅</td><td>CLI ✅ / Web ❌</td></tr>
+    <tr><td>MCP 客户端</td><td>✅ stdio + 远程 + OAuth</td><td>✅（扩展机制）</td><td>➖ 未明确</td><td>CLI ✅ / 云端 beta</td></tr>
+    <tr><td>许可证</td><td>MIT</td><td>MIT</td><td>MIT</td><td>Apache-2.0（CLI）</td></tr>
+    <tr><td>复用现有 LLM 设置（兼容网关）</td><td>✅</td><td>✅</td><td>✅</td><td>❌ 需订阅</td></tr>
+    <tr><td>与本项目集成工作量</td><td><b>低</b>（MCP + 配置）</td><td>中（SDK 重构内核）</td><td>中高（RPC + 自建 UI）</td><td>高且受限</td></tr>
+    <tr><td>综合</td><td class="star">★★★★★</td><td class="star">★★★★★</td><td class="star">★★★</td><td class="star">★★</td></tr>
+  </table>
+
+  <h3>其他候选（顺带排查）</h3>
+  <ul>
+    <li><b>Claude Code</b>：CLI 的 MCP 支持很强，Web 形态在 Claude 云端（同 codex 的问题）；商业绑定。</li>
+    <li><b>Goose</b>（Block 开源）：桌面 GUI + MCP 原生，思路接近 opencode，生态小一些。</li>
+    <li><b>Crush / Aider</b>：TUI/CLI，无 Web；Aider 无 MCP。不满足诉求。</li>
+  </ul>
+</section>
+
+<!-- ═══════════ 集成架构 ═══════════ -->
+<section>
+  <h2><span class="no">三</span>集成架构 — 一条 MCP 底座，N 个大脑</h2>
+  <div class="flow">                    ┌──────────────────────────────────────────┐
+                    │  Report Console（Electron 主进程）        │
+                    │  modules / pagesService / mysqlService …  │
+                    │  <span class="hi">质量门 · SQL审计 · confirm · CPT只经build</span> ←约束全在这层 │
+                    └───────────────┬──────────────────────────┘
+                                    │ 包装 buildTools() + SYSTEM_PROMPT
+                                    ▼
+                        <span class="hi">平台 MCP Server（新增 src/main/mcpServer.ts）</span>
+                          127.0.0.1 only · 20+ 工具 · AGENTS.md 承载开发约定
+                          ┌──────────────┬──────────────┬──────────────┐
+                          ▼              ▼              ▼              ▼
+                    <span class="hi">opencode</span>(web)      <span class="hi">pi</span>(TUI/SDK)    codex CLI    内置AgentView
+                     <span class="dim">↳ BrowserWindow 嵌入</span>  <span class="dim">↳ 后期内核替换</span>  <span class="dim">↳ 按需</span>     <span class="dim">↳ 保留为轻量入口</span></div>
+  <div class="note"><b>为什么安全</b>：四条不可破坏约束全部在工具执行层（不信任任何模型的自觉）——外部大脑换成谁，质量门照拒、审计照落、<code>sql_exec</code> 照样要 <code>confirm:true</code>、CPT 照样只能经 build 产出。MCP Server 只绑回环地址。</div>
+
+  <h3>分期落地</h3>
+  <table>
+    <tr><th>阶段</th><th>内容</th><th>工作量预估</th></tr>
+    <tr><td><b>P0 底座</b></td><td>用 <code>@modelcontextprotocol/sdk</code> 把 <code>buildTools()</code> 暴露为 MCP Server（stdio + localhost HTTP）；<code>SYSTEM_PROMPT</code> 里的开发约定已有 <code>AGENTS.md</code> 承接，外部 Agent 天然可读</td><td>1–2 天</td></tr>
+    <tr><td><b>P1 接 opencode</b></td><td>设置页/Agent 页加「外部工作台」：检测/拉起 <code>opencode web</code>，<code>BrowserWindow</code> 嵌入其 Web UI；附带生成 <code>opencode.json</code>（MCP 指向 P0）</td><td>1 天</td></tr>
+    <tr><td><b>P2 升级内置（pi 路线）</b></td><td><code>agentService</code> 内核换 pi SDK：工具结果回填上下文、compaction、会话树、steering；界面直接采用 <code>@earendil-works/pi-web-ui</code> 官方组件库重构 AgentView——Agent 界面长在应用里，不再依赖外部进程</td><td>3–5 天</td></tr>
+    <tr><td><b>P3 观察（可选）</b></td><td>prime-agent 出 Web UI / 明确 MCP 后再评估；codex 仅用于源码协作场景</td><td>—</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════ 风险 ═══════════ -->
+<section>
+  <h2><span class="no">四</span>风险与注意</h2>
+  <ul>
+    <li><b>opencode Web UI 较新</b>：功能密度可能不及 TUI，先用一周再定；不设密码的本地服务有被局域网访问风险（务必 <code>OPENCODE_SERVER_PASSWORD</code> 或仅绑 127.0.0.1）。</li>
+    <li><b>pi 的 Web UI 多为生态第三方</b>（<code>pi-web-ui</code> / <code>@hyperdreamer/pi-webui</code> / <code>@firstpick</code> 系列普遍 0.x～1.x，发布数周内）——活跃但年轻；官方的 <code>@earendil-works/pi-web-ui</code> 是组件库而非成品，集成仍需自己组装。选型时按「成品省事（opencode）vs 组件贴合（pi）」权衡。</li>
+    <li><b>外部进程管理</b>：Electron 要负责拉起/回收 opencode 进程，退出清理要做干净（单实例锁的教训）。</li>
+    <li><b>pi SDK 的 API 稳定性</b>：迭代快，P2 动手前锁定版本；工具协议从 Vercel AI SDK 迁到 pi 需要一层适配。</li>
+    <li><b>审计与会话割裂</b>：外部 Agent 的对话不落我们的 SQLite（它们有自己的会话存储）；平台侧动作照旧全审计，但「会话统一回看」需另做聚合或接受双轨。</li>
+    <li><b>prime-agent 年轻</b>：2026-08-05 才发布，自进化行为（/refine 改自身指令）在受控平台里价值有限，暂不押注。</li>
+  </ul>
+</section>
+
+<!-- ═══════════ pi Web UI 选型 ═══════════ -->
+<section>
+  <h2><span class="no">五</span>pi Web UI 选型 — 嵌入诉求下只有一条「正解」</h2>
+  <p>诉求：方便嵌入本项目（Electron + React 18 + antd），允许样式定制。逐个核实后，候选分两类：<b>组件库（可嵌入）</b>与<b>独立服务成品（只能外挂）</b>。</p>
+
+  <table>
+    <tr><th>候选</th><th>本质形态</th><th>嵌入方式</th><th>样式定制</th><th>适配判定</th></tr>
+    <tr>
+      <td><b>@earendil-works/pi-web-ui</b><br><span class="sub">官方 · v0.75.x</span></td>
+      <td><b>Lit 3 Web Components 组件库</b>：ChatPanel / MessageList / StreamingMessageContainer / ThinkingBlock / ToolMessage / ModelSelector / SessionListDialog / SandboxedIframe artifacts / IndexedDB 会话存储</td>
+      <td>直接 import 进渲染层，组件级拼装</td>
+      <td><b>shadcn 风格 CSS 变量</b>（--background/--primary/--accent/--radius/--font-sans…），覆盖变量即换肤，可对齐 antd 主题色</td>
+      <td><span class="badge b-green">✅ 唯一满足「嵌入+定制」</span></td>
+    </tr>
+    <tr>
+      <td><b>pi-web-ui</b>（xing-shuyin）<br><span class="sub">v0.22 · 简体中文文档</span></td>
+      <td>独立 Express + WebSocket 服务，agent 在服务端跑（pi SDK），浏览器内嵌 xterm 终端</td>
+      <td>BrowserWindow.loadURL(:8787) —— 与 opencode 同款外挂</td>
+      <td>fork 源码（MIT）</td>
+      <td><span class="badge b-blue">快速验证 / 独立工作台</span></td>
+    </tr>
+    <tr>
+      <td><b>@hyperdreamer/pi-webui</b><br><span class="sub">v1.15 · pi-webui.dev</span></td>
+      <td>独立工作区监管台：多会话/多机器/minimap/实时指标</td>
+      <td>独立服务(:8809)</td>
+      <td>深度 fork</td>
+      <td><span class="badge b-grey">功能最强但重，超出单机控制台场景</span></td>
+    </tr>
+    <tr>
+      <td><b>@firstpick/pi-package-webui</b></td>
+      <td>装进 pi 本体的伴随包：<code>/webui-start</code> 起本地浏览器 UI</td>
+      <td>独立页面</td>
+      <td>有限</td>
+      <td><span class="badge b-grey">轻量尝鲜</span></td>
+    </tr>
+  </table>
+
+  <h3>推荐架构（官方组件 + 官方客户端协议）</h3>
+  <div class="flow">Electron 主进程（或本地子进程）                     渲染层 AgentView（重构）
+┌────────────────────────────┐    WebSocket(127.0.0.1)   ┌─────────────────────────────────┐
+│ pi 引擎（pi SDK / pi-server）│ ◀──── CBOR 二进制协议 ──▶ │ @earendil-works/pi-client        │
+│ + 平台工具适配（buildTools） │      <span class="dim">pi-protocol 包：长度前缀+CBOR</span>      │  └▶ snapshot 订阅 → 状态渲染        │
+│ <span class="hi">质量门/审计/confirm 仍在工具层</span>      │                          │ @earendil-works/pi-web-ui 组件    │
+└────────────────────────────┘                          │  └▶ <span class="hi">registerToolRenderer：给平台工具定制渲染</span>│
+                                                        │      如 test_dataset → err_code 徽标 │
+                                                        │ 样式：覆盖 CSS 变量对齐 antd 主题  │
+                                                        └─────────────────────────────────┘</div>
+  <ul>
+    <li><b>扩展点</b>：官方库自带 <code>registerToolRenderer / registerMessageRenderer</code> 注册表——平台 20+ 工具可以各配专属展示（构建日志、实测结果表、质量门 findings），这是「嵌入后不像外挂」的关键。</li>
+    <li><b>已知摩擦</b>：① Lit 组件嵌 React 18 需薄 wrapper（React 19 才原生改善 custom element 支持），成本可控；② 官方库无 README、0.x 版本，API 靠 <code>.d.ts</code> 摸索；③ pi 自带 IndexedDB 会话存储，与我们 SQLite 会话双轨，需接受或做同步。</li>
+    <li><b>渐进路径</b>：先用 <code>npx pi-web-ui</code>（中文文档）半天验证 pi 引擎顺手不顺手 → 满意再投入组件库嵌入（估 3–5 天）。</li>
+  </ul>
+</section>
+
+<footer>
+  Report Console · 外部 Coding Agent 选型评估 · 2026-08-16 · 资料来源：pi.dev（含 packages 目录）/ opencode.ai 官方文档 / npm registry（pi-web-ui、@earendil-works/pi-web-ui、@hyperdreamer/pi-webui、@firstpick/pi-package-webui）/ GitHub（earendil-works/pi、PrimeIntellect-ai/prime-agent、anomalyco/opencode、openai/codex）/ OpenAI 社区公告 · 本文件位于 docs/
+</footer>
+</div>
+</body>
+</html>

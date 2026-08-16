@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Console · 报表开发业务流程全景</title>
+<style>
+  :root {
+    --blue: #1677ff; --green: #52c41a; --red: #ff4d4f; --amber: #faad14; --purple: #722ed1; --cyan: #13c2c2;
+    --text: #1f2329; --sub: #646a73; --line: #e5e6eb; --bg: #f5f6f8; --card: #fff;
+    --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    /* 存储地配色 */
+    --c-sqlite: #1677ff; --c-reportlets: #722ed1; --c-mysql: #13c2c2; --c-fr: #d48806;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 32px 16px 64px; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .hero { background: linear-gradient(135deg, #0a2a5e, #1677ff); color: #fff; border-radius: 14px; padding: 34px 40px; margin-bottom: 22px; }
+  .hero h1 { font-size: 25px; letter-spacing: .5px; }
+  .hero p { margin-top: 8px; opacity: .9; font-size: 14px; }
+  .hero .meta { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero .meta span { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); padding: 3px 12px; border-radius: 999px; font-size: 12.5px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 26px 30px; margin-bottom: 22px; }
+  section h2 { font-size: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  section h2 .no { background: var(--blue); color: #fff; width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex: none; }
+  h3 { font-size: 15px; margin: 16px 0 6px; }
+  p, li { font-size: 14px; }
+  ul, ol { padding-left: 22px; margin: 6px 0; }
+  li { margin: 4px 0; }
+  .sub { color: var(--sub); font-size: 13px; }
+  code { font-family: var(--mono); background: #f6f8fa; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 12.5px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 10px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
+  .b-sqlite { background: #e6f4ff; color: var(--c-sqlite); border: 1px solid #91caff; }
+  .b-reportlets { background: #f9f0ff; color: var(--c-reportlets); border: 1px solid #d3adf7; }
+  .b-mysql { background: #e6fffb; color: var(--c-mysql); border: 1px solid #87e8de; }
+  .b-fr { background: #fffbe6; color: var(--c-fr); border: 1px solid #ffe58f; }
+  .b-grey { background: #f5f5f5; color: #595959; border: 1px solid #d9d9d9; }
+  .b-green { background: #f0fbe8; color: #389e0d; border: 1px solid #b7eb8f; }
+  .b-red { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+
+  /* ── 图例 ── */
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; font-size: 13px; }
+  .legend b { font-weight: 600; }
+
+  /* ── 全链路 stepper ── */
+  .steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 8px; }
+  .step-top { text-align: center; }
+  .step-top .dot { width: 40px; height: 40px; border-radius: 50%; background: var(--blue); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; box-shadow: 0 0 0 4px #e6f4ff; }
+  .step-top .t { font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .step-top .s { font-size: 11.5px; color: var(--sub); }
+  .arrowline { display: grid; grid-template-columns: repeat(7, 1fr); margin: 2px 0 14px; }
+  .arrowline div { text-align: center; color: #b9c0c8; font-size: 16px; }
+
+  /* ── 步骤卡片 ── */
+  .stepcard { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; background: #fff; }
+  .stepcard .head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .stepcard .head .n { font-family: var(--mono); color: var(--blue); font-weight: 700; font-size: 15px; }
+  .stepcard .head b { font-size: 15px; }
+  .stepcard .where { font-size: 12.5px; color: var(--sub); }
+  .stepcard .arts { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .stepcard .arts .lbl { font-size: 12px; color: var(--sub); }
+  pre { font-family: var(--mono); background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 12px 16px; font-size: 12.5px; line-height: 1.6; overflow-x: auto; margin: 10px 0; }
+  pre .c { color: #8b949e; }
+  pre .k { color: #79c0ff; }
+  pre .s { color: #a5d6ff; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { border: 1px solid var(--line); padding: 7px 11px; text-align: left; vertical-align: top; }
+  th { background: #fafbfc; font-weight: 600; white-space: nowrap; }
+  td code { white-space: nowrap; }
+
+  /* ── 存储四地 ── */
+  .stores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .store { border-radius: 10px; border: 1px solid var(--line); padding: 16px; background: #fff; border-top: 4px solid var(--sub); }
+  .store.sqlite { border-top-color: var(--c-sqlite); }
+  .store.reportlets { border-top-color: var(--c-reportlets); }
+  .store.mysql { border-top-color: var(--c-mysql); }
+  .store.fr { border-top-color: var(--c-fr); }
+  .store h4 { font-size: 14.5px; margin-bottom: 2px; }
+  .store .loc { font-family: var(--mono); font-size: 11.5px; color: var(--sub); word-break: break-all; }
+  .store ul { margin-top: 8px; padding-left: 18px; }
+  .store li { font-size: 12.8px; margin: 3px 0; }
+
+  /* ── 运行时数据流 ── */
+  .flow { font-family: var(--mono); font-size: 12.5px; background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 16px 18px; overflow-x: auto; white-space: pre; margin: 10px 0; line-height: 1.8; }
+  .flow .dim { color: #8b949e; }
+  .flow .hi { color: #ffd866; font-weight: 700; }
+  .note { border-left: 4px solid var(--blue); background: #f0f7ff; border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 12px 0; font-size: 13.5px; }
+  .warn { border-left-color: var(--amber); background: #fffbe6; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  footer { text-align: center; color: var(--sub); font-size: 12.5px; margin-top: 30px; }
+  @media (max-width: 900px) { .steps, .arrowline { grid-template-columns: repeat(4, 1fr); } .stores { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <h1>Report Console · 报表开发业务流程全景</h1>
+  <p>一个报表从哪里开始、经历什么、产出什么、产物放在哪、由谁管理</p>
+  <div class="meta">
+    <span>📅 2026-08-16</span>
+    <span>🧱 三层架构：数据库 → 数据接口 → 页面</span>
+    <span>🎯 数据先行，页面收尾，质量门贯穿</span>
+  </div>
+</div>
+
+<!-- 图例 -->
+<section>
+  <h2><span class="no">◎</span>阅读图例 — 产物存在四个地方</h2>
+  <div class="legend">
+    <b>产物存储地：</b>
+    <span class="badge b-sqlite">📒 SQLite（应用账本）</span>
+    <span class="badge b-reportlets">📁 reportlets 目录（部署产物）</span>
+    <span class="badge b-mysql">🗄️ MySQL（业务数据）</span>
+    <span class="badge b-fr">🌐 帆软服务器（运行宿主）</span>
+    <span class="badge b-grey">⌨️ 手写源码</span>
+    <span class="badge b-green">⚙️ 工具生成</span>
+  </div>
+  <p class="sub">一句话：<b style="color:var(--c-sqlite)">蓝</b>是契约与历史的账本（应用自己的 SQLite），<b style="color:var(--c-reportlets)">紫</b>是真正部署给帆软吃的文件，<b style="color:var(--c-mysql)">青</b>是业务数据本身，<b style="color:var(--c-fr)">黄</b>是运行时替你干活的服务。</p>
+</section>
+
+<!-- ═══════════ 流程总览 ═══════════ -->
+<section>
+  <h2><span class="no">一</span>全链路：七步交付一个报表模块</h2>
+
+  <div class="steps">
+    <div class="step-top"><div class="dot">0</div><div class="t">环境准备</div><div class="s">一次性</div></div>
+    <div class="step-top"><div class="dot">1</div><div class="t">建表</div><div class="s">MySQL</div></div>
+    <div class="step-top"><div class="dot">2</div><div class="t">存储过程</div><div class="s">MySQL</div></div>
+    <div class="step-top"><div class="dot">3</div><div class="t">接口契约</div><div class="s">SQLite</div></div>
+    <div class="step-top"><div class="dot">4</div><div class="t">构建数据层</div><div class="s">_data.cpt</div></div>
+    <div class="step-top"><div class="dot">5</div><div class="t">实测接口</div><div class="s">/api/data</div></div>
+    <div class="step-top"><div class="dot">6</div><div class="t">页面</div><div class="s">jsx→cpt→预览</div></div>
+  </div>
+  <div class="arrowline"><div>→</div><div>→</div><div>→</div><div>→</div><div>→</div><div>→</div><div>🏁</div></div>
+
+  <div class="note">顺序是<b>强约定</b>：数据接口先行、实测通过（err_code=0）才做页面。Agent 的系统提示词里写死了这条工作方式——不是形式主义，页面依赖接口契约，接口依赖表结构，倒着做必然返工。</div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">0</span><b>环境准备</b><span class="where">设置页 · 一次性 · 产物：settings 表</span></div>
+    <p>填三样：帆软地址（默认 <code>localhost:8075</code>）、reportlets 目录、MySQL 连接；Agent 页配模型。可选配 Agent 模型（OpenAI / Anthropic 兼容）。</p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-sqlite">📒 settings（本机环境值，不进仓库）</span><span class="badge b-fr">🌐 前提：帆软设计器里已建好数据连接（如 whjcbb）</span></div>
+  </div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">1</span><b>建业务表</b><span class="where">Agent sql_exec（confirm:true）· 存储过程页 · 产物：MySQL 表</span></div>
+    <p>先 <code>sql_query / describe_table</code> 摸清现状再动手。建表走受控写通道，每条语句连目的带结果审计落库。</p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-mysql">🗄️ 业务表（含注释）</span><span class="badge b-sqlite">📒 ddl_log 审计记录</span></div>
+  </div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">2</span><b>写存储过程（写操作的唯一入口）</b><span class="where">存储过程页 · Agent apply_procedure · 产物：MySQL 过程</span></div>
+    <p>新增/更新/删除各一个过程，<b>必须 <code>SELECT JSON_OBJECT(...)</code> 返回结果</b>——页面靠这个 JSON 判断成败。应用方式是 DROP IF EXISTS + CREATE，同样审计落库，可反复应用（幂等）。</p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-mysql">🗄️ sp_&#123;m&#125;_insert / _update / _delete</span><span class="badge b-sqlite">📒 ddl_log</span></div>
+  </div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">3</span><b>登记接口契约</b><span class="where">数据接口页 · Agent save_dataset · 产物：SQLite 契约</span></div>
+    <p>先<b>建模块</b>（名字 = reportlets 子目录名，绑定一个帆软数据连接名），再逐个登记<b>数据集</b>：名字 / 类型 / 参数 / SQL。命名有硬约定：</p>
+    <pre><span class="c">-- 列表（自行分页 + 可选条件，用帆软公式）</span>
+SELECT ... FROM 表 WHERE 1=1 <span class="s">${if(len(p_keyword)==0,""," AND title LIKE '%"+p_keyword+"%'")}</span>
+ORDER BY id DESC LIMIT <span class="s">${(p_page-1)*p_pagesize}</span>, <span class="s">${p_pagesize}</span>
+<span class="c">-- 写操作 = CALL 存储过程</span>
+CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
+    <p>当前用户类变量（如 <code>=$fine_username</code>）声明为 <code>formula</code> 类型参数，由帆软会话注入，<b>不随请求传递</b>。契约支持模块级 JSON 导入/导出，也可扫描 reportlets 已部署目录反向纳入管理。</p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-sqlite">📒 modules + datasets 表（幂等 upsert）</span></div>
+  </div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">4</span><b>构建数据层 CPT</b><span class="where">数据接口页「构建」· Agent build_data_cpt · 产物：_data.cpt</span></div>
+    <p>把模块下全部契约一次性装配：每个数据集 → 一段 TableData XML（SQL 进 CDATA，参数类型映射 integer→<code>t="I"</code>、formula→Formula 类），替换骨架模板的 TableDataMap，整体落成一个文件。<b>质量门不过（结构缺失等 error）拒绝落盘。</b></p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-reportlets">📁 reportlets/{m}/data/{m}_data.cpt</span><span class="badge b-green">⚙️ 纯生成，永远可重建</span><span class="badge b-sqlite">📒 builds 历史</span></div>
+  </div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">5</span><b>实测接口</b><span class="where">数据接口页「实测」· Agent test_dataset / verify_module · 产物：测试历史</span></div>
+    <p>用契约参数默认值（可覆盖）POST 帆软 <code>/webroot/decision/api/data</code>（<code>page_number/page_size</code> 恒 -1），<code>err_code=0</code> 才算过。写接口用「插入→查到→删除→查不到」闭环验证。请求响应全量落历史，总览页可回看。</p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-sqlite">📒 api_tests（每次实测的请求+响应+耗时）</span></div>
+  </div>
+
+  <div class="stepcard">
+    <div class="head"><span class="n">6</span><b>开发页面 → 构建 → 预览</b><span class="where">页面页 · Agent create_page / write_page / build_page / open_page</span></div>
+    <p>从脚手架起步（blank / list / form），CodeMirror 高亮编辑 jsx。<b>jsx 是全流程唯一手写产物</b>——直接用全局 React/antd/dayjs/PATH，不写 import、不重建 PATH。构建管线：</p>
+    <pre>jsx <span class="k">--esbuild(iife)--▶</span> 去注释(字符串保护) <span class="k">--▶</span> \uXXXX 解码 <span class="k">--▶</span> Hook 解构转两步赋值
+    <span class="k">--▶</span> 注入骨架「开发者代码区」<span class="k">--▶</span> 质量门 <span class="k">--▶</span> 同目录产出 .mjs + .cpt</pre>
+    <p>质量门查：XML 良构、PATH 被遮盖、<code>_MJS_</code> 占位符残留、Unicode 转义残留、自创标签——有 error 则 .cpt 不落盘（.mjs 保留供排查）。预览用帆软 <code>op=write</code> URL + 时间戳防缓存，独立窗口打开。</p>
+    <div class="arts"><span class="lbl">产物：</span>
+      <span class="badge b-reportlets">📁 {m}/pages/x.jsx</span><span class="badge b-grey">⌨️ 手写源码</span>
+      <span class="badge b-reportlets">📁 x.mjs</span><span class="badge b-green">⚙️ 中间产物</span>
+      <span class="badge b-reportlets">📁 x.cpt</span><span class="badge b-green">⚙️ 最终产物</span>
+      <span class="badge b-sqlite">📒 builds 历史</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 产物存储矩阵 ═══════════ -->
+<section>
+  <h2><span class="no">二</span>产物与存储矩阵 — 什么放在哪，谁管理</h2>
+
+  <h3>📒 SQLite（应用账本）<span class="sub">— ~/Library/Application Support/report-console/data.sqlite3 · WAL · 应用自己读写</span></h3>
+  <table>
+    <tr><th>表</th><th>存什么</th><th>谁写入</th><th>管理方式</th></tr>
+    <tr><td><code>modules / datasets</code></td><td><b>接口契约</b>（模块、数据集参数与 SQL）</td><td>数据接口页 / Agent</td><td>CRUD + JSON 导入导出 + 目录扫描导入；删除模块级联删契约</td></tr>
+    <tr><td><code>api_tests</code></td><td>每次接口实测的请求、响应、err_code、耗时</td><td>实测动作自动</td><td>只增不改，按时间倒序回看</td></tr>
+    <tr><td><code>builds</code></td><td>每次构建的类型、目标、成败、日志</td><td>构建动作自动</td><td>只增不改，总览页最近构建</td></tr>
+    <tr><td><code>ddl_log</code></td><td><b>SQL 审计</b>：建表/改表/CALL/过程应用的语句+结果+错误</td><td>受控写通道自动</td><td>只增不改，全量留痕</td></tr>
+    <tr><td><code>agent_sessions / messages</code></td><td>Agent 会话与消息（含工具调用 JSON）</td><td>Agent 服务自动</td><td>会话列表可删</td></tr>
+    <tr><td><code>settings</code></td><td>本机环境值（帆软地址/路径/MySQL/模型）</td><td>设置页</td><td>覆盖式更新，代码默认值中性</td></tr>
+  </table>
+
+  <h3>📁 reportlets 目录（部署产物）<span class="sub">— 帆软工程 WEB-INF/reportlets · 应用直接原地读写</span></h3>
+  <table>
+    <tr><th>文件</th><th>性质</th><th>生成方式</th><th>生命周期</th></tr>
+    <tr><td><code>{m}/data/{m}_data.cpt</code></td><td>数据层（全部数据集的宿主）</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>契约一改就重建；被帆软 /api/data 加载</td></tr>
+    <tr><td><code>{m}/pages/x.jsx</code></td><td>页面源码 <span class="badge b-grey">⌨️ 唯一手写产物</span></td><td>人 / Agent 编写</td><td>长期演进； staleness 判断的基准（mtime）</td></tr>
+    <tr><td><code>{m}/pages/x.mjs</code></td><td>编译中间产物</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>每次构建覆盖；质量门失败时保留供排查</td></tr>
+    <tr><td><code>{m}/pages/x.cpt</code></td><td>页面最终产物</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>cpt mtime &lt; jsx mtime 即标 stale 待重建；帆软预览的入口</td></tr>
+  </table>
+
+  <h3>🗄️ MySQL（业务数据）<span class="sub">— 页面真正运行时查询的库</span></h3>
+  <table>
+    <tr><th>对象</th><th>产生步骤</th><th>管理通道</th></tr>
+    <tr><td>业务表</td><td>第 1 步建表</td><td rowspan="2">四通道：① information_schema 元数据查询 ② 只读通道（白名单+自动 LIMIT+禁多语句）③ 受控写通道（Agent 需 <code>confirm:true</code>，全量审计）④ 过程管理（SHOW CREATE / DROP+CREATE）</td></tr>
+    <tr><td>存储过程</td><td>第 2 步创建</td></tr>
+  </table>
+
+  <h3>🌐 帆软服务器（运行宿主）<span class="sub">— 不归本应用管理，但被三处依赖</span></h3>
+  <ul>
+    <li><b>数据连接</b>：设计器里预先配好（模块 datasource 引用的名字）→ 数据层 CPT 的 DatabaseName</li>
+    <li><b>/api/data</b>：实测与页面取数都走它</li>
+    <li><b>页面渲染</b>：<code>op=write</code> 打开 .cpt，帆软解析骨架并托管页面</li>
+  </ul>
+</section>
+
+<!-- ═══════════ 开发时 vs 运行时 ═══════════ -->
+<section>
+  <h2><span class="no">三</span>两条数据流 — 开发时 vs 页面运行时</h2>
+
+  <div class="grid2">
+    <div>
+      <h3 style="margin-top:0">🛠️ 开发时（本应用在场）</h3>
+      <div class="flow"><span class="hi">SQLite 契约</span> ──构建──▶ <span class="hi">_data.cpt</span>
+        <span class="dim">（质量门把门，reportlets 落盘）</span>
+契约参数 ──POST──▶ <span class="hi">帆软 /api/data</span> ──执行──▶ <span class="hi">MySQL</span>
+        <span class="dim">（实测=借帆软链路验证，结果回写 SQLite）</span></div>
+      <p class="sub">注意：应用<b>不自己执行</b>业务 SQL 来验证接口——它把和页面一模一样的请求发给帆软，测的是真实运行链路。</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">🏃 运行时（本应用可以关掉）</h3>
+      <div class="flow">用户浏览器 ──op=write──▶ <span class="hi">帆软</span> ──渲染──▶ 页面骨架
+                              <span class="dim">（注入全局 React/antd/dayjs/PATH，隐藏帆软框架）</span>
+页面 JS ──fetch /api/data──▶ 帆软解析 _data.cpt 的命名数据集
+                              ──数据连接──▶ <span class="hi">MySQL</span> ──JSON──▶ 页面渲染
+写操作：CALL sp_xxx ──▶ <span class="hi">JSON_OBJECT</span> ──▶ 页面解析成败</div>
+      <p class="sub">部署完成后页面完全运行在帆软上——本应用只是开发/管理台，不参与运行时供数。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 两个入口 + 质量门 ═══════════ -->
+<section>
+  <h2><span class="no">四</span>两种开发入口，一条管线，一道门</h2>
+  <div class="grid2">
+    <div>
+      <h3 style="margin-top:0">🖱️ 手工（六个视图）</h3>
+      <ul>
+        <li><b>总览</b>：环境状态 + 资产规模 + 最近构建</li>
+        <li><b>数据接口</b>：模块/契约 CRUD、构建、实测、历史</li>
+        <li><b>存储过程</b>：清单、定义编辑、DROP+CREATE、CALL 试执行</li>
+        <li><b>页面</b>：jsx 编辑（CodeMirror）、构建、staleness、预览</li>
+        <li><b>Agent / 设置</b>：对话式开发 / 环境配置</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">🤖 Agent（一句话开工）</h3>
+      <ul>
+        <li>20+ 平台工具 = 上面所有动作的模型侧映射</li>
+        <li>系统提示词内化全部开发约定（命名/分页/JSON_OBJECT/分层顺序）</li>
+        <li>会话与工具调用落 SQLite，可回溯</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note warn">
+    <b>无论谁开发，都过同一道门：</b>CPT 只能由 build 工具产出（没有手写文件入口）· 质量门 error 拒绝落盘 · 读 SQL 走白名单通道 · 写 SQL 需 <code>confirm:true</code> 且全量审计 · formula 参数不随请求传递。<b>绕过质量门没有入口</b>——这是整个设计的核心约束。
+  </div>
+  <p class="sub">另有一条自动验收线：<code>npm run selftest</code> 对真实帆软+MySQL 跑 22 步全链路（建表→过程→契约→构建→实测→页面→预览），幂等可反复执行，是环境健康度的终极检查。</p>
+</section>
+
+<footer>
+  Report Console · 报表开发业务流程全景 · 2026-08-16 · 基于源码整理（main @ d1868d7）· 记录当前实现；项目制重组设计进行中，见 design-backlog.md
+</footer>
+</div>
+</body>
+</html>

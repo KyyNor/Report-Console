@@ -135,10 +135,10 @@ export default function WorkbenchView(): React.ReactElement {
         const r = await call<{ build: BuildResult; tests: Array<{ dataset: string; ok: boolean; errCode: number | null; rowCount: number }> }>('verify:project', { project: cur })
         const failed = r.tests.filter((t) => !t.ok)
         toast(r.build.ok && failed.length === 0
-          ? `验收通过：${r.tests.length} 个接口全部 err_code=0`
+          ? `验收通过：${r.tests.length} 个接口帆软实测全部通过`
           : `验收未通过：构建 ${r.build.ok ? '通过' : '失败'}，${failed.length}/${r.tests.length} 接口失败`,
           r.build.ok && failed.length === 0 ? 'ok' : 'err')
-        if (failed.length) failed.forEach((f) => toast(`${f.dataset}: err_code=${f.errCode}`, 'err'))
+        if (failed.length) failed.forEach((f) => toast(`${f.dataset} 实测失败（err_code=${f.errCode}）`, 'err'))
         await refresh()
       } catch (e) {
         toast((e as Error).message, 'err')
@@ -161,7 +161,7 @@ export default function WorkbenchView(): React.ReactElement {
       if (!cur) return null
       try {
         const r = await call<{ ok: boolean; errCode: number | null; durationMs: number; rowCount: number; response: unknown }>('test:dataset', { project: cur, dataset: name })
-        toast(r.ok ? `${name}: err_code=0，${r.rowCount} 行 ${r.durationMs}ms` : `${name}: 实测失败（err_code=${r.errCode}）`, r.ok ? 'ok' : 'err')
+        toast(r.ok ? `${name}: 帆软实测通过，${r.rowCount} 行 ${r.durationMs}ms` : `${name}: 实测失败（err_code=${r.errCode}）`, r.ok ? 'ok' : 'err')
         await refresh()
         return r
       } catch (e) { toast((e as Error).message, 'err'); return null }
@@ -362,7 +362,7 @@ export default function WorkbenchView(): React.ReactElement {
                     pageMenuAt(r.left, r.bottom + 6)
                   }}><Icon n="plus" size={12} />新建页面</span>}
                   empty={{
-                    t: '还没有页面', d: '页面 jsx 是全流程唯一手写产物，接口实测通过（err_code=0）后再开发页面',
+                    t: '还没有页面', d: '页面 jsx 是全流程唯一手写产物，接口帆软实测通过后再开发页面',
                     actions: <span className="mini" onClick={(e) => {
                       const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                       pageMenuAt(r.left, r.bottom + 6)
@@ -401,7 +401,7 @@ export default function WorkbenchView(): React.ReactElement {
                     const kind = KIND_TAG[x.kind] ?? KIND_TAG.other
                     const connDown = connHealthMap[x.connection] === false
                     let stt = 'n', sub: React.ReactNode = '未测'
-                    if (st?.st === 'ok') { stt = 'g'; sub = <><span style={{ color: 'var(--ok)' }}>实测通过</span> {st.rows ?? '-'} 行 {st.ms ?? '-'}ms · err_code=0</> }
+                    if (st?.st === 'ok') { stt = 'g'; sub = <><span style={{ color: 'var(--ok)' }}>帆软实测通过</span> {st.rows ?? '-'} 行 {st.ms ?? '-'}ms</> }
                     else if (st?.st === 'fail') { stt = 'r'; sub = <><span style={{ color: 'var(--bad)' }}>实测失败</span> {st.why?.slice(0, 60)}</> }
                     else if (connDown) { sub = <span style={{ color: 'var(--idle)' }}>连接不可达（{x.connection}）</span> }
                     if (curProject?.missingDir) sub = '账本缓存 · 目录缺失'

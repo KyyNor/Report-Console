@@ -133,7 +133,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
         ])
         const items = [
           ...builds.slice(0, 5).map((b) => ({ i: 'box', h: <><b>构建{b.ok ? '通过' : '失败'}</b>　{String(b.target)}</>, m: fmtTime(String(b.created_at)) })),
-          ...tests.slice(0, 5).map((t) => ({ i: t.ok ? 'cck' : 'cx', h: <><b>实测 {String(t.dataset)}</b>　{t.ok ? 'err_code=0' : '失败'}</>, m: fmtTime(String(t.created_at)) }))
+          ...tests.slice(0, 5).map((t) => ({ i: t.ok ? 'cck' : 'cx', h: <><b>实测 {String(t.dataset)}</b>　{t.ok ? '通过' : '失败'}</>, m: fmtTime(String(t.created_at)) }))
         ].sort(() => 0).slice(0, 8)
         setDyn(items)
       } catch { /* 忽略 */ }
@@ -172,7 +172,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
             <div className="guide">
               <div className="gstep done"><span className="no">✓</span><div><div className="gt2">创建项目</div><div className="gd">绑定目录与连接（{p.connections.join('、') || '-'}）</div></div></div>
               <div className="gstep"><span className="no">2</span><div><div className="gt2">建表与存储过程</div><div className="gd">数据先行：过程返回 SELECT JSON_OBJECT，或关联已有过程</div></div></div>
-              <div className="gstep"><span className="no">3</span><div><div className="gt2">接口契约 → 构建实测</div><div className="gd">err_code=0 之后才进入页面开发（顺序强约定）</div></div></div>
+              <div className="gstep"><span className="no">3</span><div><div className="gt2">接口契约 → 构建实测</div><div className="gd">帆软实测通过之后才进入页面开发（顺序强约定）</div></div></div>
               <div className="gstep"><span className="no">4</span><div><div className="gt2">页面 jsx → 构建 → 预览</div><div className="gd">脚手架起步，过质量门，帆软 op=write 预览</div></div></div>
             </div>
             <div className="banner info"><Icon n="ai" /><div><b>把需求文档交给 Agent</b>：在「文档」组新建需求（meta/），然后点上方「让 Agent 从需求开始」。Agent 与手工共用同一工具链与质量门。</div></div>
@@ -209,7 +209,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
       <div className="rp-head">
         <div className="rp-r1">
           <span className="ttl">{ds.name}</span>
-          {t?.st === 'ok' ? <span className="pill-o ok"><Icon n="cck" />err_code=0</span>
+          {t?.st === 'ok' ? <span className="pill-o ok"><Icon n="cck" />帆软实测通过</span>
             : t?.st === 'fail' ? <span className="pill-o err"><Icon n="cx" />失败</span>
             : t?.st === 'unreach' ? <span className="pill-o idle"><Icon n="cd" />连接不可达</span>
             : <span className="pill-o idle"><Icon n="cd" />未测</span>}
@@ -294,16 +294,16 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
           <>
             {(lastTest ?? (t?.st === 'ok' ? { ok: true, errCode: 0, durationMs: t.ms ?? 0, rowCount: t.rows ?? 0, response: null } : null))
               ? (lastTest?.ok ?? t?.st === 'ok')
-                ? <div className="banner ok"><Icon n="cck" /><div><b>err_code=0</b>　POST /webroot/decision/api/data（page_number/page_size 恒 -1，业务分页走参数）</div></div>
+                ? <div className="banner ok"><Icon n="cck" /><div><b>帆软实测通过</b>　POST /webroot/decision/api/data（page_number/page_size 恒 -1，业务分页走参数）</div></div>
                 : <div className="banner err"><Icon n="cx" /><div><b>实测失败</b>　{String((lastTest?.response as { err_msg?: string })?.err_msg ?? t?.why ?? '')}</div></div>
-              : <div className="banner info"><Icon n="info" /><div>尚未实测。用契约默认参数打真实帆软接口，err_code=0 才算通过。</div></div>}
+              : <div className="banner info"><Icon n="info" /><div>尚未实测。用契约默认参数请求真实帆软接口，返回无错误才算通过。</div></div>}
             {(lastTest || t?.st === 'ok') && (
               <div className="blk">
                 <div className="blk-t"><Icon n="clock" />{lastTest ? '本次实测' : '最近一次实测'}</div>
                 <div className="kv">
                   <span className="k2">行数</span><span className="v2">{lastTest?.rowCount ?? t?.rows ?? '-'}</span>
                   <span className="k2">耗时</span><span className="v2">{lastTest?.durationMs ?? t?.ms ?? '-'}ms</span>
-                  <span className="k2">err_code</span><span className="v2" style={{ color: 'var(--ok)' }}>{lastTest?.errCode ?? 0}</span>
+                  <span className="k2">错误码</span><span className="v2" style={{ color: 'var(--ok)' }}>{lastTest?.errCode ?? 0}</span>
                 </div>
                 {lastTest?.response ? (
                   <details className="resp" style={{ marginTop: 8 }}>
@@ -341,7 +341,7 @@ function IfHistory({ project, dataset }: { project: string; dataset: string }): 
         {rows.map((r, i) => (
           <div key={i} className="hrow">
             <span className="hi"><Icon n={r.ok ? 'cck' : 'cx'} /></span>
-            <div className="ht"><b>err_code={String(r.err_code)}</b>{!r.ok ? `　${String(JSON.parse(String(r.response ?? '{}')).err_msg ?? '').slice(0, 90)}` : ''}</div>
+            <div className="ht">{r.ok ? <b>通过</b> : <b>err_code={String(r.err_code)}</b>}{!r.ok ? `　${String(JSON.parse(String(r.response ?? '{}')).err_msg ?? '').slice(0, 90)}` : ''}</div>
             <div className="hm">{fmtTime(String(r.created_at))}<br />{String(r.duration_ms)}ms</div>
           </div>
         ))}

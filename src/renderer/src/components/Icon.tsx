@@ -6,6 +6,7 @@ import React, { useEffect } from 'react'
 const SYMBOLS: Record<string, string> = {
   dash: '<rect x="3" y="3" width="7.5" height="9" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="5" rx="1.2"/><rect x="13.5" y="11" width="7.5" height="10" rx="1.2"/><rect x="3" y="15" width="7.5" height="6" rx="1.2"/>',
   folder: '<path d="M4 6.5a2 2 0 0 1 2-2h4l2.2 2.7h5.8a2 2 0 0 1 2 2v8.3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5z"/>',
+  folderOpen: '<path d="M4 5.5h5l2 2.5h7.5a1.6 1.6 0 0 1 1.6 1.6v1.2"/><path d="M5 19h13.5a1.5 1.5 0 0 0 1.5-1.2l1.4-6.9a1 1 0 0 0-1-1.2H6a1.5 1.5 0 0 0-1.5 1.2L3.2 17.5A1.3 1.3 0 0 0 4.5 19z"/>',
   db: '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v12.6c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9V5.5"/><path d="M4.5 11.8c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9"/>',
   ai: '<path d="M12 3.5l1.7 4.6 4.6 1.7-4.6 1.7L12 16.1l-1.7-4.6-4.6-1.7 4.6-1.7L12 3.5z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z"/>',
   set: '<path d="M6 4v3.5M6 11.5V20M12 4v8.5M12 16.5V20M18 4v2.5M18 10.5V20"/><circle cx="6" cy="9.5" r="2"/><circle cx="12" cy="14.5" r="2"/><circle cx="18" cy="8.5" r="2"/>',

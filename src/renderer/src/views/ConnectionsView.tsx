@@ -84,7 +84,7 @@ export default function ConnectionsView({ onChanged }: { onChanged?: () => void 
         <div className="pcard-row">
           <div className="pcard-h"><Icon n="db" />连接注册表（{rows.length}）</div>
           <table className="plain-table">
-            <thead><tr><th>名称</th><th>主机</th><th>用户 / 库</th><th>状态</th><th>延迟</th><th>备注</th><th style={{ width: 190 }}></th></tr></thead>
+            <thead><tr><th>名称</th><th>主机</th><th>用户 / 库</th><th>状态</th><th>延迟</th><th>备注</th><th style={{ width: 1 }}></th></tr></thead>
             <tbody>
               {rows.map((c) => {
                 const h = health[c.name]
@@ -99,8 +99,8 @@ export default function ConnectionsView({ onChanged }: { onChanged?: () => void 
                       : <span className="pill-o idle">未测</span>}</td>
                     <td className="f">{h?.reachable ? `${h.latencyMs}ms` : '-'}</td>
                     <td>{c.comment || '-'}</td>
-                    <td>
-                      <span style={{ display: 'inline-flex', gap: 6 }}>
+                    <td style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <button className="btn sm" disabled={testing === c.name} onClick={() => void test(c.name)}><Icon n="play" />{testing === c.name ? '测试中' : '测试'}</button>
                         <button className="btn sm" onClick={() => setEditing({ id: c.id, name: c.name, host: c.host, port: c.port, user: c.user, password: c.password, database: c.database, comment: c.comment })}><Icon n="pen" />编辑</button>
                         <button className="btn sm dgr-o" onClick={() => { if (confirm(`删除连接 ${c.name}？（被接口/过程引用时会拒绝）`)) void remove(c) }}><Icon n="trash" /></button>

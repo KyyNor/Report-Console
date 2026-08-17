@@ -9,7 +9,7 @@
 ## 组织模型（v2 项目制，务必先读）
 
 - **连接（Connection）是一等公民**：应用内注册表（SQLite `connections` 表），一条连接 = 一个 MySQL 连接，名字与帆软设计器里的数据连接**一一对应**。`_data.cpt` 的 TableData `DatabaseName` 与管理面 SQL 都按连接名路由。
-- **项目（Project）是顶层组织单元**：绑定一个 reportlets 子目录（自动三分 `data/` + `pages/` + `meta/`）与**多个连接**。项目名/接口名/页面名仅允许 `[a-z][a-z0-9_]*`。
+- **项目（Project）是顶层组织单元**：绑定一个项目目录（任意位置均可，缺省 `reportlets/{name}` 自动三分 `data/` + `pages/` + `meta/`）与**多个连接**；目录内 `project.json` 是项目自描述（名称/说明/连接清单，创建与保存设置时自动同步），「打开项目」凭它把本地目录注册进本机账本（`projects.dir` 列存目录，存量空值回退 `reportlets/{name}`）。项目名/接口名/页面名仅允许 `[a-z][a-z0-9_]*`。
 - **接口（数据集）单一归属项目**，各绑一个连接（从项目绑定清单中选）；构建为项目的一个 `_data.cpt`，**一项目一页、页内多连接**。
 - **存储过程归属项目创建**；复用其他项目的过程走**关联**（`proc_links` 引用，不复制），接口 SQL 直接 CALL。
 - **文档（meta/）**：需求/设计 `.md` 与过程创建语句 `.sql` 存项目 meta/ 目录；过程定义以 `meta/{name}.sql` 为源（缺省回退库内 SHOW CREATE），Agent 可读写作为上下文。
@@ -44,8 +44,8 @@ src/main/               Electron 主进程
   index.ts              入口：单实例锁、--selftest / --smoke 模式（含 pi 会话持久探测）
   db.ts                 SQLite（连接/项目/契约/测试/构建/审计的唯一持久层，WAL；含 v1 模块制存量迁移）
   connectionsService.ts 连接注册表 CRUD（名字唯一、删除前查引用）
-  projectsService.ts    项目制核心：项目与连接绑定、接口契约（各绑连接）、数据层构建、实测、
-                        过程归属/关联（定义存 meta/）、项目文档（meta/）、导入导出
+  projectsService.ts    项目制核心：项目与连接绑定（目录任意位置 + project.json 自描述，支持打开本地项目）、
+                        接口契约（各绑连接）、数据层构建、实测、过程归属/关联（定义存 meta/）、项目文档（meta/）、导入导出
   pagesService.ts       页面读写 + 原地构建（jsx → mjs + cpt）+ 预览 URL（按项目过滤）
   mysqlService.ts       按连接路由的多连接池 + 只读守卫 + 受控写（审计落 ddl_log，带连接名）
   frClient.ts           帆软 /api/data 封装 + 连通探测 + 预览 URL

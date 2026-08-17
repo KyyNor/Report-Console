@@ -1,47 +1,73 @@
 /**
- * 工作台弹层 — 新建项目向导 / 接口契约编辑 / 过程确认 / CALL 试执行 / 关联过程 / 新建过程 / 文档
+ * 工作台弹层 — 新建项目向导（名/目录分离）/ 接口契约编辑 / 过程确认 / CALL 试执行 / 关联过程 / 新建过程 / 文档
  */
 import React, { useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/ui'
 import { SqlEditor } from '../../components/CodeEditor'
+import { call } from '../../api'
 import type { Dataset, DatasetKind, DatasetParam, DbConnection } from '@shared/types'
 
 // ── 新建项目向导（3.1 / D1 / D4） ───────────────────────────────
 
-export function ProjectWizardModal({ connections, onClose, onCreate }: {
+export function ProjectWizardModal({ connections, reportletsPath, onClose, onCreate }: {
   connections: DbConnection[]
+  reportletsPath: string
   onClose: () => void
-  onCreate: (name: string, conns: string[], comment: string) => Promise<void>
+  onCreate: (name: string, dir: string, conns: string[], comment: string) => Promise<void>
 }): React.ReactElement {
   const [name, setName] = useState('')
   const [comment, setComment] = useState('')
+  const [dir, setDir] = useState('')
+  const [dirTouched, setDirTouched] = useState(false) // 未手改时目录自动跟随 reportlets/{name}
   const [picked, setPicked] = useState<string[]>(connections.length === 1 ? [connections[0].name] : [])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const dir = name || '{project}'
+  const effDir = dirTouched ? dir : (reportletsPath && name ? `${reportletsPath.replace(/\/+$/, '')}/${name}` : dir)
+
+  const browse = async () => {
+    try {
+      const d = await call<string | null>('dialog:pickDir', { title: '选择项目目录（可新建）' })
+      if (d) { setDir(d); setDirTouched(true) }
+    } catch { /* 取消或失败不处理 */ }
+  }
 
   const create = async () => {
     if (!/^[a-z][a-z0-9_]*$/.test(name)) { setErr('项目名仅允许小写字母/数字/下划线'); return }
+    if (!effDir.trim()) { setErr('项目目录不能为空：填写路径或点「选择目录」'); return }
     if (!picked.length) { setErr('至少勾选一个连接'); return }
     setBusy(true)
     setErr(null)
-    try { await onCreate(name, picked, comment) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+    try { await onCreate(name, effDir.trim(), picked, comment) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
+
+  const leaf = effDir ? effDir.split(/[\\/]/).filter(Boolean).pop() ?? '' : '{project}'
 
   return (
     <Modal
       title="新建项目" icon="folder" onClose={onClose}
       footer={<>
-        <span className="m-note">项目 = reportlets 子目录 + 多连接绑定（D1）</span>
+        <span className="m-note">项目 = 项目目录（project.json 自描述）+ 多连接绑定</span>
         <button className="btn" onClick={onClose}>取消</button>
         <button className="btn pri" onClick={create} disabled={busy}><Icon n="plus" />{busy ? '创建中…' : '创建项目'}</button>
       </>}
     >
-      <div className="fld">
-        <label>项目名（= 目录名，仅 [a-z][a-z0-9_]*）</label>
-        <input type="text" value={name} spellCheck={false} placeholder="如 order" onChange={(e) => setName(e.target.value)} />
-        <div className="fh">将创建 reportlets 子目录；中文名不可用（会成为目录 / 文件名）</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 10 }}>
+        <div className="fld">
+          <label>项目名（仅 [a-z][a-z0-9_]*）</label>
+          <input type="text" value={name} spellCheck={false} placeholder="如 order" onChange={(e) => setName(e.target.value)} />
+          <div className="fh">用于目录 / 接口前缀；中文名不可用</div>
+        </div>
+        <div className="fld">
+          <label>项目目录（默认 reportlets/项目名，可另选）</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="text" style={{ flex: 1 }} value={effDir} spellCheck={false}
+              placeholder={reportletsPath ? `${reportletsPath}/${name || '{project}'}` : '选择或输入项目目录'}
+              onChange={(e) => { setDir(e.target.value); setDirTouched(true) }} />
+            <button className="btn" onClick={() => void browse()}><Icon n="folderOpen" />选择目录</button>
+          </div>
+          <div className="fh">目录可任意位置；创建时写入 project.json（可被「打开项目」再次识别）</div>
+        </div>
       </div>
       <div className="fld">
         <label>说明</label>
@@ -65,7 +91,7 @@ export function ProjectWizardModal({ connections, onClose, onCreate }: {
       </div>
       <div className="fld">
         <label>目录结构（自动创建）</label>
-        <div className="tree">reportlets/{dir}/<br />├─ <span className="d">data/</span>　<span className="c">数据层产物（构建生成 {dir}_data.cpt）</span><br />├─ <span className="d">pages/</span>　<span className="c">页面 jsx 源码与 .mjs/.cpt 产物</span><br />└─ <span className="d">meta/</span>　<span className="c">需求 / 设计文档、过程创建语句</span></div>
+        <div className="tree">{leaf}/<br />├─ <span className="d">project.json</span>　<span className="c">项目自描述（名称/说明/连接，随设置同步）</span><br />├─ <span className="d">data/</span>　<span className="c">数据层产物（构建生成 {leaf}_data.cpt）</span><br />├─ <span className="d">pages/</span>　<span className="c">页面 jsx 源码与 .mjs/.cpt 产物</span><br />└─ <span className="d">meta/</span>　<span className="c">需求 / 设计文档、过程创建语句</span></div>
       </div>
       {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
     </Modal>
@@ -391,29 +417,45 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
 
 // ── 项目设置（改绑定连接 / 说明） ────────────────────────────────
 
-export function ProjectSettingsModal({ name, comment, connections, allConns, onClose, onSave }: {
+export function ProjectSettingsModal({ name, comment, dir, connections, allConns, onClose, onSave }: {
   name: string
   comment: string
+  dir: string
   connections: string[]
   allConns: DbConnection[]
   onClose: () => void
-  onSave: (comment: string, conns: string[]) => Promise<void>
+  onSave: (comment: string, conns: string[], dir: string) => Promise<void>
 }): React.ReactElement {
   const [cm, setCm] = useState(comment)
+  const [dv, setDv] = useState(dir)
   const [picked, setPicked] = useState<string[]>(connections)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const browse = async () => {
+    try {
+      const d = await call<string | null>('dialog:pickDir', { title: '重新绑定项目目录（含 project.json）' })
+      if (d) setDv(d)
+    } catch { /* 取消不处理 */ }
+  }
   return (
     <Modal
       title={`项目设置 — ${name}`} icon="set" onClose={onClose}
       footer={<>
         <span className="m-note">解绑连接不影响已有契约，但新建接口只能从绑定清单选</span>
         <button className="btn" onClick={onClose}>取消</button>
-        <button className="btn pri" disabled={busy || picked.length === 0} onClick={async () => { setBusy(true); setErr(null); try { await onSave(cm, picked) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
+        <button className="btn pri" disabled={busy || picked.length === 0 || !dv.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(cm, picked, dv.trim()) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
           <Icon n="check" />保存
         </button>
       </>}
     >
+      <div className="fld">
+        <label>项目目录（目录被移动后在此重绑）</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="text" style={{ flex: 1 }} value={dv} spellCheck={false} onChange={(e) => setDv(e.target.value)} />
+          <button className="btn" onClick={() => void browse()}><Icon n="folderOpen" />选择目录</button>
+        </div>
+        <div className="fh">保存时会同步重写目录内的 project.json</div>
+      </div>
       <div className="fld">
         <label>说明</label>
         <input type="text" value={cm} onChange={(e) => setCm(e.target.value)} />

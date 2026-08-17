@@ -2,7 +2,7 @@
  * IPC 注册 — 渲染层 ↔ 主进程的唯一通道（v2 项目制）
  */
 
-import { ipcMain } from 'electron'
+import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { getSettings, saveSettings } from './db'
 import * as conns from './connectionsService'
 import * as mysql from './mysqlService'
@@ -82,8 +82,22 @@ export function registerIpc(): void {
   handle('sql:describe', (a) => mysql.describeTable((a as { table: string }).table, (a as { database?: string }).database, (a as { connection?: ConnRef }).connection))
 
   // ── 项目 ──────────────────────────────────────────────
+  handle('dialog:pickDir', async (a) => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const r = await dialog.showOpenDialog(win, {
+      title: (a as { title?: string }).title ?? '选择项目目录',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
+  })
   handle('projects:list', () => projects.listProjects())
-  handle('projects:create', (a) => projects.createProject((a as { name: string }).name, (a as { connections: string[] }).connections, (a as { comment?: string }).comment))
+  handle('projects:create', (a) => projects.createProject(
+    (a as { name: string }).name,
+    (a as { connections: string[] }).connections,
+    (a as { comment?: string }).comment,
+    (a as { dir?: string }).dir
+  ))
+  handle('projects:open', (a) => projects.openProject((a as { dir: string }).dir))
   handle('projects:update', (a) => { projects.updateProject((a as { id: number }).id, a as never); return true })
   handle('projects:delete', (a) => { projects.deleteProject((a as { id: number }).id); return true })
   handle('projects:scan', () => projects.scanDeployedProjects())

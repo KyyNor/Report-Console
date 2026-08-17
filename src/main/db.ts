@@ -152,6 +152,12 @@ CREATE TABLE IF NOT EXISTS agent_messages (
     d.prepare("ALTER TABLE ddl_log ADD COLUMN connection TEXT NOT NULL DEFAULT ''").run()
   } catch { /* 已存在 */ }
 
+  // projects 增加 dir 列：项目目录与名称解耦（新建可选任意目录、可打开本地项目）；
+  // 存量行为空，读取时回退 reportlets/{name}
+  try {
+    d.prepare('ALTER TABLE projects ADD COLUMN dir TEXT').run()
+  } catch { /* 已存在 */ }
+
   migrateLegacy(d)
 }
 

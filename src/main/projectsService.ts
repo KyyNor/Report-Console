@@ -23,8 +23,11 @@ export function assertProjectName(name: string): void {
   if (!NAME_RE.test(name)) throw new Error('名称仅允许小写字母/数字/下划线（= reportlets 子目录名）')
 }
 
-function projectDir(name: string): string {
-  return join(getSettings().reportletsPath, name)
+/** 项目根目录：显式指定 > projects.dir（打开本地项目/自选目录）> reportlets/{name}（存量回退） */
+function projectDir(name: string, explicit?: string): string {
+  if (explicit) return explicit
+  const r = getDb().prepare('SELECT dir FROM projects WHERE name=?').get(name) as { dir: string | null } | undefined
+  return r?.dir || join(getSettings().reportletsPath, name)
 }
 
 function getProjectByName(name: string): { id: number; name: string; comment: string; createdAt: string } | undefined {
@@ -52,7 +55,7 @@ export function listProjects(): Project[] {
     FROM projects p ORDER BY p.name`).all() as Array<Record<string, unknown>>
   return rows.map((r) => {
     const name = r.name as string
-    const dir = projectDir(name)
+    const dir = (r.dir as string | null) || join(getSettings().reportletsPath, name)
     return {
       id: r.id as number,
       name,
@@ -83,27 +86,100 @@ function countDocs(project: string): number {
   try { return readdirSync(dir).filter((f) => /\.(md|sql)$/i.test(f)).length } catch { return 0 }
 }
 
-export function createProject(name: string, connections: string[], comment = ''): Project {
+/** 项目目录内的自描述配置（打开本地项目的凭据）：随创建/更新自动同步 */
+export interface ProjectConfig {
+  generator: 'report-console'
+  version: 1
+  name: string
+  comment: string
+  connections: string[]
+  createdAt: string
+}
+
+const PROJECT_CONFIG = 'project.json'
+
+function projectConfigPath(root: string): string {
+  return join(root, PROJECT_CONFIG)
+}
+
+/** 把当前注册表里的项目信息写回 {root}/project.json（目录存在才写，失败不阻断） */
+function syncProjectConfig(name: string): void {
+  try {
+    const p = getProjectByName(name)
+    if (!p) return
+    const root = projectDir(name)
+    if (!existsSync(root)) return
+    const cfg: ProjectConfig = {
+      generator: 'report-console',
+      version: 1,
+      name: p.name,
+      comment: p.comment,
+      connections: projectConnections(p.id),
+      createdAt: p.createdAt
+    }
+    writeFileSync(projectConfigPath(root), JSON.stringify(cfg, null, 2) + '\n', 'utf-8')
+  } catch { /* 目录缺失/只读时不阻断主流程 */ }
+}
+
+export function createProject(name: string, connections: string[], comment = '', dir?: string): Project {
   assertProjectName(name)
   if (!connections.length) throw new Error('至少绑定一个连接（来自「连接」注册表）')
   for (const cn of connections) {
     if (!getConnection({ name: cn })) throw new Error(`连接不存在：${cn}（先在「连接」页注册）`)
   }
+  const root = dir || join(getSettings().reportletsPath, name)
+  if (!dir && !getSettings().reportletsPath) throw new Error('先在「设置」页填写 reportlets 路径，或在向导中指定项目目录')
   const d = getDb()
-  const info = d.prepare('INSERT INTO projects(name, comment) VALUES(?,?)').run(name, comment)
+  const info = d.prepare('INSERT INTO projects(name, comment, dir) VALUES(?,?,?)').run(name, comment, dir ?? null)
   const pid = Number(info.lastInsertRowid)
   const bind = d.prepare('INSERT OR IGNORE INTO project_connections(project_id, connection_id) VALUES(?,?)')
   for (const cn of connections) {
     bind.run(pid, (getConnection({ name: cn }) as { id: number }).id)
   }
   // 目录三分：data/ pages/ meta/
-  const root = projectDir(name)
   for (const sub of ['data', 'pages', 'meta']) mkdirSync(join(root, sub), { recursive: true })
+  syncProjectConfig(name)
   return listProjects().find((p) => p.id === pid)!
 }
 
-export function updateProject(id: number, patch: { comment?: string; connections?: string[] }): void {
+/** 打开本地项目：读取目录内 project.json，按其中声明注册（名字/连接需先在本机注册表就绪） */
+export function openProject(dir: string): Project {
+  if (!existsSync(dir)) throw new Error(`目录不存在：${dir}`)
+  const cfgPath = projectConfigPath(dir)
+  if (!existsSync(cfgPath)) throw new Error(`目录里没有 ${PROJECT_CONFIG}，不是 Report Console 项目目录（新建项目时会自动生成）`)
+  let cfg: Partial<ProjectConfig>
+  try {
+    cfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Partial<ProjectConfig>
+  } catch (e) {
+    throw new Error(`${PROJECT_CONFIG} 解析失败：${(e as Error).message}`)
+  }
+  if (!cfg.name || !NAME_RE.test(cfg.name)) throw new Error(`${PROJECT_CONFIG} 的 name 缺失或不合法（需 [a-z][a-z0-9_]*）`)
+  const existing = getProjectByName(cfg.name)
+  if (existing) {
+    if (projectDir(cfg.name) === dir) return listProjects().find((p) => p.id === existing.id)! // 已打开，直接聚焦
+    throw new Error(`同名项目已注册（当前指向 ${projectDir(cfg.name)}）；如需改指向本目录，请在项目设置中重绑目录`)
+  }
+  const conns = cfg.connections ?? []
+  if (!conns.length) throw new Error(`${PROJECT_CONFIG} 未声明 connections`)
+  const missing = conns.filter((cn) => !getConnection({ name: cn }))
+  if (missing.length) throw new Error(`连接未注册：${missing.join('、')}（先在「连接」页注册同名连接再打开）`)
   const d = getDb()
+  const info = d.prepare('INSERT INTO projects(name, comment, dir) VALUES(?,?,?)').run(cfg.name, cfg.comment ?? '', dir)
+  const pid = Number(info.lastInsertRowid)
+  const bind = d.prepare('INSERT OR IGNORE INTO project_connections(project_id, connection_id) VALUES(?,?)')
+  for (const cn of conns) {
+    bind.run(pid, (getConnection({ name: cn }) as { id: number }).id)
+  }
+  for (const sub of ['data', 'pages', 'meta']) mkdirSync(join(dir, sub), { recursive: true })
+  return listProjects().find((p) => p.id === pid)!
+}
+
+export function updateProject(id: number, patch: { comment?: string; connections?: string[]; dir?: string }): void {
+  const d = getDb()
+  if (patch.dir !== undefined) {
+    if (!patch.dir.trim()) throw new Error('项目目录不能为空')
+    d.prepare('UPDATE projects SET dir=? WHERE id=?').run(patch.dir.trim(), id)
+  }
   if (patch.comment !== undefined) d.prepare('UPDATE projects SET comment=? WHERE id=?').run(patch.comment, id)
   if (patch.connections) {
     for (const cn of patch.connections) {
@@ -119,6 +195,8 @@ export function updateProject(id: number, patch: { comment?: string; connections
     tx()
     // 数据集引用了被解绑的连接时给出提示（不强制阻止，构建时连接名仍会写入）
   }
+  const r = d.prepare('SELECT name FROM projects WHERE id=?').get(id) as { name: string } | undefined
+  if (r) syncProjectConfig(r.name)
 }
 
 export function deleteProject(id: number): void {

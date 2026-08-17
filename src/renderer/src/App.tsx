@@ -49,7 +49,7 @@ export default function App(): React.ReactElement {
         {view === 'dashboard' && <DashboardView onNavigate={(v) => setView(v as ViewKey)} />}
         {view === 'workbench' && <WorkbenchView />}
         {view === 'connections' && <ConnectionsView />}
-        {view === 'agent' && <AgentView />}
+        {view === 'agent' && <AgentView onNavigate={(v) => setView(v as ViewKey)} />}
         {view === 'settings' && <SettingsView />}
       </div>
     </div>

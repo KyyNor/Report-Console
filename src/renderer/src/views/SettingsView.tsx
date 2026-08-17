@@ -80,7 +80,7 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
             <div className="fld">
               <label>API Key</label>
               <input type="password" value={form.llmApiKey} autoComplete="new-password" onChange={(e) => set('llmApiKey', e.target.value)} />
-              <div className="fh">留空时 Agent 走 Faux 演示模式（不发真实请求）</div>
+              <div className="fh">必填；留空时 Agent 初始化失败（协议 / 地址 / 模型 / 密钥都在本页配置）</div>
             </div>
           </div>
         </div>

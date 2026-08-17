@@ -624,8 +624,6 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
       <div className="ag-head">
         <button className="iconbtn" title="返回详情" onClick={onBack}><Icon n="back" /></button>
         <span className="ttl">Agent 会话</span>
-        {state.handle?.mode === 'faux' && <span className="tag upd">Faux 演示</span>}
-        {state.handle?.mode === 'real' && <span className="tag dict">真实模型</span>}
         {state.handle && <span className="ctx-chip" title="模型在「设置」页配置">{state.handle.modelId}</span>}
         <button className="iconbtn" title="在「Agent」页查看完整会话与历史" onClick={onBack}><Icon n="clock" /></button>
       </div>

@@ -3,13 +3,12 @@
  *
  * 架构：Agent 本体跑在渲染层（自研聊天组件订阅其事件流，见 chat/PiChat），
  * 平台工具经 IPC 桥回主进程执行（质量门/审计/confirm 约束全部留在工具层）。
- * 模型接入：设置页的 OpenAI/Anthropic 兼容配置；未配置 Key 时回落 faux 演示模式。
+ * 模型接入：设置页的 OpenAI/Anthropic 兼容配置；未配置 Key 时初始化直接失败（界面明确提示）。
  */
 
 import { Agent, type AgentTool } from '@earendil-works/pi-agent-core'
 import {
   createModels, createProvider, Type,
-  fauxProvider, fauxAssistantMessage,
   type Model, type Api
 } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
@@ -78,32 +77,15 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
   return { models, model }
 }
 
-/** 无 Key 时的 faux 演示模式：脚本化回声响应，验证 UI/事件/工具桥链路 */
-function buildFauxModel() {
-  const faux = fauxProvider()
-  const models = createModels()
-  models.setProvider(faux.provider)
-  const respond: Parameters<typeof faux.setResponses>[0][number] = (context) => {
-    faux.appendResponses([respond])
-    const lastUser = [...context.messages].reverse().find((m) => m.role === 'user')
-    const text = typeof lastUser?.content === 'string'
-      ? lastUser.content
-      : JSON.stringify(lastUser?.content ?? '')
-    return fauxAssistantMessage(
-      `【Faux 演示模式】已收到消息（${text.slice(0, 120)}）。\n\n当前未配置 LLM API Key（设置 → Agent 模型）。配置后此界面将直接由真实模型驱动，平台工具（build/test/sql/页面）全部可用。`
-    )
-  }
-  faux.setResponses([respond])
-  return { models, model: faux.getModel() as Model<Api>, faux }
-}
-
 export interface PiAgentHandle {
   agent: Agent
-  mode: 'real' | 'faux'
   sessionId: string
-  /** 当前生效模型 id（设置页配置；faux 模式为演示模型） */
+  /** 当前生效模型 id（设置页配置） */
   modelId: string
 }
+
+/** 无 Key 时明确报错（不做演示模式兜底）：提示去设置页配置后重试 */
+export const NO_KEY_ERROR = '模型未配置：Agent 需要真实模型，请先在「设置」页填写 协议 / Base URL / 模型名 / API Key，再重新打开本页'
 
 /**
  * 构建 pi Agent。
@@ -111,12 +93,11 @@ export interface PiAgentHandle {
  */
 export async function createPiAgent(fresh = false): Promise<PiAgentHandle> {
   const s = await call<AppSettings>('config:get')
+  if (!s.llmApiKey) throw new Error(NO_KEY_ERROR)
   const tools = await buildPlatformTools()
   await initSessionStorage()
 
-  const { models, model } = s.llmApiKey
-    ? buildCustomModel(s)
-    : buildFauxModel()
+  const { models, model } = buildCustomModel(s)
 
   // 恢复最近会话（messages/model/thinkingLevel 一并还原；无历史走全新会话）
   const restored = fresh ? null : await restoreLatestSession()
@@ -149,7 +130,7 @@ export async function createPiAgent(fresh = false): Promise<PiAgentHandle> {
     void saveSessionSnapshot(snapshot, agent.state)
   })
 
-  return { agent, mode: s.llmApiKey ? 'real' : 'faux', sessionId: snapshot.id, modelId: model.id }
+  return { agent, sessionId: snapshot.id, modelId: model.id }
 }
 
 // ── 共享单例：Agent 页与工作台右栏复用同一实例（同一会话流） ─────

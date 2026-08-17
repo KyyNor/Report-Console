@@ -17,7 +17,7 @@ function bootstrap(): void {
     // 转发渲染层 console，便于冒烟排查
     win.webContents.on('console-message', (_e, _level, msg) => console.log('[renderer]', msg))
     win.webContents.once('did-finish-load', () => {
-      // SMOKE_WAIT_MS 可覆盖等待时长（如 autosend 自检需要等 faux 流式完成）
+      // SMOKE_WAIT_MS 可覆盖等待时长（如 autosend 自检需要等模型流式完成）
       const waitMs = Number(process.env.SMOKE_WAIT_MS) || 2500
       setTimeout(async () => {
         try {

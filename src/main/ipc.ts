@@ -106,6 +106,7 @@ export function registerIpc(): void {
 
   // ── 接口契约 + 构建 + 实测 ────────────────────────────
   handle('datasets:list', (a) => projects.listDatasets((a as { project: string }).project))
+  handle('datasets:read', (a) => projects.readDataset((a as { project: string }).project, (a as { name: string }).name))
   handle('datasets:statuses', (a) => projects.datasetStatuses((a as { project: string }).project))
   handle('datasets:save', (a) => projects.saveDataset((a as { project: string }).project, a as never, (a as { expectId?: number }).expectId))
   handle('datasets:delete', (a) => { projects.deleteDataset((a as { project: string }).project, (a as { name: string }).name); return true })
@@ -156,7 +157,11 @@ export function registerIpc(): void {
 
   // ── pi Agent 桥（渲染层 Agent 的平台工具通道）──────────
   handle('pi:toolDefs', () => piToolDefs())
-  handle('pi:toolExec', (a) => piToolExec((a as { name: string }).name, (a as { args: unknown }).args))
+  handle('pi:toolExec', (a) => piToolExec(
+    (a as { name: string }).name,
+    (a as { args: unknown }).args,
+    (a as { scope: { project: string } }).scope
+  ))
 }
 
 /** 连接引用（id 或 name） */

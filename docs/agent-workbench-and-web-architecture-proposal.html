@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Report Console：Agent 工作台与服务化演进方案</title>
+  <style>
+    :root{--ink:#17212b;--muted:#62707d;--line:#dce3ea;--paper:#fff;--canvas:#f3f6f9;--blue:#2167d5;--blue-pale:#eaf3ff;--green:#188449;--amber:#a56500;--red:#b82c2c;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    *{box-sizing:border-box} body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.7,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+    main{max-width:1180px;margin:0 auto;padding:42px 28px 68px}.hero{padding:38px 42px;background:linear-gradient(135deg,#172b48,#205ebc);color:#fff;border-radius:22px;box-shadow:0 18px 48px #243a5a2b}.eyebrow{display:inline-flex;padding:3px 10px;border:1px solid #ffffff54;border-radius:999px;font:12px var(--mono);letter-spacing:.06em}.hero h1{font-size:34px;line-height:1.28;margin:14px 0 10px}.hero p{max-width:800px;margin:0;color:#e4efff}.meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;color:#d9e8ff;font:12px var(--mono)}
+    nav{position:sticky;top:12px;z-index:2;margin:20px 0;background:#fffffff0;backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:14px;padding:8px 14px;box-shadow:0 4px 20px #26384a10}.toc{display:flex;gap:14px;flex-wrap:wrap}.toc a{color:var(--muted);font-size:13px;text-decoration:none}.toc a:hover{color:var(--blue)}
+    section{margin-top:28px;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:30px 34px;box-shadow:0 6px 24px #26384a08}h2{font-size:23px;margin:0 0 15px;letter-spacing:-.02em}h3{font-size:17px;margin:24px 0 9px}h4{font-size:15px;margin:16px 0 7px}.lede{font-size:17px;color:#3b4b59;margin:0}.note{border-left:4px solid var(--blue);background:var(--blue-pale);padding:13px 16px;border-radius:0 10px 10px 0;margin:18px 0}.warn{border-left-color:var(--amber);background:#fff6e8}.risk{border-left-color:var(--red);background:#fff0f0}.ok{border-left-color:var(--green);background:#ecfaef}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:#fff}.card h3{margin:0 0 6px}.card p{margin:0;color:var(--muted);font-size:14px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font:11px var(--mono);font-weight:700}.p0{color:#9f2626;background:#ffe5e5}.p1{color:#9b5d00;background:#fff0cb}.p2{color:#245fba;background:#e6f0ff}.good{color:#14733d;background:#def5e4}
+    table{border-collapse:collapse;width:100%;margin:12px 0 4px;font-size:13px}th,td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}th{font-size:11px;letter-spacing:.06em;color:var(--muted);background:#f7f9fb;text-transform:uppercase}tr:last-child td{border-bottom:0}code{font:12px var(--mono);color:#224b86;background:#edf4ff;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}pre{padding:15px 17px;background:#17212b;color:#dce7f6;border-radius:11px;overflow:auto;font:12px/1.7 var(--mono)}ul,ol{padding-left:22px}li{margin:5px 0}.split{display:grid;grid-template-columns:1.05fr .95fr;gap:24px}.flow{display:grid;gap:9px}.flow .node{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#f8fafc}.flow .node b{display:block}.flow .arrow{height:14px;margin-left:18px;border-left:2px solid #a8b7c7}.flow .arrow:after{content:"";display:block;width:6px;height:6px;border-right:2px solid #a8b7c7;border-bottom:2px solid #a8b7c7;transform:rotate(45deg) translate(4px,4px)}
+    .wire{border:1px solid #b8c7d7;border-radius:13px;padding:14px;background:#f8fbff;font-size:13px}.wire-head{display:flex;align-items:center;gap:8px;border-bottom:1px solid #d7e3f0;padding-bottom:10px}.dot{width:9px;height:9px;border-radius:50%;background:var(--green)}.chip{display:inline-block;background:#e9f3ff;border:1px solid #c8dcf7;color:#245fae;border-radius:6px;padding:2px 7px;font:11px var(--mono)}.wire-message{margin:12px 0;padding:10px;border:1px solid #d8e3ef;background:#fff;border-radius:8px}.wire-input{border:1px solid #9db7d7;background:#fff;border-radius:8px;padding:10px;color:#7a8997}.callout{font-size:13px;color:var(--muted)}.source{color:var(--muted);font-size:12px}.phase{display:grid;grid-template-columns:88px 1fr;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}.phase:last-child{border-bottom:0}.phase strong{font-family:var(--mono);color:var(--blue)}
+    @media(max-width:760px){main{padding:18px 13px 42px}.hero{padding:25px 22px;border-radius:15px}.hero h1{font-size:26px}section{padding:22px 18px;border-radius:14px}.grid,.split{grid-template-columns:1fr}table{font-size:12px}.toc{gap:10px}}
+    @media print{body{background:#fff}main{max-width:none;padding:0}.hero{border-radius:0;box-shadow:none}section{break-inside:avoid;box-shadow:none}nav{display:none}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <span class="eyebrow">DECISION REPORT · DRAFT</span>
+    <h1>Agent 工作台优先化与服务化演进方案</h1>
+    <p>目标不是把已有的 CPT 开发能力再包一层聊天，而是把它变成可定位、可验证、可审计、可迁移的项目开发工作台；Electron 继续是近期主交付形态，同时为 Web 部署保留正确边界。</p>
+    <div class="meta"><span>适用对象：Report Console</span><span>范围：交互 / Agent / 项目隔离 / 架构</span><span>结论版本：2026-08-17</span></div>
+  </header>
+
+  <nav><div class="toc"><a href="#answer">结论</a><a href="#agent">Agent 入口与附加</a><a href="#tools">现状与工具</a><a href="#scope">项目隔离</a><a href="#workflow">完成报表流程</a><a href="#ui">视觉改进</a><a href="#architecture">服务化架构</a><a href="#roadmap">实施路线</a></div></nav>
+
+  <section id="answer">
+    <h2>先给结论</h2>
+    <p class="lede">你的调整方向是对的，而且比“每个资源详情页里放一个 <code>用 Agent 做</code> 按钮”更符合这个产品的核心价值：资源浏览器负责定位和核查，右栏的默认任务是持续协作与编排。</p>
+    <div class="note ok"><b>推荐的主模型：</b>工作台右栏默认是当前项目的 Agent 会话；点击资源时右栏临时切为详情；详情右上角关闭后立即回到同一个、未卸载的会话。资源通过“附加”成为轻量引用，而不是把正文塞进提示词。</div>
+    <div class="grid">
+      <div class="card"><span class="badge good">已完成</span><h3>桌面版强制项目作用域</h3><p>Agent 工具现在只能在当前项目及其绑定连接内执行；Web 化时再由服务端登录身份接管 scope。</p></div>
+      <div class="card"><span class="badge good">已完成</span><h3>让 Agent 成为右栏默认</h3><p>资源详情改为临时视图，关闭后回到同一项目的 Agent 会话。</p></div>
+      <div class="card"><span class="badge good">已完成</span><h3>增加精确读取工具</h3><p><code>read_dataset</code> 已补充，资源附加后不必加载整个接口列表的完整契约。</p></div>
+      <div class="card"><span class="badge p1">P1</span><h3>抽出应用服务，再加 HTTP</h3><p>不建议先“把 Electron 拆成前后端”再修功能。先让 IPC 与未来 HTTP 共用同一批 use case。</p></div>
+    </div>
+  </section>
+
+  <section id="agent">
+    <h2>右栏默认 Agent：交互方案</h2>
+    <p>截图中红框标出的右栏面积非常适合成为持续的任务区。SQL、页面和接口详情是阶段性阅读面；Agent 才是跨资源、跨“数据层 → 页面 → 验收”的连续工作面。</p>
+    <div class="split">
+      <div>
+        <h3>建议状态机</h3>
+        <pre>WorkbenchPanel =
+  | { view: 'agent', projectId, sessionId }
+  | { view: 'resource-detail', projectId, resourceRef }
+
+初始进入项目  → agent
+点击资源       → resource-detail
+点击详情关闭 × → agent（同一个 sessionId）
+切换项目       → 切换到该项目会话</pre>
+        <p class="callout">本轮先保证 Agent 实例和消息会话不丢失；关闭详情会恢复同一项目会话。输入草稿和滚动位置的无缝保留可在后续改为同栏可见性切换时补齐。</p>
+      </div>
+      <div class="wire" aria-label="右栏交互示意">
+        <div class="wire-head"><span class="dot"></span><b>frdemo · Agent</b><span class="chip">已绑定 1 个连接</span></div>
+        <div class="wire-message"><b>Agent</b><br>已了解当前项目。告诉我想完成的报表能力，或附加一个资源后继续。</div>
+        <div><span class="chip">@数据接口 book_by_id ×</span> <span class="chip">@页面 book_list ×</span></div>
+        <div class="wire-input">输入任务…　输入 @ 附加资源</div>
+        <p class="callout">点击资源后展示详情；右上角 <b>× 关闭详情</b>，回到这里。资源列表行或详情头部提供“附加到 Agent”。</p>
+      </div>
+    </div>
+
+    <h3>“附加”不是发送一段提示词</h3>
+    <p>现在的上下文提示词已经是正确的最小雏形：告诉 Agent 当前项目、当前资源，以及应当调用什么工具。下一步应把它从一次性自然语言升级为结构化、可见、可删除、可持久化的引用。</p>
+    <pre>ContextRef {
+  projectId: 'frdemo',
+  kind: 'dataset' | 'page' | 'procedure' | 'doc',
+  name: 'book_by_id',
+  lookup: 'read_dataset',
+  revision: 'updatedAt（可选）'
+}</pre>
+    <ul>
+      <li><b>界面：</b>输入框上方显示引用 chip；可移除，可从资源列表“一键附加”，不应自动发送消息。</li>
+      <li><b><code>@</code>：</b>用于资源引用。先选类别（接口、页面、过程、文档），再按名称过滤；默认只列当前项目。</li>
+      <li><b>发送时：</b>运行时把引用转成“该资源在项目 X；先调用工具 Y 获取现状”的隐藏上下文/开发者消息；只有 Agent 真正调用读取工具时才加载正文。</li>
+      <li><b>安全：</b>引用不能成为绕过项目边界的参数。服务端依据会话 scope 校验 <code>projectId</code> 与资源归属。</li>
+    </ul>
+    <div class="note warn"><b>要新增的工具：</b><code>read_dataset(project, name)</code>。目前 <code>list_datasets(project)</code> 的描述明确为“项目内全部接口的完整契约”。用它查看一个接口会既浪费上下文，也让 Agent 更容易误读相邻接口。</div>
+  </section>
+
+  <section id="tools">
+    <h2>当前 Agent 设计：已具备什么能力</h2>
+    <p>代码审查结果：Agent 本体运行在渲染层的 pi 引擎中；工具定义由主进程导出，实际工具执行经 IPC 回到主进程。因此 CPT 质量门、SQL 审计和写入确认没有被模型绕过。会话目前存于渲染端 IndexedDB，并由 Agent 页与工作台右栏共享。</p>
+    <table>
+      <thead><tr><th>能力组</th><th>调整后的工具</th><th>评价</th></tr></thead>
+      <tbody>
+        <tr><td>环境与项目</td><td>不向 Agent 暴露全局项目/连接发现或建项目能力</td><td>项目由界面选择，避免模型把“找工作区”当成开发步骤，也消除跨项目发现入口。</td></tr>
+        <tr><td>数据接口</td><td><code>list_datasets</code>、<code>read_dataset</code>、<code>save_dataset</code>、<code>delete_dataset</code>、<code>build_data_cpt</code>、<code>test_dataset</code></td><td><code>build_data_cpt</code> 在成功后自动验证安全的只读接口；写接口仍需显式测试，避免产生副作用。</td></tr>
+        <tr><td>存储过程</td><td><code>list_procedures</code>、<code>read_procedure</code>、<code>save_procedure</code>、<code>apply_procedure</code></td><td>保留当前项目内的定义与应用；跨项目关联是人工治理动作，不交给 Agent。</td></tr>
+        <tr><td>文档与页面</td><td><code>list_docs</code>、<code>read_doc</code>、<code>write_doc</code>、<code>list_pages</code>、<code>read_page</code>、<code>write_page</code>、<code>create_page</code>、<code>build_page</code>、<code>open_page</code></td><td>已足以在对话中完成页面开发、构建和预览。</td></tr>
+        <tr><td>数据库</td><td><code>sql_query</code>、<code>sql_exec</code>、<code>list_tables</code>、<code>describe_table</code></td><td>读写通道受控，并限制为当前项目已绑定的连接；不接受任意跨库 database 参数。</td></tr>
+      </tbody>
+    </table>
+    <h3>能否直接在 Agent 里完成报表？</h3>
+    <p><b>可以。</b>当前工具集已经覆盖“数据接口、存储过程、页面、构建、实测、预览”的完整主链路。更准确地说，Agent 应作为任务编排入口，而资源详情页应作为核查、手工微调和证据查看入口。对于“修改一个页面及相关数据”，推荐在该项目的 Agent 会话中附加页面与相关接口，再明确目标；Agent 应先读取、给出变更计划，再依次更新和验证。</p>
+  </section>
+
+  <section id="scope">
+    <h2>项目隔离：当前事实与必须补的边界</h2>
+    <div class="grid">
+      <div class="card"><span class="badge good">已有</span><h3>资源归属隔离</h3><p>数据集、过程、过程关联等 SQLite 记录有 <code>project_id</code>；项目目录按项目拆分；接口保存时也校验连接是否属于项目绑定清单。</p></div>
+      <div class="card"><span class="badge good">本轮补齐</span><h3>Agent 访问隔离</h3><p>会话按项目创建；工具执行前由桥接层覆盖项目参数，SQL 连接只能是当前项目绑定连接，并禁止任意 database 参数。</p></div>
+    </div>
+    <div class="note ok"><b>本轮后的回答：</b>在 A 项目中启动的 Agent 只能调用 A 的项目资源及其绑定连接；工具桥接层会忽略模型传入的项目名，并拒绝不在 A 绑定清单内的连接。B 项目的资源不会被列出、读取或修改。</div>
+    <h3>建议的作用域模型</h3>
+    <pre>ExecutionContext {
+  actorId, workspaceId,
+  projectId,                         // 当前工作范围，必填
+  allowedConnectionIds,              // 由项目绑定关系推导，不接收模型声明
+  crossProject: 'deny',
+  sessionId, requestId
+}
+
+executeTool(context, toolName, args)
+  → authorize(context, toolName, args)
+  → service.useCase(context, args)
+  → audit(context, result)</pre>
+    <ul>
+      <li>Agent 会话默认一项目一个 scope；切换项目时切换会话，或明确提示“此会话属于 A”。</li>
+      <li>工具不再相信模型传来的 <code>project</code>；执行层注入当前项目。跨项目过程关联保留为人工界面动作，而非 Agent 权限。</li>
+      <li>SQL 的连接必须由当前项目的绑定连接集合验证；跨库访问另设明确授权，而不是让 <code>database</code> 任意切换。</li>
+      <li>未来服务端应从登录身份推导 actor/workspace/project scope；不要把当前渲染层传入的 scope 当作多用户安全边界。</li>
+    </ul>
+    <p class="source">附带发现：页面服务目前按全局 reportlets 根目录加项目名解析页面路径，而项目服务支持项目自定义目录。服务化前应统一为一个 <code>ProjectArtifactStore.resolve(projectId)</code>，否则“任意项目目录”与页面读写路径并不完全一致。</p>
+  </section>
+
+  <section id="workflow">
+    <h2>用 Agent 完成一个报表：推荐的真实流程</h2>
+    <div class="split">
+      <div class="flow">
+        <div class="node"><b>1. 定位与需求</b>选择项目；附加需求文档、已有页面或接口。Agent 读取文档与当前资源，不直接猜测。</div><div class="arrow"></div>
+        <div class="node"><b>2. 数据摸底</b>读取项目资源；必要时 <code>describe_table</code> / 只读查询确认表结构。</div><div class="arrow"></div>
+        <div class="node"><b>3. 数据层先行</b>需要时建表/保存并应用过程；保存接口契约；构建 <code>_data.cpt</code> 后自动验证安全的只读接口；写接口在确认后实测。</div><div class="arrow"></div>
+        <div class="node"><b>4. 页面层</b>创建或读取 JSX；实现页面；构建页面 CPT；打开预览。</div><div class="arrow"></div>
+        <div class="node"><b>5. 验收与沉淀</b>验证全部数据接口、关键页面预览；将设计决策写入 meta 文档；保留构建与审计证据。</div>
+      </div>
+      <div>
+        <h3>推荐对话方式</h3>
+        <p>直接在项目 Agent 对话中描述目标即可，例如“基于 @需求文档 与 @页面，新增图书编辑能力；先给出影响范围和计划，确认后执行”。</p>
+        <p>对有副作用的操作，Agent 应先声明计划并用只读工具核对；实际 DDL/DML 已要求 <code>confirm: true</code> 且落审计，但未来仍应加入产品级确认卡片，而不是只依赖模型传参。</p>
+        <h3>资源详情页的定位</h3>
+        <p>不是另一个对话入口，而是“证据与微调页”：看 SQL/代码、查看构建与实测记录、手动保存、打开预览、附加给 Agent。这样能避免对话与详情页面争夺同一个右栏的主身份。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="ui">
+    <h2>界面优化：结合新主模型的取舍</h2>
+    <p>整体 UI 已有一致的浅色技术工具语言：顶部导航、蓝色主操作、深色代码区、资源状态标签和编辑器的方向一致。优先级应从“美化卡片”转到“让 Agent 工作区成为稳定中心”。</p>
+    <table>
+      <thead><tr><th>优先级</th><th>观察</th><th>方案</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge p0">P0</span></td><td>详情页里的“用 Agent 做”与构建/保存/实测同列，入口分散且层级相近。</td><td>右栏默认 Agent；资源改为“附加”动作。详情关闭回对话，Agent 入口只保留全局导航与右栏默认态。</td></tr>
+        <tr><td><span class="badge p0">P0</span></td><td>当前 Agent 页面在超宽屏中用户/助手消息横向距离很大，推理虚线块比正文更显眼。</td><td>对话列固定并居中；默认折叠推理；工具结果保持紧凑。右栏模式下使用同一套密度更高的组件。</td></tr>
+        <tr><td><span class="badge p1">P1</span></td><td>三栏工作台在单项目情况下左栏与中栏较占宽，资源列表压缩了任务区。</td><td>左栏可折叠；中栏支持拖拽宽度；右栏设合理最小宽度。资源列表提供行尾附加图标或悬浮菜单。</td></tr>
+        <tr><td><span class="badge p1">P1</span></td><td>连接页和设置页在超宽屏的有效内容偏左，右边大面积留白。</td><td>使用居中 max-width，或采用真正有信息价值的双栏；保存操作做成吸附页脚/标题栏，并显示未保存状态。</td></tr>
+        <tr><td><span class="badge p2">P2</span></td><td>资源组、资源行、卡片和提示条的边线密集；成功状态也多重重复。</td><td>弱化次级分割线，以留白和浅底色分组；默认仅显示主状态，详情再展开实测行数和耗时。</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>可访问性检查项：</b>浅灰辅助文字与浅蓝选中态需实测对比度；没有文字的删除/设置图标需 Tooltip、可读标签和至少 32px 点击面积；窄屏和键盘焦点需要运行态验证，截图无法确认。</div>
+  </section>
+
+  <section id="architecture">
+    <h2>前后端分离 + Electron 壳：可行，而且应当这样演进</h2>
+    <p><b>可行，但不要把“Electron 主进程”简单改名为“后端”。</b>真正应该先抽离的是业务 use case 和基础设施端口；IPC 只是第一种 transport，未来 HTTP/SSE 是第二种 transport。Electron 仍可作为近期首要发布目标，并改为同一 Web 前端的打包壳。</p>
+    <div class="split">
+      <div>
+        <h3>现在</h3>
+        <div class="flow"><div class="node"><b>React Renderer</b>UI、pi Agent、会话 IndexedDB、模型配置读取</div><div class="arrow"></div><div class="node"><b>Electron IPC</b>通用 invoke 通道</div><div class="arrow"></div><div class="node"><b>Main Services</b>SQLite、文件系统、FineReport、MySQL、CPT 构建、工具执行</div></div>
+      </div>
+      <div>
+        <h3>目标</h3>
+        <div class="flow"><div class="node"><b>Web UI / Electron UI</b>同一 React 前端；仅负责显示、输入和资源选择</div><div class="arrow"></div><div class="node"><b>API + Agent Runtime</b>HTTP、SSE、鉴权、会话、作用域工具执行、审批</div><div class="arrow"></div><div class="node"><b>Application Core</b>项目/资源/构建/实测 use case，与 transport 无关</div><div class="arrow"></div><div class="node"><b>Adapters</b>SQLite/Postgres、Artifact Store、FineReport Client、MySQL、审计、队列</div></div>
+      </div>
+    </div>
+    <h3>必须做出的部署选择</h3>
+    <p>构建 CPT 必须写入 FineReport 可读取的 reportlets 目录；所以未来 B/S 模式让<b>服务端与 FineReport 同机或同一受控部署单元</b>，服务端直接持有 reportlets、FineReport Client 与数据库访问。浏览器和 Electron 壳都不再依赖本地 FineReport、报表目录或数据库资源。</p>
+    <table><thead><tr><th>模式</th><th>UI</th><th>资源执行位置</th><th>适用</th></tr></thead><tbody><tr><td>当前桌面版</td><td>Electron Renderer</td><td>Electron Main 本机服务</td><td>现阶段主交付</td></tr><tr><td>目标单环境 B/S</td><td>浏览器 / Electron 壳</td><td>部署 FineReport 的服务端</td><td>团队共享控制台</td></tr><tr><td>多环境平台</td><td>浏览器 / Electron 壳</td><td>每个环境各自部署 FineReport 与应用服务</td><td>多项目、多人、受控部署</td></tr></tbody></table>
+    <div class="note warn"><b>安全变化：</b>Web 化后模型 API Key、数据库密码、DDL 权限、审计日志都不能再由浏览器/渲染层持有。当前 Agent 在渲染层创建且通过 <code>config:get</code> 获得模型配置；目标架构应由服务端持有密钥并在服务端执行 Agent 与工具。</div>
+  </section>
+
+  <section id="roadmap">
+    <h2>不推倒重来的实施路线</h2>
+    <div class="phase"><strong>Phase 0</strong><div><b>已完成首轮边界收敛，继续修路径一致性</b><br>桌面版 Agent 工具已强制当前项目与允许连接，并新增 <code>read_dataset</code>；下一步统一页面/文档/数据产物的项目目录解析。</div></div>
+    <div class="phase"><strong>Phase 1</strong><div><b>完成 Agent-first 工作台</b><br>右栏默认会话、详情临时覆盖、资源附加 chips、仅 <code>@</code> 联想、每项目会话、产品级危险操作确认。</div></div>
+    <div class="phase"><strong>Phase 2</strong><div><b>提取应用核心</b><br>从 <code>src/main</code> 中抽出 project/dataset/page/procedure/build/test use case；把 SQLite、文件、FineReport、MySQL 实现放到 adapter；保留 IPC adapter，行为不变。</div></div>
+    <div class="phase"><strong>Phase 3</strong><div><b>增加服务 API</b><br>用同一 use case 增加 HTTP API 与 SSE Agent 事件流；React 改为 API client；会话、密钥、审批和 FineReport/数据库访问迁到服务端。Electron 壳连接该服务。</div></div>
+    <div class="phase"><strong>Phase 4</strong><div><b>准备多人/远端</b><br>认证、workspace/tenant、RBAC、密钥托管、任务队列与部署健康检查；每个环境由服务端部署 FineReport 与应用服务。此阶段再决定 Postgres/对象存储等基础设施。</div></div>
+    <div class="phase"><strong>Phase 5</strong><div><b>双形态发布</b><br>同一前端产物可在 Web 部署；Electron 仅提供桌面窗口、协议唤起、更新和本地缓存等壳能力，不再承担本地资源执行。</div></div>
+  </section>
+
+  <section>
+    <h2>建议的决策顺序</h2>
+    <ol>
+      <li>确认“每项目一个默认 Agent scope；右栏默认 Agent；详情可关闭返回”的交互原则。</li>
+      <li>跨项目策略固定为默认拒绝；关联外部过程仅由人工界面完成。</li>
+      <li>先实施 Phase 0 和 Phase 1；它们直接解决当前高频体验和越权风险。</li>
+      <li>Phase 2 开始抽服务边界，仍以 Electron 打包为主，不改变用户的安装与使用方式。</li>
+      <li>只有在明确需要浏览器多人使用或远端部署时，再进入 Phase 3 以后的服务化投资。</li>
+    </ol>
+    <p class="source">审查依据：当前项目的 <code>src/main/agent/tools.ts</code>、<code>src/main/agent/piBridge.ts</code>、<code>src/renderer/src/agent/piAgent.ts</code>、<code>src/renderer/src/views/workbench/RightPanel.tsx</code>、项目/页面/连接服务实现，以及此前提供的界面截图。旧工作流参考：<a href="https://github.com/xiaomaomi-distinct/fr-flow-v3">fr-flow-v3</a>（其 README 将 PM、数据、展示、QA 划为顺序流水线）；本控制台适合保留这条质量顺序，但以项目资源与受控 Agent 工具替代难管理的产物和本地 Skill 上下文。</p>
+  </section>
+</main>
+</body>
+</html>

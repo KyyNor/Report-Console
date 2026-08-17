@@ -1,12 +1,12 @@
 /**
  * 工作台右栏 — 资源操作面板（接口/过程/页面/文档四类 + 项目面板 + 内嵌 Agent）
  */
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { CodeBlk, fmtBytes, fmtTime, mdToHtml } from '../../components/ui'
 import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
-import { PiChat } from '../../agent/chat/PiChat'
+import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
 import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, ConnectionHealth, BuildResult, CheckerFinding } from '@shared/types'
 
@@ -93,27 +93,31 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   agentCtx: { project: string; resource?: string } | null
   onExitAgent: () => void
 }): React.ReactElement {
-  if (agentMode) return <AgentPanel ctx={agentCtx} project={ctx.project} onBack={onExitAgent} />
+  if (agentMode) return <AgentPanel ctx={agentCtx} project={ctx.project} data={data} />
   const { sel } = ctx
   const r = sel ? sel : null
   if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} />
   if (r.startsWith('if:')) {
     const ds = data.datasets.find((x) => x.name === r.slice(3))
-    return ds ? <IfPanel key={r} ctx={ctx} ds={ds} st={data.statuses[ds.name]} acts={acts} /> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return ds ? <DetailShell onClose={onExitAgent}><IfPanel key={r} ctx={ctx} ds={ds} st={data.statuses[ds.name]} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
   }
   if (r.startsWith('sp:')) {
     const sp = data.procs.find((x) => x.name === r.slice(3))
-    return sp ? <SpPanel key={r} ctx={ctx} sp={sp} acts={acts} /> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return sp ? <DetailShell onClose={onExitAgent}><SpPanel key={r} ctx={ctx} sp={sp} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
   }
   if (r.startsWith('pg:')) {
     const pg = data.pages.find((x) => x.name === r.slice(3))
-    return pg ? <PgPanel key={r} ctx={ctx} pg={pg} acts={acts} /> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return pg ? <DetailShell onClose={onExitAgent}><PgPanel key={r} ctx={ctx} pg={pg} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
   }
   if (r.startsWith('doc:')) {
     const doc = data.docs.find((x) => x.name === r.slice(4))
-    return doc ? <DocPanel key={r} ctx={ctx} doc={doc} acts={acts} /> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return doc ? <DetailShell onClose={onExitAgent}><DocPanel key={r} ctx={ctx} doc={doc} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
   }
   return <ProjectPanel ctx={ctx} data={data} acts={acts} />
+}
+
+function DetailShell({ children, onClose }: { children: React.ReactElement; onClose: () => void }): React.ReactElement {
+  return <div className="rp-detail"><button className="iconbtn rp-detail-close" title="关闭详情并回到 Agent" onClick={onClose}><Icon n="x" /></button>{children}</div>
 }
 
 // ── 项目面板（未选资源 / 空项目） ───────────────────────────────
@@ -150,7 +154,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
         </div>
         <div className="rp-acts">
           <button className="btn" onClick={() => void acts.verify()} disabled={empty} title="构建 + 实测项目内全部接口"><Icon n="shield" />一键验收</button>
-          <button className="btn pri" onClick={() => acts.useAgent()}><Icon n="ai" />{empty ? '让 Agent 从需求开始' : '用 Agent 做'}</button>
+          <button className="btn pri" onClick={() => acts.useAgent()}><Icon n="ai" />{empty ? '让 Agent 从需求开始' : '返回 Agent'}</button>
           <button className="iconbtn" title="项目设置" onClick={acts.openProjectSettings}><Icon n="set" /></button>
           <button className="iconbtn" title="删除项目（需确认）" onClick={acts.deleteProject}><Icon n="trash" /></button>
         </div>
@@ -222,7 +226,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             <Icon n="box" />{busy === 'build' ? '构建中…' : '构建'}</button>
           <button className="btn" onClick={async () => { setBusy('test'); try { setLastTest(await acts.testDataset(ds.name)) } finally { setBusy('') } }} disabled={!!busy}>
             <Icon n="play" />{busy === 'test' ? '实测中…' : '实测'}</button>
-          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />用 Agent 做</button>
+          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />附加到 Agent</button>
           <button className="iconbtn" title="编辑契约" onClick={() => acts.editDataset(ds)}><Icon n="pen" /></button>
           <button className="iconbtn" title="删除契约（需确认）" onClick={() => { if (confirm(`删除接口 ${ds.name}？（不影响已部署 CPT）`)) void acts.deleteDataset(ds.name) }}><Icon n="trash" /></button>
         </div>
@@ -379,7 +383,7 @@ function SpPanel({ ctx, sp, acts }: { ctx: SelCtx; sp: ProcRecord; acts: WBActs 
         <div className="rp-acts">
           <button className="btn dgr-o" onClick={() => acts.applyProc(sp)}><Icon n="box" />应用 DROP+CREATE</button>
           <button className="btn" onClick={() => acts.callProc(sp)}><Icon n="play" />试执行 CALL</button>
-          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />用 Agent 做</button>
+          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />附加到 Agent</button>
           {linked
             ? <button className="iconbtn" title="解除关联（不影响源项目）" onClick={() => { if (confirm(`解除关联 ${sp.name}？`)) void acts.unlinkProc(sp) }}><Icon n="x" /></button>
             : <button className="iconbtn" title="删除过程（需确认）" onClick={() => { if (confirm(`删除过程契约 ${sp.name}？（数据库中的过程不受影响，meta 语句一并删除）`)) void acts.deleteProc(sp.name) }}><Icon n="trash" /></button>}
@@ -478,7 +482,7 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
           <button className="btn pri" onClick={async () => { setBusy('build'); try { setLastBuild(await acts.buildPage(pg.name)) } finally { setBusy('') } }} disabled={!!busy}>
             <Icon n="box" />{busy === 'build' ? '构建中…' : stale ? '构建（待重建）' : '构建'}</button>
           <button className="btn" onClick={() => void acts.openPage(pg.name)}><Icon n="ext" />预览</button>
-          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />用 Agent 做</button>
+          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />附加到 Agent</button>
           <button className="iconbtn" title="删除（连带 .mjs / .cpt，需确认）" onClick={() => { if (confirm(`删除页面 ${pg.name}？连带 .mjs / .cpt`)) void acts.deletePage(pg.name) }}><Icon n="trash" /></button>
         </div>
       </div>
@@ -573,7 +577,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
             setBusy(true)
             try { await acts.saveDoc(doc.name, content); setDirty(false) } finally { setBusy(false) }
           }} disabled={busy || content === null}><Icon n="pen" />{busy ? '保存中…' : dirty ? '保存*' : '保存'}</button>
-          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />用 Agent 做</button>
+          <button className="btn acc-o" onClick={() => acts.useAgent(key)}><Icon n="ai" />附加到 Agent</button>
           <button className="iconbtn" title="删除（需确认）" onClick={() => { if (confirm(`删除文档 ${doc.name}？`)) void acts.deleteDoc(doc.name) }}><Icon n="trash" /></button>
         </div>
       </div>
@@ -596,44 +600,42 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
-function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource?: string } | null; project: Project | null; onBack: () => void }): React.ReactElement {
-  const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string; ctxSent?: string }>({})
-  const digest = buildDigest(ctx, project)
+function AgentPanel({ ctx, project, data }: { ctx: { project: string; resource?: string } | null; project: Project | null; data: WBData }): React.ReactElement {
+  const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const options = useMemo(() => resourceAttachments(data), [data.datasets, data.procs, data.pages, data.docs])
+
+  useEffect(() => {
+    if (!ctx?.resource) return
+    const attachment = options.find((x) => x.key === ctx.resource)
+    if (attachment) setAttachments((prev) => prev.some((x) => x.key === attachment.key) ? prev : [...prev, attachment])
+  }, [ctx?.resource, options])
 
   useEffect(() => {
     let alive = true
     void (async () => {
       try {
-        const handle = await getSharedPiAgent()
+        if (!project) throw new Error('请先选择项目后再使用 Agent')
+        const handle = await getSharedPiAgent({ project: project.name })
         if (alive) setState((s) => ({ ...s, handle }))
       } catch (e) {
         if (alive) setState({ error: (e as Error).message })
       }
     })()
     return () => { alive = false }
-  }, [])
+  }, [project?.name])
 
-  const sendCtx = async () => {
-    if (!digest || !state.handle) return
-    await state.handle.agent.prompt(digest)
-    setState((s) => ({ ...s, ctxSent: ctx?.resource }))
-  }
+  const digest = buildDigest(project, attachments)
 
   return (
     <div className="rp">
       <div className="ag-head">
-        <button className="iconbtn" title="返回详情" onClick={onBack}><Icon n="back" /></button>
         <span className="ttl">Agent 会话</span>
         {state.handle && <span className="ctx-chip" title="模型在「设置」页配置">{state.handle.modelId}</span>}
-        <button className="iconbtn" title="在「Agent」页查看完整会话与历史" onClick={onBack}><Icon n="clock" /></button>
       </div>
       <div className="ag-ctx">
-        {ctx?.project && <span className="ctx-chip">项目 <b>{ctx.project}</b></span>}
-        {ctx?.resource && <span className="ctx-chip">资源 <b>{ctx.resource}</b></span>}
+        {project && <span className="ctx-chip">项目 <b>{project.name}</b></span>}
         {project?.connections.map((c) => <span key={c} className="ctx-chip">连接 <b>{c}</b></span>)}
-        {digest && state.ctxSent !== ctx?.resource && (
-          <button className="btn sm acc-o" onClick={() => void sendCtx()} disabled={!state.handle}><Icon n="send" />把上下文发给 Agent</button>
-        )}
       </div>
       <div className="ag-thread-wrap" style={{ padding: '8px 10px 10px', display: 'flex' }}>
         {state.error
@@ -641,22 +643,38 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
           : !state.handle
             ? <div className="banner info" style={{ margin: 12 }}><Icon n="info" /><div>正在初始化（加载平台工具与会话）…</div></div>
             : null}
-        {state.handle && <PiChat handle={state.handle} />}
+        {state.handle && <PiChat
+          handle={state.handle}
+          contextPrefix={digest}
+          attachments={attachments}
+          mentionOptions={options}
+          onAttach={(a) => setAttachments((prev) => prev.some((x) => x.key === a.key) ? prev : [...prev, a])}
+          onDetach={(key) => setAttachments((prev) => prev.filter((x) => x.key !== key))}
+          placeholder="描述开发任务；输入 @ 附加当前项目资源…"
+        />}
       </div>
     </div>
   )
 }
 
-/** 组装上下文摘要（发送给 Agent 的第一条消息） */
-function buildDigest(ctx: { project: string; resource?: string } | null, project: Project | null): string {
-  if (!ctx) return ''
-  const lines = [`[上下文] 当前项目：${ctx.project}`]
-  if (project) lines.push(`绑定连接：${project.connections.join('、')}`)
-  if (ctx.resource) {
-    const [kind, name] = [ctx.resource.slice(0, ctx.resource.indexOf(':')), ctx.resource.slice(ctx.resource.indexOf(':') + 1)]
+function resourceAttachments(data: WBData): ChatAttachment[] {
+  return [
+    ...data.datasets.map((x) => ({ key: `if:${x.name}`, label: `接口 ${x.name}` })),
+    ...data.procs.map((x) => ({ key: `sp:${x.name}`, label: `过程 ${x.name}` })),
+    ...data.pages.map((x) => ({ key: `pg:${x.name}`, label: `页面 ${x.name}` })),
+    ...data.docs.map((x) => ({ key: `doc:${x.name}`, label: `文档 ${x.name}` }))
+  ]
+}
+
+/** 每次任务附带轻量引用；Agent 必须主动调读取工具，资源正文不会进入聊天上下文。 */
+function buildDigest(project: Project | null, attachments: ChatAttachment[]): string {
+  if (!project) return ''
+  const lines = [`[上下文] 当前项目：${project.name}`, `绑定连接：${project.connections.join('、')}`]
+  for (const attachment of attachments) {
+    const [kind, name] = [attachment.key.slice(0, attachment.key.indexOf(':')), attachment.key.slice(attachment.key.indexOf(':') + 1)]
     const kindName = kind === 'if' ? '数据接口' : kind === 'sp' ? '存储过程' : kind === 'pg' ? '页面' : '文档'
-    lines.push(`当前选中资源：${kindName} ${name}`)
-    lines.push(`请先用相应工具（${kind === 'if' ? 'list_datasets' : kind === 'sp' ? 'read_procedure' : kind === 'pg' ? 'read_page' : 'read_doc'}）了解它的现状，再等我下一步指示。`)
+    const tool = kind === 'if' ? 'read_dataset' : kind === 'sp' ? 'read_procedure' : kind === 'pg' ? 'read_page' : 'read_doc'
+    lines.push(`附加资源：${kindName} ${name}；需要现状时先调用 ${tool}。`)
   }
   return lines.join('\n')
 }

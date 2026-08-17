@@ -39,7 +39,7 @@ export default function WorkbenchView(): React.ReactElement {
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [modal, setModal] = useState<ModalState>(null)
-  const [agentMode, setAgentMode] = useState(false)
+  const [agentMode, setAgentMode] = useState(true)
   const [agentCtx, setAgentCtx] = useState<{ project: string; resource?: string } | null>(null)
 
   // 项目资源
@@ -106,10 +106,16 @@ export default function WorkbenchView(): React.ReactElement {
     if (sel === 'if:__pending__' && datasets.length) setSel(`if:${datasets[0].name}`)
   }, [datasets, sel])
 
+  // 右栏以 Agent 为默认；点资源才临时进入详情，关闭详情回到原会话。
+  useEffect(() => {
+    if (sel && sel !== 'if:__pending__') setAgentMode(false)
+  }, [sel])
+
   const selectProject = (name: string) => {
     setCur(name)
     setSel(null)
-    setAgentMode(false)
+    setAgentCtx({ project: name })
+    setAgentMode(true)
   }
 
   /** 打开本地项目：选目录 → 读 project.json 注册进本机账本 */
@@ -347,6 +353,7 @@ export default function WorkbenchView(): React.ReactElement {
                         <div className="sub">{x.type === 'markdown' ? 'Markdown' : x.type === 'sql' ? 'SQL' : '文件'} · meta/ 目录</div>
                       </div>
                       <div className="meta">{fmtShort(new Date(x.mtime).toISOString())}</div>
+                      <button className="row-attach" title="附加到 Agent" onClick={(e) => { e.stopPropagation(); acts.useAgent(`doc:${x.name}`) }}><Icon n="ai" size={13} /></button>
                     </div>
                   ))}
                 </Group>
@@ -376,6 +383,7 @@ export default function WorkbenchView(): React.ReactElement {
                           <div className="sub">{fmtBytes(x.size)} · 产物 {x.cptExists ? '.mjs+.cpt' : '-'}</div>
                         </div>
                         <div className="meta">构建<br />{x.lastBuildAt ? fmtShort(x.lastBuildAt) : '-'}</div>
+                        <button className="row-attach" title="附加到 Agent" onClick={(e) => { e.stopPropagation(); acts.useAgent(`pg:${x.name}`) }}><Icon n="ai" size={13} /></button>
                       </div>
                     )
                   })}
@@ -410,6 +418,7 @@ export default function WorkbenchView(): React.ReactElement {
                           <div className="sub"><span className="cbadge"><Icon n="db" />{x.connection}</span>{sub}</div>
                         </div>
                         <div className="meta">构建<br />{fmtShort(statuses[x.name]?.build)}</div>
+                        <button className="row-attach" title="附加到 Agent" onClick={(e) => { e.stopPropagation(); acts.useAgent(`if:${x.name}`) }}><Icon n="ai" size={13} /></button>
                       </div>
                     )
                   })}
@@ -448,6 +457,7 @@ export default function WorkbenchView(): React.ReactElement {
                         <div className="sub">{x.comment || '-'}</div>
                       </div>
                       <div className="meta">{fmtShort(x.updatedAt)}<br />{x.appliedCount} 次应用</div>
+                      <button className="row-attach" title="附加到 Agent" onClick={(e) => { e.stopPropagation(); acts.useAgent(`sp:${x.name}`) }}><Icon n="ai" size={13} /></button>
                     </div>
                   ))}
                 </Group>
@@ -464,7 +474,7 @@ export default function WorkbenchView(): React.ReactElement {
             acts={acts}
             agentMode={agentMode}
             agentCtx={agentCtx}
-            onExitAgent={() => setAgentMode(false)}
+            onExitAgent={() => { setSel(null); setAgentCtx(cur ? { project: cur } : null); setAgentMode(true) }}
           />
         </aside>
       </div>

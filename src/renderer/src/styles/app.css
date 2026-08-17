@@ -231,6 +231,7 @@ svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px
 .grp-empty .mini{display:inline-flex;align-items:center;gap:5px;margin:8px 6px 0 0;padding:4px 10px;
   border:1px solid var(--border2);border-radius:6px;font-size:11px;color:var(--muted);cursor:pointer}
 .grp-empty .mini:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-s)}
+.row-attach{flex:none;display:grid;place-items:center;width:26px;height:26px;margin-left:5px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--faint);cursor:pointer;opacity:0}.row:hover .row-attach,.row:focus-within .row-attach{opacity:1}.row-attach:hover{border-color:oklch(84% .04 259);background:var(--accent-s);color:var(--accent)}
 .nores{padding:30px;text-align:center;color:var(--faint);font-size:12px}
 .placeholder{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   color:var(--faint);padding:30px;text-align:center}
@@ -239,6 +240,7 @@ svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px
 
 /* ---- 右栏 · 操作面板 ---- */
 .col-right{min-height:0;display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--border)}
+.rp-detail{position:relative;height:100%;min-height:0}.rp-detail>.rp{height:100%}.rp-detail-close{position:absolute;z-index:2;right:12px;top:12px;background:var(--surface)}
 .rp{display:flex;flex-direction:column;height:100%;min-height:0}
 .rp-head{flex:none;padding:12px 16px 0;border-bottom:1px solid var(--border);background:var(--surface)}
 .rp-r1{display:flex;align-items:center;gap:8px;min-width:0}
@@ -497,6 +499,11 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
   padding:8px 10px;overflow:auto;max-height:280px;white-space:pre-wrap;word-break:break-all}
 
 .rc-composer{flex:none;border-top:1px solid var(--border);background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.rc-attachments{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.rc-attachment{display:inline-flex;align-items:center;gap:5px;padding:3px 5px 3px 8px;border:1px solid oklch(84% .04 259);border-radius:6px;background:var(--accent-s);color:oklch(42% .1 259);font:10.5px var(--font-mono)}
+.rc-attachment button{display:grid;place-items:center;width:15px;height:15px;border:0;border-radius:3px;background:transparent;color:inherit;font:14px/1 var(--font-ui);cursor:pointer}.rc-attachment button:hover{background:oklch(80% .04 259)}
+.rc-mentions{display:flex;flex-direction:column;max-height:184px;overflow:auto;border:1px solid var(--border2);border-radius:var(--r2);background:var(--surface);box-shadow:0 8px 22px #26384a18;padding:4px}
+.rc-mentions button{display:flex;align-items:center;gap:6px;padding:6px 8px;border:0;border-radius:5px;background:transparent;color:var(--fg);font:11px var(--font-mono);text-align:left;cursor:pointer}.rc-mentions button:hover{background:var(--accent-s);color:var(--accent)}
 .rc-composer textarea{resize:none;border:1px solid var(--border2);border-radius:var(--r2);background:var(--surface);
   padding:8px 11px;font-size:12.5px;line-height:1.6;max-height:130px;outline:none;width:100%}
 .rc-composer textarea:focus{border-color:var(--accent)}

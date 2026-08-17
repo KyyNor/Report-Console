@@ -48,9 +48,20 @@ function useChatView(agent: Agent): ChatView {
 
 // ── 主组件 ──────────────────────────────────────────────────────
 
-export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…' }: {
+export interface ChatAttachment {
+  key: string
+  label: string
+}
+
+export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach }: {
   handle: PiAgentHandle
   placeholder?: string
+  /** 每次任务发送时附带的轻量资源引用，不含资源正文。 */
+  contextPrefix?: string
+  attachments?: ChatAttachment[]
+  mentionOptions?: ChatAttachment[]
+  onAttach?: (attachment: ChatAttachment) => void
+  onDetach?: (key: string) => void
 }): React.ReactElement {
   const agent = handle.agent
   const view = useChatView(agent)
@@ -93,7 +104,18 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
     setDraft('')
     requestAnimationFrame(autoSize)
     stick.current = true
-    void agent.prompt(text)
+    void agent.prompt(contextPrefix ? `${contextPrefix}\n\n[任务]\n${text}` : text)
+  }
+
+  const mention = /(?:^|\s)@([^\s@]*)$/.exec(draft)
+  const mentionQuery = mention?.[1].toLowerCase() ?? ''
+  const mentionMatches = mention
+    ? mentionOptions.filter((o) => !attachments.some((a) => a.key === o.key) && o.label.toLowerCase().includes(mentionQuery)).slice(0, 7)
+    : []
+  const pickMention = (attachment: ChatAttachment) => {
+    onAttach?.(attachment)
+    setDraft((v) => v.replace(/(?:^|\s)@([^\s@]*)$/, (m) => m.startsWith(' ') ? ' ' : ''))
+    requestAnimationFrame(() => taRef.current?.focus())
   }
 
   const streamingAssistant = view.streaming?.role === 'assistant' ? view.streaming : undefined
@@ -129,6 +151,12 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
         </div>
       </div>
       <div className="rc-composer">
+        {attachments.length > 0 && <div className="rc-attachments" aria-label="已附加资源">
+          {attachments.map((a) => <span key={a.key} className="rc-attachment">@{a.label}<button title={`移除 ${a.label}`} onClick={() => onDetach?.(a.key)}>×</button></span>)}
+        </div>}
+        {mention && mentionMatches.length > 0 && <div className="rc-mentions" role="listbox" aria-label="资源建议">
+          {mentionMatches.map((a) => <button key={a.key} type="button" onClick={() => pickMention(a)}><Icon n="link" size={12} />@{a.label}</button>)}
+        </div>}
         <textarea
           ref={taRef}
           value={draft}
@@ -156,8 +184,10 @@ function UserCard({ msg }: { msg: Extract<AgentMessage, { role: 'user' }> }): Re
   const text = typeof msg.content === 'string'
     ? msg.content
     : msg.content.filter((b): b is TextContent => b.type === 'text').map((b) => b.text).join('\n')
-  if (!text.trim()) return null
-  return <div className="rc-msg user"><div className="rc-bubble">{text}</div></div>
+  // 资源引用是运行时上下文，不重复占用用户消息的视觉空间。
+  const shown = text.includes('\n[任务]\n') ? text.slice(text.lastIndexOf('\n[任务]\n') + 6) : text
+  if (!shown.trim()) return null
+  return <div className="rc-msg user"><div className="rc-bubble">{shown}</div></div>
 }
 
 // ── 助手消息：thinking / text / toolCall 块序 + 元信息脚注 ───────

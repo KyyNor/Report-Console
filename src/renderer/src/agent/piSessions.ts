@@ -25,6 +25,7 @@ interface SessionRecord extends SessionData {
   modifiedAt: string
   messageCount: number
   preview: string
+  project?: string
 }
 
 let initPromise: Promise<IDBDatabase> | null = null
@@ -65,10 +66,10 @@ export interface RestoredSession {
 }
 
 /** 恢复最近一次会话；无历史时返回 null（调用方走全新会话） */
-export async function restoreLatestSession(): Promise<RestoredSession | null> {
+export async function restoreLatestSession(project: string): Promise<RestoredSession | null> {
   try {
     const db = await initSessionStorage()
-    const all = await reqAs(tx(db, 'readonly').getAll())
+    const all = (await reqAs(tx(db, 'readonly').getAll()) as SessionRecord[]).filter((r) => r.project === project)
     if (all.length === 0) return null
     const latest = all.reduce((a, b) => ((b as SessionRecord).modifiedAt > (a as SessionRecord).modifiedAt ? b : a)) as SessionRecord
     if (!Array.isArray(latest?.messages)) return null
@@ -88,6 +89,7 @@ export interface SaveSnapshot {
   id: string
   title: string
   createdAt: string
+  project: string
 }
 
 /** 保存当前 AgentState（message_end / agent_end 时调用；元数据保留首次创建时间与标题） */
@@ -104,6 +106,7 @@ export async function saveSessionSnapshot(
       modifiedAt: new Date().toISOString(),
       messageCount: state.messages.length,
       preview: previewFromMessages(state.messages),
+      project: snapshot.project,
       messages: state.messages,
       thinkingLevel: state.thinkingLevel
     }

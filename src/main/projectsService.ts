@@ -241,6 +241,15 @@ export function listDatasets(project: string): Dataset[] {
   return rows.map(rowToDataset)
 }
 
+/** 读取单个接口契约，供 Agent 按资源引用精确加载，避免把整个项目接口塞入上下文。 */
+export function readDataset(project: string, name: string): Dataset {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const row = getDb().prepare('SELECT * FROM datasets WHERE project_id=? AND name=?').get(p.id, name) as Record<string, unknown> | undefined
+  if (!row) throw new Error(`接口不存在：${project}/${name}`)
+  return rowToDataset(row)
+}
+
 /** 每个接口的最近实测状态（api_tests 只增不改，取每 dataset 最新一条） */
 export function datasetStatuses(project: string): Record<string, DatasetStatus> {
   const p = getProjectByName(project)

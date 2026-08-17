@@ -10,9 +10,6 @@ import { z } from 'zod'
 import * as projects from '../projectsService'
 import * as pages from '../pagesService'
 import * as sql from '../mysqlService'
-import * as conns from '../connectionsService'
-import { pingFrServer } from '../frClient'
-import { getSettings } from '../db'
 
 export { SYSTEM_PROMPT } from '@shared/agentPrompt'
 
@@ -30,49 +27,17 @@ const connRef = z.object({ id: z.number().optional(), name: z.string().optional(
 
 export function buildTools() {
   return {
-    // ── 环境 ──────────────────────────────────────────────
-    fr_status: tool({
-      description: '检查开发环境：帆软服务连通性、各数据连接连通性、reportlets 目录可写性',
-      parameters: z.object({}),
-      execute: async () => {
-        const fr = await pingFrServer()
-        const health = await projects.connectionsHealth()
-        const s = getSettings()
-        let writable = false
-        try { const fs = await import('fs'); fs.accessSync(s.reportletsPath, fs.constants.W_OK); writable = true } catch { writable = false }
-        return { fr, connections: health, reportletsPath: s.reportletsPath, reportletsWritable: writable }
-      }
-    }),
-
-    // ── 连接注册表 ────────────────────────────────────────
-    list_connections: tool({
-      description: '列出连接注册表（名字与帆软数据连接一致，接口/过程绑定用名字引用）',
-      parameters: z.object({}),
-      execute: async () => conns.listConnections().map((c) => ({ name: c.name, host: c.host, port: c.port, user: c.user, database: c.database, comment: c.comment }))
-    }),
-
-    // ── 项目 ──────────────────────────────────────────────
-    list_projects: tool({
-      description: '列出全部项目：绑定连接、资源规模、目录是否缺失',
-      parameters: z.object({}),
-      execute: async () => projects.listProjects().map((p) => ({ name: p.name, connections: p.connections, counts: p.counts, missingDir: p.missingDir, comment: p.comment }))
-    }),
-
-    create_project: tool({
-      description: '创建项目（= reportlets 子目录，自动建 data/ pages/ meta/ 三目录）。需绑定至少一个已注册连接',
-      parameters: z.object({
-        name: z.string().regex(/^[a-z][a-z0-9_]*$/, '小写字母开头，仅字母/数字/下划线'),
-        connections: z.array(z.string()).min(1).describe('绑定的连接名（来自连接注册表）'),
-        comment: z.string().optional()
-      }),
-      execute: async ({ name, connections, comment }) => projects.createProject(name, connections, comment)
-    }),
-
     // ── 接口契约 ──────────────────────────────────────────
     list_datasets: tool({
       description: '列出项目内全部接口（数据集）的完整契约：参数、SQL、类型、所属连接',
       parameters: z.object({ project: z.string() }),
       execute: async ({ project }) => projects.listDatasets(project)
+    }),
+
+    read_dataset: tool({
+      description: '读取项目内单个接口的完整契约（参数、SQL、类型、所属连接）。资源以 @ 附加时优先使用，避免读取全部接口。',
+      parameters: z.object({ project: z.string(), name: z.string() }),
+      execute: async ({ project, name }) => projects.readDataset(project, name)
     }),
 
     save_dataset: tool({
@@ -105,9 +70,20 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     build_data_cpt: tool({
-      description: '构建项目数据层 CPT 并部署到 reportlets/{project}/data/（一项目一页，页内每数据集各带连接名）。质量门不过会拒绝落盘并返回 findings',
+      description: '构建项目数据层 CPT 并自动实测所有只读接口（list/stat/detail/dict/other）。一项目一页，质量门不过会拒绝落盘；写接口不自动调用，仍须显式 test_dataset。',
       parameters: z.object({ project: z.string() }),
-      execute: async ({ project }) => projects.buildDataCpt(project)
+      execute: async ({ project }) => {
+        const build = projects.buildDataCpt(project)
+        if (!build.ok) return { build, validation: [] }
+        const datasets = projects.listDatasets(project)
+        const validation = await Promise.all(datasets
+          .filter((d) => !['insert', 'update', 'delete'].includes(d.kind))
+          .map(async (d) => {
+            const t = await projects.testDataset(project, d.name)
+            return { dataset: d.name, ok: t.ok, errCode: t.errCode, rowCount: t.rowCount, durationMs: t.durationMs }
+          }))
+        return { build, validation }
+      }
     }),
 
     test_dataset: tool({
@@ -120,19 +96,6 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
       execute: async ({ project, dataset, overrides }) => {
         const r = await projects.testDataset(project, dataset, overrides ?? {})
         return { ok: r.ok, errCode: r.errCode, durationMs: r.durationMs, rowCount: r.rowCount, response: truncate(r.response) }
-      }
-    }),
-
-    verify_project: tool({
-      description: '构建数据层 CPT 并实测项目内全部接口，返回逐项通过情况（数据层验收）',
-      parameters: z.object({ project: z.string() }),
-      execute: async ({ project }) => {
-        const { build, tests } = await projects.verifyProject(project)
-        return {
-          buildOk: build.ok,
-          buildFindings: build.findings,
-          datasets: tests.map((t) => ({ dataset: t.dataset, ok: t.ok, errCode: t.errCode, rowCount: t.rowCount, durationMs: t.durationMs, err: t.ok ? undefined : JSON.stringify(t.response).slice(0, 300) }))
-        }
       }
     }),
 
@@ -166,21 +129,6 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
       description: '把过程定义应用到数据库（DROP IF EXISTS + CREATE，审计落库，定义取 meta/ 文件）',
       parameters: z.object({ project: z.string(), name: z.string() }),
       execute: async ({ project, name }) => projects.applyProjectProcedure(project, name)
-    }),
-
-    link_procedure: tool({
-      description: '关联其他项目的过程到本项目（引用不复制；本项目接口 SQL 可直接 CALL）',
-      parameters: z.object({
-        project: z.string(),
-        srcProject: z.string().describe('过程归属的源项目名'),
-        name: z.string()
-      }),
-      execute: async ({ project, srcProject, name }) => {
-        const target = projects.listProcedures(srcProject).find((x) => x.name === name && x.own)
-        if (!target) throw new Error(`源项目 ${srcProject} 没有自有过程 ${name}`)
-        projects.linkProcedure(project, target.id)
-        return { ok: true }
-      }
     }),
 
     // ── 项目文档（meta/） ────────────────────────────────
@@ -299,14 +247,5 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
       execute: async ({ table, connection, database }) => sql.describeTable(table, database, connection)
     }),
 
-    // ── 历史 ──────────────────────────────────────────────
-    recent_history: tool({
-      description: '查看最近的构建与接口测试历史',
-      parameters: z.object({}),
-      execute: async () => ({
-        builds: projects.listBuilds(10),
-        apiTests: projects.listApiTests(10)
-      })
-    })
   }
 }

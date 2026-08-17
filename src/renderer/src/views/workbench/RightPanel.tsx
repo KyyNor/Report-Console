@@ -2,14 +2,12 @@
  * 工作台右栏 — 资源操作面板（接口/过程/页面/文档四类 + 项目面板 + 内嵌 Agent）
  */
 import React, { useEffect, useRef, useState } from 'react'
-import '@earendil-works/pi-web-ui'
-import '@earendil-works/pi-web-ui/app.css'
 import { Icon } from '../../components/Icon'
 import { CodeBlk, fmtBytes, fmtTime, mdToHtml } from '../../components/ui'
 import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
-import { getSharedPiAgent } from '../../agent/piAgent'
+import { getSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
+import { PiChat } from '../../agent/chat/PiChat'
 import { call } from '../../api'
-import type { ChatPanelElement } from '../../pi-elements'
 import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, ConnectionHealth, BuildResult, CheckerFinding } from '@shared/types'
 
 export interface WBData {
@@ -599,8 +597,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
 function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource?: string } | null; project: Project | null; onBack: () => void }): React.ReactElement {
-  const panelRef = useRef<ChatPanelElement | null>(null)
-  const [state, setState] = useState<{ ready: boolean; mode?: string; error?: string; ctxSent?: string; modelId?: string }>({ ready: false })
+  const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string; ctxSent?: string }>({})
   const digest = buildDigest(ctx, project)
 
   useEffect(() => {
@@ -608,23 +605,17 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
     void (async () => {
       try {
         const handle = await getSharedPiAgent()
-        if (!alive) return
-        await panelRef.current?.setAgent?.(handle.agent, { onApiKeyRequired: async () => true })
-        // 模型唯一入口是「设置」页：关闭 pi 自带的目录模型选择器（同 Agent 页）
-        if (panelRef.current?.agentInterface) panelRef.current.agentInterface.enableModelSelector = false
-        if (alive) setState({ ready: true, mode: handle.mode, modelId: handle.modelId })
+        if (alive) setState((s) => ({ ...s, handle }))
       } catch (e) {
-        if (alive) setState({ ready: false, error: (e as Error).message })
+        if (alive) setState({ error: (e as Error).message })
       }
     })()
     return () => { alive = false }
   }, [])
 
   const sendCtx = async () => {
-    if (!digest || !state.ready) return
-    const { getSharedPiAgent } = await import('../../agent/piAgent')
-    const handle = await getSharedPiAgent()
-    await handle.agent.prompt(digest)
+    if (!digest || !state.handle) return
+    await state.handle.agent.prompt(digest)
     setState((s) => ({ ...s, ctxSent: ctx?.resource }))
   }
 
@@ -633,9 +624,9 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
       <div className="ag-head">
         <button className="iconbtn" title="返回详情" onClick={onBack}><Icon n="back" /></button>
         <span className="ttl">Agent 会话</span>
-        {state.mode === 'faux' && <span className="tag upd">Faux 演示</span>}
-        {state.mode === 'real' && <span className="tag dict">真实模型</span>}
-        {state.ready && state.modelId && <span className="ctx-chip" title="模型在「设置」页配置">{state.modelId}</span>}
+        {state.handle?.mode === 'faux' && <span className="tag upd">Faux 演示</span>}
+        {state.handle?.mode === 'real' && <span className="tag dict">真实模型</span>}
+        {state.handle && <span className="ctx-chip" title="模型在「设置」页配置">{state.handle.modelId}</span>}
         <button className="iconbtn" title="在「Agent」页查看完整会话与历史" onClick={onBack}><Icon n="clock" /></button>
       </div>
       <div className="ag-ctx">
@@ -643,16 +634,16 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
         {ctx?.resource && <span className="ctx-chip">资源 <b>{ctx.resource}</b></span>}
         {project?.connections.map((c) => <span key={c} className="ctx-chip">连接 <b>{c}</b></span>)}
         {digest && state.ctxSent !== ctx?.resource && (
-          <button className="btn sm acc-o" onClick={() => void sendCtx()} disabled={!state.ready}><Icon n="send" />把上下文发给 Agent</button>
+          <button className="btn sm acc-o" onClick={() => void sendCtx()} disabled={!state.handle}><Icon n="send" />把上下文发给 Agent</button>
         )}
       </div>
-      <div className="ag-thread-wrap rc-pi-agent" style={{ padding: '8px 10px 10px', display: 'flex' }}>
+      <div className="ag-thread-wrap" style={{ padding: '8px 10px 10px', display: 'flex' }}>
         {state.error
           ? <div className="banner err" style={{ margin: 12 }}><Icon n="cx" /><div><b>Agent 初始化失败</b><br />{state.error}</div></div>
-          : !state.ready
+          : !state.handle
             ? <div className="banner info" style={{ margin: 12 }}><Icon n="info" /><div>正在初始化（加载平台工具与会话）…</div></div>
             : null}
-        <pi-chat-panel ref={panelRef} style={{ flex: 1, minHeight: 0 }} />
+        {state.handle && <PiChat handle={state.handle} />}
       </div>
     </div>
   )

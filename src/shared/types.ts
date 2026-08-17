@@ -152,6 +152,6 @@ export interface StatusPayload {
 }
 
 // ── Agent ───────────────────────────────────────────────────────
-// Agent 引擎为 pi（渲染层 @earendil-works/pi-agent-core + pi-web-ui），
-// 会话持久化走 IndexedDB（官方 SessionsStore），平台工具经 piBridge 的
+// Agent 引擎为 pi（渲染层 @earendil-works/pi-agent-core，聊天界面为自研组件），
+// 会话持久化走 IndexedDB（自研存储层），平台工具经 piBridge 的
 // pi:toolDefs / pi:toolExec IPC 通道回主进程执行——详见 src/main/agent/。

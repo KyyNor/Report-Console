@@ -22,7 +22,8 @@ npm run dev          # 开发模式（electron-vite，热更新）
 npm test             # vitest 单元测试（CPT 生成/变换/质量门，含 Python 黄金对照）
 npm run typecheck    # tsc --noEmit
 npm run selftest     # 集成自检：构建后对真实帆软+MySQL 跑 27 步全链路（幂等，exit 0/1）
-npm run smoke        # 冒烟：构建后启动并截图 smoke.png（SMOKE_VIEW=workbench 深链指定视图）
+npm run smoke        # 冒烟：构建后启动并截图 smoke.png（SMOKE_VIEW=agent|workbench|connections 深链；
+                      #  SMOKE_AUTOSEND=1 自动发消息、SMOKE_WAIT_MS 控制截图前等待，探针输出聊天 DOM 统计与会话落库校验）
 npm run pack         # electron-builder 打包（dist/，不装 dmg）
 ```
 
@@ -54,19 +55,21 @@ src/main/               Electron 主进程
   agent/piBridge.ts     工具 JSON Schema 导出 + 受控执行（渲染层 pi Agent 经 pi:toolDefs/pi:toolExec 调用）
   selftest.ts           27 步全链路自检（连接→建表→过程→项目→契约→构建→实测→页面→预览→文档）
   templates/            数据/页面 CPT 骨架（?raw 导入）+ 页面脚手架 blank/list/form
-src/renderer/           React 19 + CodeMirror，深色 tech-utility 主题（样式移植 docs/prototypes/workbench.html）
+src/renderer/           React 19 + CodeMirror，浅色 tech-utility 主题、深色代码块（样式移植 docs/prototypes/workbench.html）
   App.tsx               自绘标题栏（无边框窗口）+ 图标侧栏五入口：总览/项目(工作台)/连接/Agent/设置
   views/workbench/      三栏工作台：左=项目选择器+环境状态，中=四组资源（接口/过程/页面/文档），
                         右=操作面板（构建/实测/编辑/弹层确认）+ 内嵌 Agent（与 Agent 页共享单例会话）
   views/ConnectionsView.tsx  连接注册表管理（CRUD + 连通测试）
   agent/piAgent.ts      pi Agent 工厂：@earendil-works/pi-agent-core 跑在渲染层，
                         工具经 IPC 桥回主进程；无 Key 时回落 faux 演示模式；getSharedPiAgent 共享单例。
-                        模型唯一入口是设置页：pi 自带的全量目录模型选择器已禁用（enableModelSelector=false），
+                        模型唯一入口是设置页（自研聊天界面没有模型选择器），
                         会话恢复与 streamFn 对未注册 provider 一律回落当前配置（否则报 Unknown provider）
-  agent/piSessions.ts   会话持久化：官方 SessionsStore + IndexedDB（随 userData 走），
+  agent/piSessions.ts   会话持久化：自研 IndexedDB 存储（库 rc-pi-sessions，随 userData 走），
                         启动恢复最近会话、message_end/agent_end 自动快照
-  views/AgentView.tsx   官方 @earendil-works/pi-web-ui 组件（<pi-chat-panel>，light DOM），
-                        主题经 CSS 设计变量对齐深色主题（styles/app.css .rc-pi-agent）
+  agent/chat/           自研聊天 UI（替代 pi-web-ui）：PiChat 订阅 Agent 事件流渲染
+                        消息/流式/思考/工具块（调用与结果配对、运行中自动展开），
+                        Markdown 为 markdown-it（html:false 默认转义）+ 复用 ui.tsx hl() 高亮
+  views/AgentView.tsx   Agent 页壳（初始化/新建会话/状态），聊天主体是 agent/chat/PiChat
 src/shared/types.ts     主进程/渲染层/Agent 工具共用的类型（v2：Connection/Project/Dataset+connection/ProcRecord/DocMeta）
 src/shared/agentPrompt.ts Agent 系统提示词（项目制约定内化）
 tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照（含页内多连接用例）
@@ -108,4 +111,4 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 - SQLite 时间列用 `datetime('now','localtime')`（本地时区），别混用 ISO UTC。
 - 帆软 `/api/data` 的参数 `type` 用 `String/Integer/Double`（首字母大写），与契约内小写类型是两套表示（`projectsService.ts` 的 typeMap 负责映射）。
 - v1 存量库首启会自动迁移（modules→legacy_modules、datasets→legacy_datasets、settings mysql* → connections 种子）；迁移逻辑幂等，别手改 legacy_* 表。
-- pi-web-ui 是 Lit light DOM 组件，React 19 原生支持 custom elements（见 pi-elements.d.ts）；实例方法（setAgent）经 ref 调用。
+- 聊天 UI 是自研 React 组件（agent/chat/PiChat），视图状态由 Agent 事件驱动（rAF 合并刷新）；渲染必须走 Markdown 组件（markdown-it html:false），不要往 dangerouslySetInnerHTML 塞未转义的模型输出。

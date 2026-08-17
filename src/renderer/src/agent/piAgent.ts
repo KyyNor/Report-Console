@@ -1,7 +1,7 @@
 /**
  * pi Agent 工厂 — 在渲染层构建 @earendil-works/pi-agent-core 的 Agent
  *
- * 架构：Agent 本体跑在渲染层（pi-web-ui 组件直接订阅其事件流），
+ * 架构：Agent 本体跑在渲染层（自研聊天组件订阅其事件流，见 chat/PiChat），
  * 平台工具经 IPC 桥回主进程执行（质量门/审计/confirm 约束全部留在工具层）。
  * 模型接入：设置页的 OpenAI/Anthropic 兼容配置；未配置 Key 时回落 faux 演示模式。
  */

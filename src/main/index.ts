@@ -17,31 +17,28 @@ function bootstrap(): void {
     // 转发渲染层 console，便于冒烟排查
     win.webContents.on('console-message', (_e, _level, msg) => console.log('[renderer]', msg))
     win.webContents.once('did-finish-load', () => {
+      // SMOKE_WAIT_MS 可覆盖等待时长（如 autosend 自检需要等 faux 流式完成）
+      const waitMs = Number(process.env.SMOKE_WAIT_MS) || 2500
       setTimeout(async () => {
         try {
           const info = await win.webContents.executeJavaScript(`(async () => {
-            const deepText = (el) => {
-              let t = (el.textContent || '')
-              if (el.shadowRoot) for (const c of el.shadowRoot.querySelectorAll('*')) t += deepText(c)
-              for (const c of el.querySelectorAll('*')) if (c.shadowRoot) t += deepText(c)
-              return t
-            }
-            const p = document.querySelector('pi-chat-panel')
-            const text = p ? deepText(p) : ''
+            const p = document.querySelector('.rc-chat')
+            const text = p ? (p.textContent || '') : ''
             const idb = await new Promise((res) => {
-              const r = indexedDB.open('report-console-pi')
+              const r = indexedDB.open('rc-pi-sessions')
               r.onsuccess = () => {
                 const db = r.result
                 const names = Array.from(db.objectStoreNames)
-                const meta = names.find((n) => n.includes('metadata'))
-                if (!meta) return res('stores:' + names.join(','))
-                const req = db.transaction(meta, 'readonly').objectStore(meta).getAll()
-                req.onsuccess = () => res(JSON.stringify(req.result.map((m) => ({ title: m.title, count: m.messageCount }))))
+                if (!names.includes('sessions')) return res('stores:' + names.join(','))
+                const req = db.transaction('sessions', 'readonly').objectStore('sessions').getAll()
+                req.onsuccess = () => res(JSON.stringify(req.result.map((m) => ({ title: m.title, count: m.messageCount, roles: (m.messages || []).map((x) => x.role).join(',') }))))
                 req.onerror = () => res('read-err')
               }
               r.onerror = () => res('db-err')
             })
-            return JSON.stringify({ hasProbeText: text.includes('冒烟自检'), textLen: text.length, idb })
+            const q = (s) => document.querySelectorAll(s).length
+            const dom = { bubble: q('.rc-bubble'), ahead: q('.rc-a-head'), md: q('.rc-md'), tool: q('.rc-tool'), toolopen: q('.rc-tool .rc-tool-b'), think: q('.rc-think'), busy: q('.rc-composer .btn:not(.pri)') }
+            return JSON.stringify({ hasProbeText: text.includes('冒烟自检'), textLen: text.length, dom, idb })
           })()`).catch((e: unknown) => `probe failed: ${(e as Error).message}`)
           console.log(`[smoke] agent persist: ${info}`)
           const img = await win.webContents.capturePage()
@@ -51,7 +48,7 @@ function bootstrap(): void {
           console.error('[smoke] capture failed', e)
         }
         app.quit()
-      }, 2500)
+      }, waitMs)
     })
     return
   }

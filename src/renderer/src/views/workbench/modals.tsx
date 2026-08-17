@@ -300,7 +300,7 @@ export function LinkProcModal({ linkable, onClose, onLink }: {
     <Modal
       title="关联其他项目的过程" icon="link" onClose={onClose}
       footer={<>
-        <span className="m-note">关联 = 引用不复制（D3）；本项目接口 SQL 可直接 CALL</span>
+        <span className="m-note">关联 = 引用不复制；本项目接口 SQL 可直接 CALL</span>
         <button className="btn" onClick={onClose}>取消</button>
         <button className="btn pri" disabled={!picked || busy} onClick={async () => { if (!picked) return; setBusy(true); setErr(null); try { await onLink(picked.id) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
           <Icon n="link" />{busy ? '关联中…' : '关联'}
@@ -399,7 +399,7 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
     <Modal
       title={title} icon="file" onClose={onClose}
       footer={<>
-        <span className="m-note">存于项目 meta/ 目录（D4）；Agent 可读取作为开发上下文</span>
+        <span className="m-note">存于项目 meta/ 目录；Agent 可读取作为开发上下文</span>
         <button className="btn" onClick={onClose}>取消</button>
         <button className="btn pri" disabled={busy || !name.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(name.trim()) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
           <Icon n="check" />确定

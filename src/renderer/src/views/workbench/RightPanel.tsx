@@ -217,7 +217,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
         <div className="rp-r2">
           <span className={`tag ${kind.cls}`} title={kind.tip}>{kind.label}</span>
           {connChip(ds.connection)}
-          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>项目 {ctx.project?.name} · 单一归属（D2）</span>
+          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>项目 {ctx.project?.name} · 单一归属</span>
         </div>
         <div className="rp-acts">
           <button className="btn pri" onClick={async () => { setBusy('build'); try { setLastBuild(await acts.buildData()) } finally { setBusy('') } }} disabled={!!busy}>
@@ -250,7 +250,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             </div>
             <div className="blk">
               <div className="blk-t"><Icon n="code" />SQL（只读）<span className="lnk" onClick={() => acts.editDataset(ds)}>编辑</span></div>
-              <CodeBlk title={<>sql · 只读，构建产物只能由 build 生成（D6）</>} body={ds.sql} />
+              <CodeBlk title={<>sql · 只读，构建产物只能由 build 生成</>} body={ds.sql} />
             </div>
             <div className="blk">
               <div className="blk-t"><Icon n="box" />产物归属</div>
@@ -278,7 +278,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
               <div className="loglines">{(lastBuild?.log ?? ['（暂无，点击上方「构建」）']).join('\n')}</div>
             </div>
             <div className="blk">
-              <div className="blk-t"><Icon n="box" />项目产物（D2 · 一项目一页·页内多连接）</div>
+              <div className="blk-t"><Icon n="box" />项目产物（一项目一页 · 页内多连接）</div>
               <div className="kv">
                 <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
                 <span className="k2">说明</span><span className="v2">每个 TableData 各自携带 DatabaseName（连接名）</span>
@@ -388,7 +388,7 @@ function SpPanel({ ctx, sp, acts }: { ctx: SelCtx; sp: ProcRecord; acts: WBActs 
         </div>
         {linked && (
           <div className="banner info" style={{ marginBottom: 0, marginTop: 10 }}>
-            <Icon n="info" /><div><b>D3 关联引用，不复制</b>：定义来自「{sp.srcProject}」，应用（DROP+CREATE）作用于连接 {sp.connection}。</div>
+            <Icon n="info" /><div><b>关联引用，不复制</b>：定义来自「{sp.srcProject}」，应用（DROP+CREATE）作用于连接 {sp.connection}。</div>
           </div>
         )}
       </div>
@@ -489,7 +489,7 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
         {tab === 'src' && (
           <div className="blk">
             <div className="blk-t">
-              <Icon n="code" />jsx 源码（全流程唯一手写产物）
+              <Icon n="code" />jsx 源码
               <span className="lnk" onClick={async () => {
                 if (src === null) return
                 setBusy('save')
@@ -590,7 +590,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
             : <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <SqlEditor value={content} height="460px" onChange={(v) => { setContent(v); setDirty(true) }} />
               </div>}
-        {!isMd && <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div><b>D4</b>：过程创建语句存于项目 meta/，与库内实际定义互为备份（「存储过程」面板的保存也写这里）</div></div>}
+        {!isMd && <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div>过程创建语句存于项目 meta/，与库内实际定义互为备份（「存储过程」面板的保存也写这里）</div></div>}
       </div>
     </div>
   )

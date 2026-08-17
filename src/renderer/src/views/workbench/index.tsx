@@ -25,11 +25,7 @@ type ModalState =
   | { k: 'projsettings' }
   | null
 
-const KIND_TAG: Record<string, { cls: string; label: string }> = {
-  list: { cls: 'list', label: '列表' }, stat: { cls: 'stat', label: '统计' }, detail: { cls: 'one', label: '单条' },
-  dict: { cls: 'dict', label: '字典' }, insert: { cls: 'ins', label: '增' }, update: { cls: 'upd', label: '改' },
-  delete: { cls: 'del', label: '删' }, other: { cls: 'other', label: '其他' }
-}
+import { KIND_TAG } from './kinds'
 
 export default function WorkbenchView(): React.ReactElement {
   const toast = useToast()
@@ -93,12 +89,22 @@ export default function WorkbenchView(): React.ReactElement {
   }, [toast])
 
   useEffect(() => { void loadProjects() }, [loadProjects])
-  useEffect(() => { if (cur) void loadResources(cur) }, [cur, loadResources])
+  useEffect(() => {
+    if (cur) void loadResources(cur)
+    // 冒烟深链：?sel=1 自动选中第一个资源（核对选中态样式）
+    if (sel === null && new URLSearchParams(window.location.search).get('sel') === '1') {
+      setSel('if:__pending__')
+    }
+  }, [cur, loadResources, sel])
 
   const refresh = useCallback(async () => {
     await loadProjects()
     if (cur) await loadResources(cur)
   }, [loadProjects, loadResources, cur])
+
+  useEffect(() => {
+    if (sel === 'if:__pending__' && datasets.length) setSel(`if:${datasets[0].name}`)
+  }, [datasets, sel])
 
   const selectProject = (name: string) => {
     setCur(name)
@@ -359,7 +365,7 @@ export default function WorkbenchView(): React.ReactElement {
                       <div key={x.name} className={`row${sel === `if:${x.name}` ? ' on' : ''}`} onClick={() => { setSel(`if:${x.name}`); setAgentMode(false) }}>
                         <span className={`st ${stt}`} />
                         <div className="main">
-                          <div className="nm"><b>{x.name}</b><span className={`tag ${kind.cls}`}>{kind.label}</span></div>
+                          <div className="nm"><b>{x.name}</b><span className={`tag ${kind.cls}`} title={kind.tip}>{kind.label}</span></div>
                           <div className="sub"><span className="cbadge"><Icon n="db" />{x.connection}</span>{sub}</div>
                         </div>
                         <div className="meta">构建<br />{fmtShort(statuses[x.name]?.build)}</div>

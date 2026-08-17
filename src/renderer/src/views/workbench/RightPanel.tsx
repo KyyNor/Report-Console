@@ -45,11 +45,7 @@ export interface WBActs {
 
 export interface SelCtx { project: Project | null; sel: string | null; tab: Record<string, string>; setTab: (k: string, t: string) => void }
 
-const KIND_TAG: Record<string, { cls: string; label: string }> = {
-  list: { cls: 'list', label: '列表' }, stat: { cls: 'stat', label: '统计' }, detail: { cls: 'one', label: '单条' },
-  dict: { cls: 'dict', label: '字典' }, insert: { cls: 'ins', label: '增' }, update: { cls: 'upd', label: '改' },
-  delete: { cls: 'del', label: '删' }, other: { cls: 'other', label: '其他' }
-}
+import { KIND_TAG } from './kinds'
 
 function TabsBar({ tabs, cur, onSelect }: { tabs: Array<{ k: string; n: string; bdg?: string }>; cur: string; onSelect: (k: string) => void }): React.ReactElement {
   return (
@@ -219,7 +215,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             : <span className="pill-o idle"><Icon n="cd" />未测</span>}
         </div>
         <div className="rp-r2">
-          <span className={`tag ${kind.cls}`}>{kind.label}</span>
+          <span className={`tag ${kind.cls}`} title={kind.tip}>{kind.label}</span>
           {connChip(ds.connection)}
           <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>项目 {ctx.project?.name} · 单一归属（D2）</span>
         </div>

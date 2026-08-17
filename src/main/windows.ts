@@ -25,16 +25,19 @@ export function createMainWindow(): BrowserWindow {
     }
   })
   // 开发模式走 electron-vite 的 dev server；生产加载打包产物
-  // SMOKE_VIEW=xxx 以 hash 深链打开指定视图；SMOKE_AUTOSEND=1 让 Agent 页自动发一条自检消息
+  // SMOKE_VIEW=xxx 以 hash 深链打开指定视图；SMOKE_AUTOSEND=1 让 Agent 页自动发一条自检消息；
+  // SMOKE_SEL=1 让工作台自动选中第一个资源（冒烟核对选中态样式）
   const hash = process.env.SMOKE_VIEW || ''
-  const query = process.env.SMOKE_AUTOSEND ? { autosend: '1' } : undefined
+  const query: Record<string, string> = {}
+  if (process.env.SMOKE_AUTOSEND) query.autosend = '1'
+  if (process.env.SMOKE_SEL) query.sel = process.env.SMOKE_SEL
   if (process.env.ELECTRON_RENDERER_URL) {
     const u = new URL(process.env.ELECTRON_RENDERER_URL)
     if (hash) u.hash = hash
-    if (query) for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v)
+    for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v)
     void win.loadURL(u.toString())
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: hash || undefined, query })
+    void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: hash || undefined, query: Object.keys(query).length ? query : undefined })
   }
   // 外链走系统浏览器
   win.webContents.setWindowOpenHandler(({ url }) => {

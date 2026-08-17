@@ -231,88 +231,82 @@ export default function WorkbenchView(): React.ReactElement {
 
   return (
     <div className="stage">
-      {/* 工作台头 */}
-      <header className="wb-head">
-        <div className="crumb">
-          <b>{curProject?.name ?? '项目'}</b>
-          {curProject && <span className="dirchip">{curProject.dir}</span>}
-          {curProject?.connections.map((c) => (
-            <span key={c} className={`cbadge${connHealthMap[c] === false ? ' off' : ''}`}><Icon n="db" />{c}</span>
-          ))}
-        </div>
-        <div className="grow" />
-        <button className="btn" onClick={(e) => {
-          const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-          newMenuAt(r.left, r.bottom + 6)
-        }}><Icon n="plus" />新建<Icon n="chd" size={12} /></button>
-        <button className="btn acc-o" onClick={() => void acts.verify()} disabled={!cur || (curProject?.counts.ifs ?? 0) === 0}><Icon n="shield" />一键验收</button>
-      </header>
-
       <div className="cols">
-        {/* 左栏：项目选择器 */}
+        {/* 左栏：项目选择器（设计稿 3.1） */}
         <aside className="col-left">
-          <div className="cl-head">
-            <b>项目（{projects.length}）</b>
+          <div className="colhead">
+            <span className="t">项目</span>
+            <span className="sub">{projects.length ? `${projects.length} 个` : ''}</span>
             <span className="grow" />
             <button className="iconbtn" title="新建项目" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" /></button>
           </div>
           <div className="cl-list">
             {projects.length === 0 && (
               <div className="cl-empty">
-                <Icon n="folder" />
-                <p>还没有项目<br />从向导开始，或从已有目录扫描导入</p>
-                <button className="btn sm" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" />新建项目</button>
+                <h4>欢迎使用 Report Console</h4>
+                <p>还没有项目。项目是顶层的组织单元：绑定一个 reportlets 目录与多个数据库连接。</p>
+                <button className="big" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" /><span><b>新建项目</b><span>名称 · 勾选连接 · 自动建 data/pages/meta</span></span></button>
+                <ScanButton onScaned={loadProjects} />
               </div>
             )}
             {projects.map((p) => (
-              <div key={p.id} className={`pcard${cur === p.name ? ' on' : ''}`} onClick={() => selectProject(p.name)}>
-                <div className="pc-r1">
-                  <span className="pc-name" title={p.comment || p.name}>{p.name}</span>
-                  {p.missingDir && <span className="pc-warn" title="绑定目录不存在（可能被移动或删除）"><Icon n="alert" />目录缺失</span>}
+              <div key={p.id} className={`pj${cur === p.name ? ' on' : ''}${p.missingDir ? ' missing' : ''}`} onClick={() => selectProject(p.name)} title={p.comment || p.name}>
+                <div className="nm">
+                  {p.name}
+                  {p.missingDir && <span className="pc-warn" title="项目目录缺失：目录已被移动或删除，资源只读"><Icon n="alert" size={14} /></span>}
                 </div>
-                <div className="pc-r2">
-                  {p.connections.map((c) => <span key={c} className={`cbadge${connHealthMap[c] === false ? ' off' : ''}`}><Icon n="db" />{c}</span>)}
+                <div className="dir" title={p.dir}>{p.dir}</div>
+                <div className="badges">
+                  {p.connections.map((c) => <span key={c} className={`cbadge${connHealthMap[c] === false ? ' off' : ''}`}><i />{c}</span>)}
                 </div>
-                <div className="pc-r3"><span>接口 {p.counts.ifs}</span><span>过程 {p.counts.sps}</span><span>页面 {p.counts.pgs}</span><span>文档 {p.counts.docs}</span></div>
+                <div className="sum">
+                  <span>接口 {p.counts.ifs}</span><span>过程 {p.counts.sps}</span><span>页面 {p.counts.pgs}</span><span>文档 {p.counts.docs}</span>
+                  {p.missingDir && ' · 目录缺失'}
+                </div>
               </div>
             ))}
+            {projects.length > 0 && (
+              <button className="newpj" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" size={14} />新建项目</button>
+            )}
           </div>
           <div className="cl-foot">
-            <div className="env-t"><Icon n="info" />环境状态</div>
-            <div className="env-row" title="在「设置」配置">
-              <span className={`dot ${status?.frReachable ? 'g' : 'r'}`} />
-              <span className="k">帆软</span>
-              <span className="v">{status?.frReachable ? `${status.frLatencyMs}ms` : '不可达'}</span>
-            </div>
-            <div className="env-row" title="在「设置」配置">
-              <span className={`dot ${status?.reportletsWritable ? 'g' : 'y'}`} />
-              <span className="k">reportlets</span>
-              <span className="v">{status?.reportletsWritable ? '可写' : '不可写'}</span>
+            <div className="env-t">环境状态<span style={{ color: 'var(--accent)', cursor: 'default' }}>连接管理 →</span></div>
+            <div className="env-row" title="帆软服务器：页面预览 / 接口实测的运行宿主">
+              <span className="sq" style={{ background: 'var(--c-fr)' }} />
+              <span className="k"><b>帆软</b><span>localhost:8075</span></span>
+              <span className="v"><i className={`dot ${status?.frReachable ? 'g' : 'r'}`} /> {status?.frReachable ? `${status.frLatencyMs}ms` : '不可达'}</span>
             </div>
             {(status?.connections ?? []).map((c) => (
-              <div className="env-row" key={c.name} title={c.error ?? c.version ?? ''}>
-                <span className={`dot ${c.reachable ? 'g' : 'r'}`} />
-                <span className="k">{c.name}</span>
-                <span className="v">{c.reachable ? `${c.latencyMs}ms` : '超时'}</span>
+              <div className="env-row" key={c.name} title={c.error ?? c.version ?? c.name}>
+                <span className="sq" style={{ background: 'var(--c-mysql)' }} />
+                <span className="k"><b>{c.name}</b><span>{c.version ? `MySQL ${c.version.split('-')[0]}` : '-'}</span></span>
+                <span className="v"><i className={`dot ${c.reachable ? 'g' : 'r'}`} /> {c.reachable ? `${c.latencyMs}ms` : '超时'}</span>
               </div>
             ))}
+            <div className="env-row" title="reportlets 部署目录可写性">
+              <span className="sq" style={{ background: 'var(--c-report)' }} />
+              <span className="k"><b>reportlets</b><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{status?.reportletsPath || '-'}</span></span>
+              <span className="v"><i className={`dot ${status?.reportletsWritable ? 'g' : 'y'}`} /> {status?.reportletsWritable ? '可写' : '不可写'}</span>
+            </div>
             <div className="env-legend">
               <span><i style={{ background: 'var(--c-sqlite)' }} />SQLite 账本</span>
-              <span><i style={{ background: 'var(--c-cpt)' }} />reportlets 产物</span>
+              <span><i style={{ background: 'var(--c-report)' }} />reportlets 产物</span>
               <span><i style={{ background: 'var(--c-mysql)' }} />MySQL</span>
               <span><i style={{ background: 'var(--c-fr)' }} />帆软</span>
             </div>
           </div>
         </aside>
 
-        {/* 中栏：资源浏览器 */}
+        {/* 中栏：资源浏览器（设计稿 3.2） */}
         <section className="col-mid">
-          <div className="mid-head">
+          <div className="colhead">
+            <span className="t">资源</span>
             <label className="search">
-              <Icon n="search" />
-              <input value={search} placeholder="按名称过滤资源…" onChange={(e) => setSearch(e.target.value)} />
+              <Icon n="search" size={13} />
+              <input value={search} placeholder="搜索资源名称" onChange={(e) => setSearch(e.target.value)} />
             </label>
-            <span className="mid-count">{[datasets, procs, pages, docs].flat().filter((x) => match(x.name)).length} 项{q ? ` · 匹配「${q}」` : ''}</span>
+            <span className="grow" />
+            <span className="sub">{[datasets, procs, pages, docs].flat().filter((x) => match(x.name)).length} 项{q ? ` · 匹配「${q}」` : ''}</span>
           </div>
 
           {curProject?.missingDir && (
@@ -325,30 +319,30 @@ export default function WorkbenchView(): React.ReactElement {
           <div className="mid-scroll">
             {!cur ? (
               <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-                <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--acc-soft)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--acc)', marginBottom: 16 }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--accent-s)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', marginBottom: 16 }}>
                   <Icon n="box" />
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>开始第一个项目</div>
-                <div style={{ fontSize: 12.5, color: 'var(--tx2)', lineHeight: 1.7, maxWidth: 400, margin: '0 auto 18px' }}>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 400, margin: '0 auto 18px' }}>
                   项目是 Report Console 的顶层组织单元：绑定一个 reportlets 目录与若干 MySQL 连接，收纳数据接口、存储过程、页面与文档。已有目录也可以扫描导入。
                 </div>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                   <button className="btn pri" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" />新建项目</button>
                   <ScanButton onScaned={loadProjects} />
                 </div>
-                <div style={{ marginTop: 22, fontSize: 11.5, color: 'var(--tx3)' }}>还没有 MySQL 连接？先到「连接」注册（与帆软设计器里的数据连接同名）</div>
+                <div style={{ marginTop: 22, fontSize: 11.5, color: 'var(--faint)' }}>还没有 MySQL 连接？先到「连接」注册（与帆软设计器里的数据连接同名）</div>
               </div>
             ) : (
               <>
                 {/* 数据接口 */}
                 <Group
                   gk="ifs" title="数据接口" one="接口" count={datasets.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<button className="btn sm" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" />新建接口</button>}
+                  extra={<span className="gact" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" size={12} />新建接口</span>}
                   empty={{
                     t: '还没有数据接口', d: '顺序约定：建表 → 存储过程 → 接口契约 → 构建实测，接口先行',
                     actions: <>
                       <button className="btn sm" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" />新建接口</button>
-                      <button className="btn acc-o sm" onClick={() => acts.useAgent()}><Icon n="ai" />用 Agent 做</button>
+                      <span className="mini" onClick={() => acts.useAgent()}><Icon n="ai" size={12} />用 Agent 做</span>
                     </>
                   }}
                 >
@@ -357,9 +351,9 @@ export default function WorkbenchView(): React.ReactElement {
                     const kind = KIND_TAG[x.kind] ?? KIND_TAG.other
                     const connDown = connHealthMap[x.connection] === false
                     let stt = 'n', sub: React.ReactNode = '未测'
-                    if (st?.st === 'ok') { stt = 'g'; sub = <><span style={{ color: '#7ee0a8' }}>实测通过</span> {st.rows ?? '-'} 行 {st.ms ?? '-'}ms · err_code=0</> }
-                    else if (st?.st === 'fail') { stt = 'r'; sub = <><span style={{ color: '#f39893' }}>实测失败</span> {st.why?.slice(0, 60)}</> }
-                    else if (connDown) { sub = <span style={{ color: '#9aa2b1' }}>连接不可达（{x.connection}）</span> }
+                    if (st?.st === 'ok') { stt = 'g'; sub = <><span style={{ color: 'var(--ok)' }}>实测通过</span> {st.rows ?? '-'} 行 {st.ms ?? '-'}ms · err_code=0</> }
+                    else if (st?.st === 'fail') { stt = 'r'; sub = <><span style={{ color: 'var(--bad)' }}>实测失败</span> {st.why?.slice(0, 60)}</> }
+                    else if (connDown) { sub = <span style={{ color: 'var(--idle)' }}>连接不可达（{x.connection}）</span> }
                     if (curProject?.missingDir) sub = '账本缓存 · 目录缺失'
                     return (
                       <div key={x.name} className={`row${sel === `if:${x.name}` ? ' on' : ''}`} onClick={() => { setSel(`if:${x.name}`); setAgentMode(false) }}>
@@ -377,22 +371,22 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 存储过程 */}
                 <Group
                   gk="sps" title="存储过程" one="过程" count={procs.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<button className="btn sm" onClick={async () => {
+                  extra={<span className="gact" onClick={async () => {
                     try {
                       const linkable = await call<LinkableProc[]>('procs:linkable', { project: cur })
                       setModal({ k: 'linkproc', linkable })
                     } catch (e) { toast((e as Error).message, 'err') }
-                  }}><Icon n="link" />关联</button>}
+                  }}><Icon n="link" size={12} />关联</span>}
                   empty={{
                     t: '还没有存储过程', d: '写操作的唯一入口。可关联其他项目已有的过程（引用不复制），或从模板起步（约定返回 SELECT JSON_OBJECT）',
                     actions: <>
-                      <button className="btn sm" onClick={async () => {
+                      <span className="mini" onClick={async () => {
                         try {
                           const linkable = await call<LinkableProc[]>('procs:linkable', { project: cur })
                           setModal({ k: 'linkproc', linkable })
                         } catch (e) { toast((e as Error).message, 'err') }
-                      }}><Icon n="link" />关联现有过程</button>
-                      <button className="btn sm" onClick={() => setModal({ k: 'newproc' })}><Icon n="plus" />从模板新建</button>
+                      }}><Icon n="link" size={12} />关联现有过程</span>
+                      <span className="mini" onClick={() => setModal({ k: 'newproc' })}><Icon n="plus" size={12} />从模板新建</span>
                     </>
                   }}
                 >
@@ -414,16 +408,16 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 页面 */}
                 <Group
                   gk="pgs" title="页面" one="页面" count={pages.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<button className="btn sm" onClick={(e) => {
+                  extra={<span className="gact" onClick={(e) => {
                     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                     pageMenuAt(r.left, r.bottom + 6)
-                  }}><Icon n="plus" />新建页面</button>}
+                  }}><Icon n="plus" size={12} />新建页面</span>}
                   empty={{
                     t: '还没有页面', d: '页面 jsx 是全流程唯一手写产物，接口实测通过（err_code=0）后再开发页面',
-                    actions: <button className="btn sm" onClick={(e) => {
+                    actions: <span className="mini" onClick={(e) => {
                       const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                       pageMenuAt(r.left, r.bottom + 6)
-                    }}><Icon n="plus" />新建页面</button>
+                    }}><Icon n="plus" size={12} />新建页面</span>
                   }}
                 >
                   {pages.filter((x) => match(x.name)).map((x) => {
@@ -444,10 +438,10 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 文档 */}
                 <Group
                   gk="docs" title="文档（元数据）" one="文档" count={docs.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<button className="btn sm" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" />新建文档</button>}
+                  extra={<span className="gact" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>}
                   empty={{
                     t: '还没有文档', d: '把需求 / 设计文档放进项目 meta/ 目录，Agent 可读取作为开发上下文',
-                    actions: <button className="btn sm" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" />新建文档</button>
+                    actions: <span className="mini" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
                   }}
                 >
                   {docs.filter((x) => match(x.name)).map((x) => (
@@ -602,16 +596,6 @@ export default function WorkbenchView(): React.ReactElement {
   )
 
   // ── 弹出菜单 ────────────────────────────────────────────────
-  function newMenuAt(x: number, y: number): void {
-    openMenu(x, y, [
-      { i: 'code', t: '数据接口', s: '3.2-1', onClick: () => setModal({ k: 'dataset', init: { name: '', kind: 'list' } }) },
-      { i: 'term', t: '存储过程', s: '3.2-2', onClick: () => setModal({ k: 'newproc' }) },
-      { i: 'pen', t: '页面', s: '3.2-3', onClick: () => pageMenuAt(x, y + 120) },
-      { i: 'file', t: '文档', s: '3.2-4', onClick: () => setModal({ k: 'newdoc' }) },
-      { div: true },
-      { i: 'folder', t: '新建项目…', s: '3.1', onClick: () => setModal({ k: 'wizard' }) }
-    ])
-  }
 
   function pageMenuAt(x: number, y: number): void {
     openMenu(x, y, [
@@ -687,7 +671,7 @@ function Group({ gk, title, one, count, collapsed, onToggle, extra, empty, child
 function ScanButton({ onScaned }: { onScaned: () => void }): React.ReactElement {
   const toast = useToast()
   return (
-    <button className="btn" onClick={() => {
+    <button className="big" onClick={() => {
       void (async () => {
         try {
           const dirs = await call<string[]>('projects:scan')
@@ -699,7 +683,7 @@ function ScanButton({ onScaned }: { onScaned: () => void }): React.ReactElement 
           onScaned()
         } catch (e) { toast((e as Error).message, 'err') }
       })()
-    }}><Icon n="scan" />从目录扫描导入</button>
+    }}><Icon n="scan" /><span><b>从目录扫描导入</b><span>扫描 reportlets 已部署目录反向纳入管理</span></span></button>
   )
 }
 

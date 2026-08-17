@@ -51,7 +51,7 @@ export function Modal({ title, icon, onClose, children, footer, wide, tone }: {
   return (
     <div className="mask" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={`modal${wide ? ' wide' : ''}`} data-stop>
-        <div className="m-h" style={tone === 'danger' ? { color: '#f5a29c' } : tone === 'warn' ? { color: '#e8c377' } : undefined}>
+        <div className="m-h" style={tone === 'danger' ? { color: '#f5a29c' } : tone === 'warn' ? { color: 'var(--warn)' } : undefined}>
           {icon && <Icon n={icon} />}
           <span className="mt">{title}</span>
           <button className="iconbtn" onClick={onClose}><Icon n="x" /></button>
@@ -143,7 +143,7 @@ export function mdToHtml(md: string): string {
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
   for (const ln of lines) {
     if (ln.trim().startsWith('```')) {
-      if (inCode) { out.push('</pre>'); inCode = false } else { out.push('<pre style="font:11px var(--mono);background:var(--code-bg);border:1px solid var(--code-line);border-radius:6px;padding:10px 12px;overflow:auto;color:#c7cfdd">'); inCode = true }
+      if (inCode) { out.push('</pre>'); inCode = false } else { out.push('<pre>'); inCode = true }
       continue
     }
     if (inCode) { out.push(escHtml(ln)); continue }

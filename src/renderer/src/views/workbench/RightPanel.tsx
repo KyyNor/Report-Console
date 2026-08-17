@@ -66,7 +66,7 @@ function TabsBar({ tabs, cur, onSelect }: { tabs: Array<{ k: string; n: string; 
 function Findings({ findings }: { findings: CheckerFinding[] }): React.ReactElement {
   const errs = findings.filter((f) => f.severity === 'error')
   const warns = findings.filter((f) => f.severity === 'warning')
-  if (!findings.length) return <div style={{ fontSize: 11.5, color: 'var(--tx3)', padding: '6px 2px' }}>本次没有 findings。</div>
+  if (!findings.length) return <div style={{ fontSize: 11.5, color: 'var(--faint)', padding: '6px 2px' }}>本次没有 findings。</div>
   return (
     <>
       {errs.map((f, i) => (
@@ -152,7 +152,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
         <div className="rp-r1"><span className="ttl reg">{p.name}</span></div>
         <div className="rp-r2">
           {p.connections.map((cn) => connChip(cn))}
-          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--tx3)' }}>创建于 {p.createdAt.slice(0, 10)}{p.comment ? ` · ${p.comment}` : ''}</span>
+          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>创建于 {p.createdAt.slice(0, 10)}{p.comment ? ` · ${p.comment}` : ''}</span>
         </div>
         <div className="rp-acts">
           <button className="btn" onClick={() => void acts.verify()} disabled={empty} title="构建 + 实测项目内全部接口"><Icon n="shield" />一键验收</button>
@@ -166,7 +166,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
         <div className="blk">
           <div className="blk-t"><Icon n="folder" />项目信息</div>
           <div className="kv">
-            <span className="k2">绑定目录</span><span className="v2">{p.missingDir ? <span style={{ color: '#e8c377' }}>{p.dir}（缺失）</span> : p.dir}</span>
+            <span className="k2">绑定目录</span><span className="v2">{p.missingDir ? <span style={{ color: 'var(--warn)' }}>{p.dir}（缺失）</span> : p.dir}</span>
             <span className="k2">目录三分</span><span className="v2">data/（数据层产物）+ pages/（页面）+ meta/（文档与过程语句）</span>
             <span className="k2">资源规模</span><span className="v2">接口 {c.ifs} · 过程 {c.sps} · 页面 {c.pgs} · 文档 {c.docs}</span>
           </div>
@@ -185,7 +185,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
           <div className="blk">
             <div className="blk-t"><Icon n="clock" />项目动态</div>
             <div className="hist">
-              {dyn.length === 0 && <div className="hrow"><div className="ht" style={{ color: 'var(--tx3)' }}>暂无动态</div></div>}
+              {dyn.length === 0 && <div className="hrow"><div className="ht" style={{ color: 'var(--faint)' }}>暂无动态</div></div>}
               {dyn.map((d, i) => (
                 <div key={i} className="hrow"><span className="hi"><Icon n={d.i} /></span><div className="ht">{d.h}</div><div className="hm">{d.m}</div></div>
               ))}
@@ -221,7 +221,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
         <div className="rp-r2">
           <span className={`tag ${kind.cls}`}>{kind.label}</span>
           {connChip(ds.connection)}
-          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--tx3)' }}>项目 {ctx.project?.name} · 单一归属（D2）</span>
+          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>项目 {ctx.project?.name} · 单一归属（D2）</span>
         </div>
         <div className="rp-acts">
           <button className="btn pri" onClick={async () => { setBusy('build'); try { setLastBuild(await acts.buildData()) } finally { setBusy('') } }} disabled={!!busy}>
@@ -243,9 +243,9 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
                 <thead><tr><th>NAME</th><th>TYPE</th><th>DEFAULT</th></tr></thead>
                 <tbody>
                   {ds.params.map((p, i) => (
-                    <tr key={i}><td className="f">{p.name}</td><td className="f">{p.type}</td><td className="f">{p.default || <span style={{ color: '#5d6675' }}>-</span>}</td></tr>
+                    <tr key={i}><td className="f">{p.name}</td><td className="f">{p.type}</td><td className="f">{p.default || <span style={{ color: 'var(--faint)' }}>-</span>}</td></tr>
                   ))}
-                  {!ds.params.length && <tr><td colSpan={3} style={{ color: '#5d6675' }}>无参数</td></tr>}
+                  {!ds.params.length && <tr><td colSpan={3} style={{ color: 'var(--faint)' }}>无参数</td></tr>}
                 </tbody>
               </table>
               {ds.params.some((p) => p.type === 'formula') && (
@@ -259,7 +259,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             <div className="blk">
               <div className="blk-t"><Icon n="box" />产物归属</div>
               <div className="kv">
-                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-cpt)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
+                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
                 <span className="k2">数据集连接</span><span className="v2">{ds.connection}</span>
                 <span className="k2">最近构建</span><span className="v2">{fmtTime(st?.build)}</span>
               </div>
@@ -284,7 +284,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             <div className="blk">
               <div className="blk-t"><Icon n="box" />项目产物（D2 · 一项目一页·页内多连接）</div>
               <div className="kv">
-                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-cpt)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
+                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
                 <span className="k2">说明</span><span className="v2">每个 TableData 各自携带 DatabaseName（连接名）</span>
               </div>
             </div>
@@ -307,7 +307,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
                 <div className="kv">
                   <span className="k2">行数</span><span className="v2">{lastTest?.rowCount ?? t?.rows ?? '-'}</span>
                   <span className="k2">耗时</span><span className="v2">{lastTest?.durationMs ?? t?.ms ?? '-'}ms</span>
-                  <span className="k2">err_code</span><span className="v2" style={{ color: '#7ee0a8' }}>{lastTest?.errCode ?? 0}</span>
+                  <span className="k2">err_code</span><span className="v2" style={{ color: 'var(--ok)' }}>{lastTest?.errCode ?? 0}</span>
                 </div>
                 {lastTest?.response ? (
                   <details className="resp" style={{ marginTop: 8 }}>
@@ -341,7 +341,7 @@ function IfHistory({ project, dataset }: { project: string; dataset: string }): 
     <div className="blk">
       <div className="blk-t"><Icon n="clock" />测试历史（api_tests 只增不改）</div>
       <div className="hist">
-        {rows.length === 0 && <div className="hrow"><div className="ht" style={{ color: 'var(--tx3)' }}>暂无历史</div></div>}
+        {rows.length === 0 && <div className="hrow"><div className="ht" style={{ color: 'var(--faint)' }}>暂无历史</div></div>}
         {rows.map((r, i) => (
           <div key={i} className="hrow">
             <span className="hi"><Icon n={r.ok ? 'cck' : 'cx'} /></span>
@@ -380,7 +380,7 @@ function SpPanel({ ctx, sp, acts }: { ctx: SelCtx; sp: ProcRecord; acts: WBActs 
         <div className="rp-r2">
           {linked ? <span className="tag lnk"><Icon n="link" />关联自「{sp.srcProject}」</span> : <span className="tag own">本项目创建</span>}
           {connChip(sp.connection)}
-          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--tx3)' }}>最后修改 {fmtTime(sp.updatedAt)} · {sp.appliedCount} 次应用</span>
+          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>最后修改 {fmtTime(sp.updatedAt)} · {sp.appliedCount} 次应用</span>
         </div>
         <div className="rp-acts">
           <button className="btn dgr-o" onClick={() => acts.applyProc(sp)}><Icon n="box" />应用 DROP+CREATE</button>
@@ -408,9 +408,9 @@ function SpPanel({ ctx, sp, acts }: { ctx: SelCtx; sp: ProcRecord; acts: WBActs 
                 try { await acts.saveProcDef(sp, def); setDirty(false) } finally { setSaving(false) }
               }}>{saving ? '保存中…' : dirty ? '保存定义*' : '保存定义'}</span>
             </div>
-            <div style={{ border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
               {def === null
-                ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--tx3)', fontSize: 12 }}>读取定义中…</div>
+                ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--faint)', fontSize: 12 }}>读取定义中…</div>
                 : <SqlEditor value={def} height="420px" onChange={(v) => { setDef(v); setDirty(true) }} />}
             </div>
             <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div>保存只写 meta/ 文件；「应用」才执行 DROP IF EXISTS + CREATE（审计落 ddl_log）。模板约定返回 <b>SELECT JSON_OBJECT(...)</b></div></div>
@@ -433,7 +433,7 @@ function SpAudit({ name }: { name: string }): React.ReactElement {
     <div className="blk">
       <div className="blk-t"><Icon n="term" />审计记录（ddl_log，只增不改）</div>
       <div className="hist">
-        {rows.length === 0 && <div className="hrow"><div className="ht" style={{ color: 'var(--tx3)' }}>暂无审计</div></div>}
+        {rows.length === 0 && <div className="hrow"><div className="ht" style={{ color: 'var(--faint)' }}>暂无审计</div></div>}
         {rows.map((r, i) => (
           <div key={i} className="hrow">
             <span className="hi"><Icon n={r.ok ? 'cck' : 'cx'} /></span>
@@ -478,7 +478,7 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
         </div>
         <div className="rp-r2">
           <span className="tag src">{fmtBytes(pg.size)}</span>
-          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--tx3)' }}>上次构建 {pg.lastBuildAt ? `${fmtTime(pg.lastBuildAt)}${pg.lastBuildOk === false ? ' · 失败' : ''}` : '-'}</span>
+          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>上次构建 {pg.lastBuildAt ? `${fmtTime(pg.lastBuildAt)}${pg.lastBuildOk === false ? ' · 失败' : ''}` : '-'}</span>
         </div>
         <div className="rp-acts">
           <button className="btn pri" onClick={async () => { setBusy('build'); try { setLastBuild(await acts.buildPage(pg.name)) } finally { setBusy('') } }} disabled={!!busy}>
@@ -500,9 +500,9 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
                 try { await acts.savePage(pg.name, src); setDirty(false) } finally { setBusy('') }
               }}>{busy === 'save' ? '保存中…' : dirty ? '保存*' : '保存'}</span>
             </div>
-            <div style={{ border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
               {src === null
-                ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--tx3)', fontSize: 12 }}>读取源码中…</div>
+                ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--faint)', fontSize: 12 }}>读取源码中…</div>
                 : <JsxEditor value={src} height="440px" onChange={(v) => { setSrc(v); setDirty(true) }} />}
             </div>
             <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div><b>页面运行约定</b>：jsx 直接用全局 React / antd / $ / PATH，不写 import、不重建 PATH、不自建 app-root，骨架负责兜底加载</div></div>
@@ -571,7 +571,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
         <div className="rp-r1"><span className="ttl reg">{doc.name}</span></div>
         <div className="rp-r2">
           <span className="tag src">{isMd ? 'Markdown' : 'SQL 源码'}</span>
-          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--tx3)' }}>meta/ · {fmtBytes(doc.size)} · {fmtTime(new Date(doc.mtime).toISOString())}</span>
+          <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>meta/ · {fmtBytes(doc.size)} · {fmtTime(new Date(doc.mtime).toISOString())}</span>
         </div>
         <div className="rp-acts">
           <button className="btn" onClick={async () => {
@@ -588,10 +588,10 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
         {content === null ? <div className="nores">读取中…</div> : tab === 'view'
           ? <div className="md" dangerouslySetInnerHTML={{ __html: mdToHtml(content) }} />
           : isMd
-            ? <div style={{ border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+            ? <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <MdEditor value={content} height="460px" onChange={(v) => { setContent(v); setDirty(true) }} />
               </div>
-            : <div style={{ border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+            : <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <SqlEditor value={content} height="460px" onChange={(v) => { setContent(v); setDirty(true) }} />
               </div>}
         {!isMd && <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div><b>D4</b>：过程创建语句存于项目 meta/，与库内实际定义互为备份（「存储过程」面板的保存也写这里）</div></div>}

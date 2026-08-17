@@ -163,7 +163,7 @@ export function DatasetEditModal({ project, boundConns, init, onClose, onSave }:
       </div>
       <div className="fld">
         <label>SQL（写操作 = CALL 存储过程，约定返回 JSON_OBJECT）</label>
-        <div style={{ border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
           <SqlEditor value={sql} onChange={setSql} height="220px" />
         </div>
       </div>
@@ -349,7 +349,7 @@ END`)
       </div>
       <div className="fld">
         <label>定义（CREATE PROCEDURE，约定 SELECT JSON_OBJECT 返回结果）</label>
-        <div style={{ border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
           <SqlEditor value={def} onChange={setDef} height="240px" />
         </div>
       </div>

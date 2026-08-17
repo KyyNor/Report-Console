@@ -77,7 +77,7 @@ export default function DashboardView({ onNavigate }: { onNavigate: (v: string) 
                     <td>{cn.reachable ? <span className="pill-o ok"><Icon n="cck" />可达</span> : <span className="pill-o err"><Icon n="cx" />不可达</span>}</td>
                     <td className="f">{cn.version ?? '-'}</td>
                     <td className="f">{cn.reachable ? `${cn.latencyMs ?? '-'}ms` : '-'}</td>
-                    <td style={{ color: '#f39893', fontSize: 11 }}>{!cn.reachable ? (cn.error ?? '').slice(0, 80) : ''}</td>
+                    <td style={{ color: 'var(--bad)', fontSize: 11 }}>{!cn.reachable ? (cn.error ?? '').slice(0, 80) : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -98,7 +98,7 @@ export default function DashboardView({ onNavigate }: { onNavigate: (v: string) 
                   <td className="f">{fmtTime(String(b.created_at))}</td>
                 </tr>
               ))}
-              {builds.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--tx3)' }}>暂无构建记录</td></tr>}
+              {builds.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--faint)' }}>暂无构建记录</td></tr>}
             </tbody>
           </table>
         </div>

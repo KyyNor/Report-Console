@@ -15,8 +15,8 @@ export function createMainWindow(): BrowserWindow {
     // 深色自绘标题栏（设计稿）：macOS 藏原生栏保红绿灯，Windows/Linux 用 overlay
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 14, y: 13 },
-    ...(process.platform !== 'darwin' ? { titleBarOverlay: { color: '#10121700', symbolColor: '#9fa8b8', height: 38 } } : {}),
-    backgroundColor: '#08090c',
+    ...(process.platform !== 'darwin' ? { titleBarOverlay: { color: '#00000000', symbolColor: '#4b5563', height: 42 } } : {}),
+    backgroundColor: '#f5f6f8',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

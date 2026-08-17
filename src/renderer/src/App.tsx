@@ -12,7 +12,7 @@ type ViewKey = 'dashboard' | 'workbench' | 'connections' | 'agent' | 'settings'
 
 const ITEMS: Array<{ key: ViewKey; icon: string; label: string }> = [
   { key: 'dashboard', icon: 'dash', label: '总览' },
-  { key: 'workbench', icon: 'folder', label: '项目（工作台）' },
+  { key: 'workbench', icon: 'folder', label: '项目' },
   { key: 'connections', icon: 'db', label: '连接' },
   { key: 'agent', icon: 'ai', label: 'Agent' },
   { key: 'settings', icon: 'set', label: '设置' }
@@ -43,31 +43,28 @@ export default function App(): React.ReactElement {
 
   return (
     <div className="app-frame">
-      <header className="titlebar">
-        {/* macOS 红绿灯由 trafficLightPosition 停在此区；Windows/Linux 用系统 overlay */}
+      {/* 顶栏一体式导航（设计稿方向 A）：macOS 红绿灯区 + 品牌 + 五入口 + 环境迷你点 */}
+      <nav className="navtop">
         <div className="lights" />
-        <span className="tb-title">Report Console</span>
-        <span className="tb-sub">{ITEMS.find((i) => i.key === view)?.label ?? ''}</span>
-        <div className="tb-right">
-          <span className="tb-chip"><span className={`dot ${status?.frReachable ? 'g' : 'r'}`} />帆软 {status?.frLatencyMs !== undefined ? `${status.frLatencyMs}ms` : '…'}</span>
-          {(status?.connections ?? []).slice(0, 3).map((c) => (
-            <span key={c.name} className="tb-chip"><span className={`dot ${c.reachable ? 'g' : 'r'}`} />{c.name}{c.reachable && c.latencyMs !== undefined ? ` ${c.latencyMs}ms` : !c.reachable ? ' 不可达' : ''}</span>
-          ))}
-        </div>
-      </header>
-
-      <div className="app-body">
-        <nav className="rail">
-          <div className="logo"><Icon n="box" /></div>
+        <div className="brand"><b>Report&nbsp;Console</b><span>项目制工作台</span></div>
+        <div className="entries">
           {ITEMS.map((it) => (
-            <button key={it.key} className={`rail-it${view === it.key ? ' on' : ''}`} onClick={() => setView(it.key)}>
-              <Icon n={it.icon} />
-              <span className="tip">{it.label}<small>⌘{ITEMS.findIndex((x) => x.key === it.key) + 1}</small></span>
+            <button key={it.key} className={`nentry${view === it.key ? ' on' : ''}`} onClick={() => setView(it.key)}>
+              <Icon n={it.icon} /><span>{it.label}</span>
             </button>
           ))}
-          <span className="spring" />
-        </nav>
+        </div>
+        <div className="grow" />
+        <div className="envmini" title="帆软 / 各连接 / reportlets 环境状态">
+          <span>帆软 <i className={`dot ${status?.frReachable ? 'g' : 'r'}`} /></span>
+          {(status?.connections ?? []).map((c) => (
+            <span key={c.name} title={c.error ?? c.version ?? c.name}>{c.name} <i className={`dot ${c.reachable ? 'g' : 'r'}`} /></span>
+          ))}
+          <span>reportlets <i className={`dot ${status?.reportletsWritable ? 'g' : 'y'}`} /></span>
+        </div>
+      </nav>
 
+      <div className="app-body">
         {view === 'dashboard' && <DashboardView onNavigate={(v) => setView(v as ViewKey)} />}
         {view === 'workbench' && <WorkbenchView />}
         {view === 'connections' && <ConnectionsView onChanged={refreshStatus} />}

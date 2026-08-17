@@ -15,7 +15,7 @@ import type { ChatPanelElement } from '../pi-elements'
 export default function AgentView(): React.ReactElement {
   const panelRef = useRef<ChatPanelElement | null>(null)
   const handleRef = useRef<PiAgentHandle | null>(null)
-  const [status, setStatus] = useState<{ ready: boolean; mode?: 'real' | 'faux'; error?: string }>({ ready: false })
+  const [status, setStatus] = useState<{ ready: boolean; mode?: 'real' | 'faux'; error?: string; modelId?: string }>({ ready: false })
 
   const start = useCallback(async (fresh: boolean) => {
     setStatus({ ready: false })
@@ -31,7 +31,10 @@ export default function AgentView(): React.ReactElement {
         // Key 由 getApiKey（设置页配置）提供，不让组件弹 Key 输入框
         onApiKeyRequired: async () => true
       })
-      setStatus({ ready: true, mode: handle.mode })
+      // 模型唯一入口是「设置」页：关闭 pi 自带的目录模型选择器
+      // （那本是 pi 官方客户端的全量目录，选了未注册 provider 会报 Unknown provider）
+      if (panelRef.current?.agentInterface) panelRef.current.agentInterface.enableModelSelector = false
+      setStatus({ ready: true, mode: handle.mode, modelId: handle.modelId })
       // 冒烟自检：URL 带 autosend=1 时自动发一条消息，验证 Agent 循环 → 组件渲染全链路
       if (!fresh && new URLSearchParams(window.location.search).get('autosend') === '1') {
         setTimeout(() => { void handle.agent.prompt('（冒烟自检）你好，请确认平台工具已加载。') }, 500)
@@ -50,6 +53,11 @@ export default function AgentView(): React.ReactElement {
         <b>Agent 开发助手</b>
         {status.mode === 'faux' && <span className="tag upd">Faux 演示模式（未配置 Key）</span>}
         {status.mode === 'real' && <span className="tag dict">真实模型</span>}
+        {status.ready && status.modelId && (
+          <span className="pill-o idle" title="模型在「设置」页配置（协议 / Base URL / 模型 / API Key）">
+            <Icon n="ai" />{status.modelId}
+          </span>
+        )}
         <span className="sub">平台动作=工具（主进程执行，质量门/审计内建）· 会话自动保存（IndexedDB），重启恢复 · 与工作台共享会话</span>
         <span className="grow" />
         <button className="btn sm" disabled={!status.ready} onClick={() => { void start(true) }}><Icon n="plus" />新建会话</button>

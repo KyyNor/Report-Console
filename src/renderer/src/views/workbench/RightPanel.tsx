@@ -600,7 +600,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 
 function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource?: string } | null; project: Project | null; onBack: () => void }): React.ReactElement {
   const panelRef = useRef<ChatPanelElement | null>(null)
-  const [state, setState] = useState<{ ready: boolean; mode?: string; error?: string; ctxSent?: string }>({ ready: false })
+  const [state, setState] = useState<{ ready: boolean; mode?: string; error?: string; ctxSent?: string; modelId?: string }>({ ready: false })
   const digest = buildDigest(ctx, project)
 
   useEffect(() => {
@@ -610,7 +610,9 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
         const handle = await getSharedPiAgent()
         if (!alive) return
         await panelRef.current?.setAgent?.(handle.agent, { onApiKeyRequired: async () => true })
-        if (alive) setState({ ready: true, mode: handle.mode })
+        // 模型唯一入口是「设置」页：关闭 pi 自带的目录模型选择器（同 Agent 页）
+        if (panelRef.current?.agentInterface) panelRef.current.agentInterface.enableModelSelector = false
+        if (alive) setState({ ready: true, mode: handle.mode, modelId: handle.modelId })
       } catch (e) {
         if (alive) setState({ ready: false, error: (e as Error).message })
       }
@@ -633,6 +635,7 @@ function AgentPanel({ ctx, project, onBack }: { ctx: { project: string; resource
         <span className="ttl">Agent 会话</span>
         {state.mode === 'faux' && <span className="tag upd">Faux 演示</span>}
         {state.mode === 'real' && <span className="tag dict">真实模型</span>}
+        {state.ready && state.modelId && <span className="ctx-chip" title="模型在「设置」页配置">{state.modelId}</span>}
         <button className="iconbtn" title="在「Agent」页查看完整会话与历史" onClick={onBack}><Icon n="clock" /></button>
       </div>
       <div className="ag-ctx">

@@ -101,6 +101,8 @@ export interface PiAgentHandle {
   agent: Agent
   mode: 'real' | 'faux'
   sessionId: string
+  /** 当前生效模型 id（设置页配置；faux 模式为演示模型） */
+  modelId: string
 }
 
 /**
@@ -122,13 +124,16 @@ export async function createPiAgent(fresh = false): Promise<PiAgentHandle> {
     ? { id: restored.id, title: restored.title, createdAt: restored.createdAt }
     : { id: newSessionId(), title: '新会话', createdAt: new Date().toISOString() }
 
+  // 模型唯一来源是设置页配置：会话只恢复消息与 thinkingLevel。
+  // 旧会话可能存过 pi 目录模型（provider 未注册）或已失效网关，一律回落当前配置，
+  // 否则发消息会报 Unknown provider；streamFn 再兜一层防止运行中被切到未注册模型。
   const agent = new Agent({
     sessionId: snapshot.id,
-    streamFn: (m, ctx, opts) => models.streamSimple(m, ctx, opts),
+    streamFn: (m, ctx, opts) => models.streamSimple(m.provider === model.provider ? m : model, ctx, opts),
     getApiKey: () => s.llmApiKey || undefined,
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
-      model: (restored?.data.model as typeof model) ?? model,
+      model,
       thinkingLevel: restored?.data.thinkingLevel,
       tools,
       messages: (restored?.data.messages ?? []) as never[]
@@ -144,7 +149,7 @@ export async function createPiAgent(fresh = false): Promise<PiAgentHandle> {
     void saveSessionSnapshot(snapshot, agent.state)
   })
 
-  return { agent, mode: s.llmApiKey ? 'real' : 'faux', sessionId: snapshot.id }
+  return { agent, mode: s.llmApiKey ? 'real' : 'faux', sessionId: snapshot.id, modelId: model.id }
 }
 
 // ── 共享单例：Agent 页与工作台右栏复用同一实例（同一会话流） ─────

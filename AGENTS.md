@@ -60,7 +60,9 @@ src/renderer/           React 19 + CodeMirror，深色 tech-utility 主题（样
                         右=操作面板（构建/实测/编辑/弹层确认）+ 内嵌 Agent（与 Agent 页共享单例会话）
   views/ConnectionsView.tsx  连接注册表管理（CRUD + 连通测试）
   agent/piAgent.ts      pi Agent 工厂：@earendil-works/pi-agent-core 跑在渲染层，
-                        工具经 IPC 桥回主进程；无 Key 时回落 faux 演示模式；getSharedPiAgent 共享单例
+                        工具经 IPC 桥回主进程；无 Key 时回落 faux 演示模式；getSharedPiAgent 共享单例。
+                        模型唯一入口是设置页：pi 自带的全量目录模型选择器已禁用（enableModelSelector=false），
+                        会话恢复与 streamFn 对未注册 provider 一律回落当前配置（否则报 Unknown provider）
   agent/piSessions.ts   会话持久化：官方 SessionsStore + IndexedDB（随 userData 走），
                         启动恢复最近会话、message_end/agent_end 自动快照
   views/AgentView.tsx   官方 @earendil-works/pi-web-ui 组件（<pi-chat-panel>，light DOM），

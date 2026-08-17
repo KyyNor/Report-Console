@@ -13,7 +13,7 @@ import {
 } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
-import { SYSTEM_PROMPT } from '@shared/agentPrompt'
+import { buildSystemPrompt } from '@shared/agentPrompt'
 import { call } from '../api'
 import type { AppSettings } from '@shared/types'
 import { initSessionStorage, restoreLatestSession, saveSessionSnapshot, newSessionId, titleFromMessages, type SaveSnapshot } from './piSessions'
@@ -46,6 +46,8 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
   const baseUrl = (isAnthropic ? (s.llmBaseUrl || ANTHROPIC_DEFAULT) : (s.llmBaseUrl || OPENAI_DEFAULT)).replace(/\/+$/, '')
   const api = isAnthropic ? 'anthropic-messages' : 'openai-completions'
   const modelId = s.llmModel || (isAnthropic ? 'claude-sonnet-4-5' : 'gpt-4o-mini')
+  // ZAI/GLM 即使关闭思考也需要发送 thinking: { type: 'disabled' }，否则可能把正常文本放进 reasoning_content。
+  const isZaiCompatible = !isAnthropic && (baseUrl.includes('open.bigmodel.cn') || baseUrl.includes('api.z.ai'))
 
   const model: Model<Api> = {
     id: modelId,
@@ -53,7 +55,7 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
     api,
     provider: providerId,
     baseUrl,
-    reasoning: false,
+    reasoning: isZaiCompatible || s.llmThinkingEnabled,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
@@ -116,9 +118,10 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
     streamFn: (m, ctx, opts) => models.streamSimple(m.provider === model.provider ? m : model, ctx, opts),
     getApiKey: () => s.llmApiKey || undefined,
     initialState: {
-      systemPrompt: `${SYSTEM_PROMPT}\n\n## 当前会话范围\n- 当前项目固定为：${scope.project}。所有项目资源和 SQL 连接均由平台按此范围校验；不得尝试访问其他项目。`,
+      systemPrompt: buildSystemPrompt(scope.project),
       model,
-      thinkingLevel: restored?.data.thinkingLevel,
+      // 配置页控制开关与级别；对 GLM 关闭时也保留 reasoning=true，以显式传递 disabled。
+      thinkingLevel: s.llmThinkingEnabled ? s.llmThinkingLevel : 'off',
       tools,
       messages: (restored?.data.messages ?? []) as never[]
     }

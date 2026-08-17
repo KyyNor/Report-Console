@@ -613,11 +613,15 @@ function AgentPanel({ ctx, project, data }: { ctx: { project: string; resource?:
 
   useEffect(() => {
     let alive = true
+    if (!project) {
+      setState({})
+      return () => { alive = false }
+    }
+    setState({})
     void (async () => {
       try {
-        if (!project) throw new Error('请先选择项目后再使用 Agent')
         const handle = await getSharedPiAgent({ project: project.name })
-        if (alive) setState((s) => ({ ...s, handle }))
+        if (alive) setState({ handle })
       } catch (e) {
         if (alive) setState({ error: (e as Error).message })
       }
@@ -631,11 +635,7 @@ function AgentPanel({ ctx, project, data }: { ctx: { project: string; resource?:
     <div className="rp">
       <div className="ag-head">
         <span className="ttl">Agent 会话</span>
-        {state.handle && <span className="ctx-chip" title="模型在「设置」页配置">{state.handle.modelId}</span>}
-      </div>
-      <div className="ag-ctx">
-        {project && <span className="ctx-chip">项目 <b>{project.name}</b></span>}
-        {project?.connections.map((c) => <span key={c} className="ctx-chip">连接 <b>{c}</b></span>)}
+        {state.handle && <span className="ctx-chip" title={`当前项目：${project?.name ?? '-'}；模型在「设置」页配置`}>{state.handle.modelId} · {project?.name}</span>}
       </div>
       <div className="ag-thread-wrap" style={{ padding: '8px 10px 10px', display: 'flex' }}>
         {state.error

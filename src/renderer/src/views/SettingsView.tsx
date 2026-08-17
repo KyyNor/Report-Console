@@ -15,7 +15,8 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
     })()
   }, [])
 
-  const set = (k: keyof AppSettings, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const setThinkingEnabled = (v: boolean) => setForm((f) => (f ? { ...f, llmThinkingEnabled: v } : f))
 
   const save = async () => {
     if (!form) return
@@ -76,6 +77,24 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
             <div className="fld">
               <label>模型</label>
               <input type="text" value={form.llmModel} spellCheck={false} placeholder="gpt-4o-mini / claude-sonnet-4-5 / 自部署模型名" onChange={(e) => set('llmModel', e.target.value)} />
+            </div>
+            <div className="fld">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.llmThinkingEnabled} onChange={(e) => setThinkingEnabled(e.target.checked)} style={{ width: 'auto' }} />
+                启用模型思考
+              </label>
+              <div className="fh">关闭时会请求兼容模型返回正常文本；GLM/ZAI 会显式收到关闭思考参数。</div>
+            </div>
+            <div className="fld">
+              <label>思考级别</label>
+              <select value={form.llmThinkingLevel} disabled={!form.llmThinkingEnabled} onChange={(e) => set('llmThinkingLevel', e.target.value)}>
+                <option value="minimal">最少</option>
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
+                <option value="xhigh">很高</option>
+              </select>
+              <div className="fh">仅在模型/兼容网关支持时生效；保存后新建 Agent 会话即可应用。</div>
             </div>
             <div className="fld">
               <label>API Key</label>

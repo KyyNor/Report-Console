@@ -209,7 +209,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   llmProvider: 'openai',
   llmBaseUrl: 'https://api.openai.com/v1',
   llmApiKey: '',
-  llmModel: 'gpt-4o-mini'
+  llmModel: 'gpt-4o-mini',
+  llmThinkingEnabled: false,
+  llmThinkingLevel: 'medium'
 }
 
 export function getSettings(): AppSettings {
@@ -218,7 +220,17 @@ export function getSettings(): AppSettings {
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
   // 旧库可能残留 mysql* 键，读时过滤掉（迁移已转入 connections）
   const { mysqlHost: _h, mysqlPort: _p, mysqlUser: _u, mysqlPassword: _w, mysqlDatabase: _d, ...rest } = map as Record<string, string>
-  return { ...DEFAULT_SETTINGS, ...rest } as AppSettings
+  const validThinkingLevels = new Set<AppSettings['llmThinkingLevel']>(['minimal', 'low', 'medium', 'high', 'xhigh'])
+  const level = validThinkingLevels.has(rest.llmThinkingLevel as AppSettings['llmThinkingLevel'])
+    ? rest.llmThinkingLevel as AppSettings['llmThinkingLevel']
+    : DEFAULT_SETTINGS.llmThinkingLevel
+  return {
+    ...DEFAULT_SETTINGS,
+    ...rest,
+    // settings 表按字符串保存，读取时还原布尔值；旧库没有这些键则使用默认值。
+    llmThinkingEnabled: rest.llmThinkingEnabled === undefined ? DEFAULT_SETTINGS.llmThinkingEnabled : rest.llmThinkingEnabled === 'true',
+    llmThinkingLevel: level
+  }
 }
 
 export function saveSettings(patch: Partial<AppSettings>): AppSettings {

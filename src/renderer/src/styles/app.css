@@ -347,7 +347,6 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 /* ---- Agent 面板（工作台右栏内嵌） ---- */
 .ag-head{flex:none;padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;background:var(--surface)}
 .ag-head .ttl{font-size:13.5px;font-weight:700;flex:1;font-family:var(--font-ui)}
-.ag-ctx{flex:none;display:flex;gap:5px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
 .ctx-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;padding:3px 9px;border-radius:999px;
   background:var(--accent-s);color:oklch(40% 0.1 259);font-family:var(--font-mono)}
 .ctx-chip b{font-weight:600}

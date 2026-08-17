@@ -140,6 +140,9 @@ export interface AppSettings {
   llmBaseUrl: string
   llmApiKey: string
   llmModel: string
+  /** 是否请求模型输出可见思考；关闭时 GLM/ZAI 会显式收到 thinking: disabled。 */
+  llmThinkingEnabled: boolean
+  llmThinkingLevel: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
 }
 
 export interface StatusPayload {

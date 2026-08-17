@@ -4,27 +4,22 @@
 
 ---
 
-## #1 连接清单 + 项目制重组
+## #1 连接清单 + 项目制重组（2026-08-16 提出 / 08-17 拍板 / **08-17 已落地**）
 
-### 已定（2026-08-16 提出 / 08-17 拍板）
+### ✅ 已落地（commit 见 git log `feat(v2)`）
 
-1. **连接是一等公民，应用内注册**：连接注册表（SQLite），一条连接 = 一个 MySQL 连接（host/port/user/password/database），与帆软设计器里的数据连接一一对应、名字一致；`_data.cpt` 与管理面（sql_query / 建表 / 过程管理）均按连接名路由。
-2. **组织层级改为项目制**：顶层 Project，绑定一个目录。不考虑存量迁移（均为测试数据）。
-3. **项目绑定多个数据连接**（非单主连接）。存储过程和数据接口都直接绑定到项目：
-   - **接口不共用**：归属单一项目，进该项目目录 `data/` 下的 `_data.cpt`。
-   - **存储过程可共用**：一般在本项目创建；需要共用时通过**关联**引用其他项目已创建的过程（关联，不是复制）。
-4. **一项目一页 `_data.cpt`，页内多连接**：每个 TableData 各自带连接名（CPT 格式天然支持），页面端 `PATH.getDataTemplate` 约定不变。
-5. **项目目录结构三分**：`data/`（数据层产物）+ `pages/`（页面）+ **元数据目录**（存储过程创建语句、项目需求文档、项目设计文档等）。
-6. **工作台交互为左中右三栏**：左栏选项目，中栏看项目各类资源，右栏操作（查看 / 手动编辑 / 启动构建 / 调用 Agent）。详细需求见 [`ui-requirements.md`](ui-requirements.md)，交设计 agent 出原型。
+1. **连接是一等公民，应用内注册**：`connections` 表 + 连接页 CRUD + 连通测试；`_data.cpt` TableData `DatabaseName` 与管理面 SQL（只读/受控写/过程管理）均按连接名路由（mysqlService 多连接池）。
+2. **项目制**：`projects` + `project_connections`；绑定一个 reportlets 目录，自动三分 `data/` + `pages/` + `meta/`。v1 模块存量自动迁移（含 settings mysql* → 连接种子）。
+3. **项目绑多个连接**；接口（数据集）单一归属 + 各绑一个连接（须在项目绑定清单内）。
+4. **一项目一页 `_data.cpt`，页内多连接**（生成器每数据集 dbConnection，单测覆盖）。
+5. **存储过程归属项目 + 关联共享**（`proc_links` 引用不复制）；定义以 `meta/{name}.sql` 为源，「应用」DROP+CREATE 审计落库。
+6. **元数据目录 meta/**：需求/设计 .md + 过程语句 .sql，工作台第四组资源，Agent 可读写（read_doc/write_doc 工具）。
+7. **三栏工作台**（左项目/中四组资源/右操作面板 + 内嵌 Agent）：按 `docs/prototypes/workbench.html` 深色 tech-utility 原型落地；无边框窗口自绘标题栏；五视图导航（总览/项目/连接/Agent/设置）。
+8. **Agent**：沿用 pi 引擎；工具集换项目制 API；工作台右栏「用 Agent 做」带上下文唤起（与 Agent 页共享单例会话）。
+9. selftest 27 步全绿；冒烟四视图截图核验。
 
-### 待办
+### 遗留小项（不阻塞，随手改）
 
-- [ ] 设计 agent 出三栏工作台原型 → 评审 → 定稿
-- [ ] 元数据目录命名与位置（项目目录内 `meta/`？是否会被帆软模板扫描影响）待实现期定
-- [ ] 定稿后展开实现影响面（契约表结构 / buildDataCpt 每数据集 dbConnection / mysqlService 按连接建池 / Agent 工具 schema / selftest / AGENTS.md）
-
-### 不可破坏的约束
-
-- 质量门与"CPT 只能经 build 产出"不变
-- formula 参数不随请求传递不变
-- `err_code=0` 实测闭环语义不变
+- [ ] 工作台头部「新建」菜单的页面子菜单目前复用 prompt 输入页面名，可换成正式弹层
+- [ ] 文档重命名入口（docrename modal 已实现，中栏右键/菜单未接）
+- [ ] pi-chat-panel 在 420px 右栏的进一步适配（深色变量已对齐，细节字号可再调）

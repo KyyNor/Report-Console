@@ -1,126 +1,114 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Col, Row, Statistic, Typography, Button, Space, Tag, Table, Descriptions, Alert } from 'antd'
-import {
-  ApiOutlined, DatabaseOutlined, CodeOutlined, CheckCircleFilled,
-  CloseCircleFilled, RobotOutlined, ReloadOutlined
-} from '@ant-design/icons'
+import { Icon } from '../components/Icon'
 import { call } from '../api'
-import type { StatusPayload } from '@shared/types'
+import { fmtTime } from '../components/ui'
+import type { StatusPayload, BuildResult } from '@shared/types'
 
-export default function DashboardView({ onNavigate }: { onNavigate: (v: string) => void }) {
+export default function DashboardView({ onNavigate }: { onNavigate: (v: string) => void }): React.ReactElement {
   const [status, setStatus] = useState<StatusPayload | null>(null)
   const [builds, setBuilds] = useState<Array<Record<string, unknown>>>([])
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
 
   const refresh = async () => {
     setLoading(true)
-    setLoadError(null)
+    setError(null)
     try {
       const [s, b] = await Promise.all([
         call<StatusPayload>('status:get'),
-        call<Array<Record<string, unknown>>>('history:builds', { limit: 8 })
+        call<Array<Record<string, unknown>>>('history:builds', { limit: 10 })
       ])
       setStatus(s)
       setBuilds(b)
     } catch (e) {
-      setLoadError((e as Error).message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }
   }
-
   useEffect(() => { void refresh() }, [])
 
+  const c = status?.counts
+
   return (
-    <div style={{ padding: 20 }}>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>总览</Typography.Title>
+    <div className="page">
+      <div className="page-head">
+        <b>总览</b>
+        <span className="sub">环境状态 · 资产规模 · 构建历史</span>
+        <span className="grow" />
+        <button className="btn sm" onClick={() => void refresh()} disabled={loading}><Icon n="cd" />刷新</button>
+      </div>
+      <div className="page-body">
+        {error && (
+          <div className="banner err"><Icon n="cx" /><div>状态加载失败：{error}　<button className="btn sm" style={{ marginLeft: 8 }} onClick={refresh}>重试</button></div></div>
+        )}
+        <div className="statgrid">
+          <div className="statcard">
+            <div className="st-t"><span className={`dot ${status?.frReachable ? 'g' : 'r'}`} />帆软服务</div>
+            <div className={`st-v ${status ? (status.frReachable ? 'ok' : 'err') : ''}`}>{status ? (status.frReachable ? '在线' : '不可达') : '…'}</div>
+            <div className="st-m">{status?.frLatencyMs !== undefined ? `${status.frLatencyMs}ms` : '-'}</div>
+          </div>
+          <div className="statcard">
+            <div className="st-t"><Icon n="db" size={12} />数据连接</div>
+            <div className="st-v">{status ? status.connections.length : '…'}</div>
+            <div className="st-m">{status ? `${status.connections.filter((x) => x.reachable).length} 可达 · ${status.connections.filter((x) => !x.reachable).length} 不可达` : '-'}</div>
+          </div>
+          <div className="statcard">
+            <div className="st-t"><Icon n="folder" size={12} />reportlets</div>
+            <div className={`st-v ${status ? (status.reportletsWritable ? 'ok' : 'warn') : ''}`}>{status ? (status.reportletsWritable ? '可写' : '不可写') : '…'}</div>
+            <div className="st-m" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{status?.reportletsPath || '-'}</div>
+          </div>
+          <div className="statcard">
+            <div className="st-t"><Icon n="box" size={12} />项目 / 接口</div>
+            <div className="st-v">{c ? `${c.projects} / ${c.datasets}` : '…'}</div>
+            <div className="st-m">页面 {c?.pages ?? '-'} · 过程 {c?.procedures ?? '-'} · 文档 {c?.docs ?? '-'}</div>
+          </div>
+        </div>
 
-      {loadError && (
-        <Alert
-          type="error" showIcon closable style={{ marginBottom: 12 }}
-          message="状态加载失败"
-          description={loadError}
-          action={<Button size="small" onClick={refresh}>重试</Button>}
-        />
-      )}
+        {(status?.connections.length ?? 0) > 0 && (
+          <div className="pcard-row" style={{ marginBottom: 16 }}>
+            <div className="pcard-h"><Icon n="db" />连接健康</div>
+            <table className="plain-table">
+              <thead><tr><th>连接</th><th>状态</th><th>版本</th><th>延迟</th><th>错误</th></tr></thead>
+              <tbody>
+                {status!.connections.map((cn) => (
+                  <tr key={cn.name}>
+                    <td className="f">{cn.name}</td>
+                    <td>{cn.reachable ? <span className="pill-o ok"><Icon n="cck" />可达</span> : <span className="pill-o err"><Icon n="cx" />不可达</span>}</td>
+                    <td className="f">{cn.version ?? '-'}</td>
+                    <td className="f">{cn.reachable ? `${cn.latencyMs ?? '-'}ms` : '-'}</td>
+                    <td style={{ color: '#f39893', fontSize: 11 }}>{!cn.reachable ? (cn.error ?? '').slice(0, 80) : ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <Row gutter={[12, 12]}>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="帆软服务"
-              value={status ? (status.frReachable ? '在线' : '不可达') : '…'}
-              prefix={status?.frReachable ? <CheckCircleFilled style={{ color: '#52c41a' }} /> : <CloseCircleFilled style={{ color: '#ff4d4f' }} />}
-              suffix={status?.frReachable && status.frLatencyMs !== undefined ? ` (${status.frLatencyMs}ms)` : ''}
-              valueStyle={{ fontSize: 18 }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title={`MySQL ${status?.mysqlVersion ? status.mysqlVersion.split('-')[0] : ''}`}
-              value={status ? (status.mysqlReachable ? '在线' : '不可达') : '…'}
-              prefix={status?.mysqlReachable ? <CheckCircleFilled style={{ color: '#52c41a' }} /> : <CloseCircleFilled style={{ color: '#ff4d4f' }} />}
-              valueStyle={{ fontSize: 18 }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="reportlets 可写"
-              value={status ? (status.reportletsWritable ? '正常' : '不可写') : '…'}
-              prefix={status?.reportletsWritable ? <CheckCircleFilled style={{ color: '#52c41a' }} /> : <CloseCircleFilled style={{ color: '#faad14' }} />}
-              valueStyle={{ fontSize: 18 }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small" style={{ height: '100%' }}>
-            <Space direction="vertical" size={4} style={{ width: '100%' }}>
-              <Typography.Text type="secondary" style={{ fontSize: 13 }}>资产规模</Typography.Text>
-              <Space size={6} wrap>
-                <Tag icon={<ApiOutlined />} color="blue">{status?.counts.modules ?? 0} 模块</Tag>
-                <Tag icon={<ApiOutlined />} color="geekblue">{status?.counts.datasets ?? 0} 接口</Tag>
-                <Tag icon={<CodeOutlined />} color="purple">{status?.counts.pages ?? 0} 页面</Tag>
-                <Tag icon={<DatabaseOutlined />} color="cyan">{status?.counts.procedures ?? 0} 过程</Tag>
-              </Space>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+        <div className="pcard-row">
+          <div className="pcard-h"><Icon n="clock" />最近构建</div>
+          <table className="plain-table">
+            <thead><tr><th>类型</th><th>目标</th><th>结果</th><th>时间</th></tr></thead>
+            <tbody>
+              {builds.map((b) => (
+                <tr key={String(b.id)}>
+                  <td>{b.kind === 'data' ? <span className="tag list">数据层</span> : <span className="tag stat">页面</span>}</td>
+                  <td className="f">{String(b.target)}</td>
+                  <td>{b.ok ? <span className="pill-o ok"><Icon n="cck" />成功</span> : <span className="pill-o err"><Icon n="cx" />失败</span>}</td>
+                  <td className="f">{fmtTime(String(b.created_at))}</td>
+                </tr>
+              ))}
+              {builds.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--tx3)' }}>暂无构建记录</td></tr>}
+            </tbody>
+          </table>
+        </div>
 
-      <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
-        <Col span={14}>
-          <Card size="small" title="最近构建" extra={<Button size="small" icon={<ReloadOutlined />} onClick={refresh} loading={loading}>刷新</Button>}>
-            <Table
-              size="small" pagination={false}
-              dataSource={builds} rowKey="id"
-              columns={[
-                { title: '类型', dataIndex: 'kind', width: 60, render: (v) => <Tag color={v === 'data' ? 'blue' : 'purple'}>{v}</Tag> },
-                { title: '目标', dataIndex: 'target' },
-                { title: '结果', dataIndex: 'ok', width: 70, render: (v) => v ? <Tag color="success">成功</Tag> : <Tag color="error">失败</Tag> },
-                { title: '时间', dataIndex: 'created_at', width: 150 }
-              ]}
-            />
-          </Card>
-        </Col>
-        <Col span={10}>
-          <Card size="small" title="环境">
-            <Descriptions size="small" column={1} bordered>
-              <Descriptions.Item label="业务库">{status?.database ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="reportlets"><Typography.Text copyable style={{ fontSize: 12 }}>{status?.reportletsPath ?? '-'}</Typography.Text></Descriptions.Item>
-            </Descriptions>
-            <Space style={{ marginTop: 12 }} wrap>
-              <Button type="primary" icon={<ApiOutlined />} onClick={() => onNavigate('datasets')}>管理接口</Button>
-              <Button icon={<CodeOutlined />} onClick={() => onNavigate('pages')}>管理页面</Button>
-              <Button icon={<RobotOutlined />} onClick={() => onNavigate('agent')}>唤起 Agent</Button>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button className="btn pri" onClick={() => onNavigate('workbench')}><Icon n="folder" />进入项目工作台</button>
+          <button className="btn acc-o" onClick={() => onNavigate('connections')}><Icon n="db" />管理连接</button>
+          <button className="btn acc-o" onClick={() => onNavigate('agent')}><Icon n="ai" />唤起 Agent</button>
+        </div>
+      </div>
     </div>
   )
 }

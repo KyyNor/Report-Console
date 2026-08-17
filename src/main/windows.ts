@@ -12,6 +12,11 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 700,
     title: 'Report Console — 帆软加壳开发控制台',
+    // 深色自绘标题栏（设计稿）：macOS 藏原生栏保红绿灯，Windows/Linux 用 overlay
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 14, y: 13 },
+    ...(process.platform !== 'darwin' ? { titleBarOverlay: { color: '#10121700', symbolColor: '#9fa8b8', height: 38 } } : {}),
+    backgroundColor: '#08090c',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

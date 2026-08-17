@@ -88,6 +88,23 @@ describe('dataWriter', () => {
     expect(xml).toContain('<![CDATA[SELECT a < b AND c > d -- \'quote\']]>')
     expect(() => fxParser.parse(`<r>${xml}</r>`)).not.toThrow()
   })
+
+  it('页内多连接：每数据集各自携带 DatabaseName（一项目一页·页内多连接）', () => {
+    const xml = generateDataCpt(dataTemplate, {
+      defaultDbName: 'frdemo_db',
+      datasets: [
+        { name: 'a_qry', sql: 'SELECT 1', params: [], dbConnection: 'conn_a' },
+        { name: 'dict_x', sql: 'SELECT 2', params: [], dbConnection: 'conn_b' },
+        { name: 'b_qry', sql: 'SELECT 3', params: [] } // 未指定 → 默认连接
+      ]
+    })
+    const arr = asArray(fxParser.parse(xml).WorkBook.TableDataMap.TableData)
+    expect(arr).toHaveLength(3)
+    const dbName = (i: number) => String((arr[i].Connection as Record<string, unknown>).DatabaseName).replace(/<!\[CDATA\[|\]\]>/g, '')
+    expect(dbName(0)).toBe('conn_a')
+    expect(dbName(1)).toBe('conn_b')
+    expect(dbName(2)).toBe('frdemo_db')
+  })
 })
 
 describe('jsTransform', () => {

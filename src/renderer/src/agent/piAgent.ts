@@ -146,3 +146,21 @@ export async function createPiAgent(fresh = false): Promise<PiAgentHandle> {
 
   return { agent, mode: s.llmApiKey ? 'real' : 'faux', sessionId: snapshot.id }
 }
+
+// ── 共享单例：Agent 页与工作台右栏复用同一实例（同一会话流） ─────
+
+let shared: Promise<PiAgentHandle> | null = null
+
+/** 取共享 Agent（恢复最近会话）；失败时清缓存，下次重试 */
+export function getSharedPiAgent(): Promise<PiAgentHandle> {
+  if (!shared) {
+    shared = createPiAgent(false).catch((e) => { shared = null; throw e })
+  }
+  return shared
+}
+
+/** 新建会话并替换共享单例 */
+export function resetSharedPiAgent(): Promise<PiAgentHandle> {
+  shared = createPiAgent(true).catch((e) => { shared = null; throw e })
+  return shared
+}

@@ -1,19 +1,20 @@
 /**
  * 自检/演示模式（--selftest）
  *
- * 用平台自身的服务，对真实帆软 + MySQL 走一遍完整链路：
- *   建模块 → 存储过程（insert/update/delete JSON）→ 接口契约 → 构建 _data.cpt
- *   → /api/data 逐项实测 → 页面 jsx（列表脚手架）→ 构建 .mjs/.cpt → 预览 URL
+ * 用平台自身的服务，对真实帆软 + MySQL 走一遍完整链路（v2 项目制）：
+ *   建项目（绑定连接）→ 存储过程（insert/update/delete JSON）→ 接口契约
+ *   → 构建 _data.cpt → /api/data 逐项实测 → 页面 jsx（列表脚手架）→ 构建 .mjs/.cpt → 预览 URL
  *
  * 全部幂等，可反复执行。结果以 JSON 打到 stdout，exit 0/1。
+ * 连接取注册表第一个（本机需先在「连接」页注册，名字与帆软数据连接一致）。
  */
 
 import type { BrowserWindow } from 'electron'
-import * as modules from './modules'
+import * as projects from './projectsService'
 import * as pages from './pagesService'
 import * as sql from './mysqlService'
+import * as conns from './connectionsService'
 import { pingFrServer } from './frClient'
-import { getSettings } from './db'
 
 const DDL = `CREATE TABLE IF NOT EXISTS frdemo_book (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -67,19 +68,44 @@ export async function runSelftest(_win?: BrowserWindow): Promise<{ ok: boolean; 
     if (!r.reachable) throw new Error(`不可达（${r.latencyMs}ms）`)
     return `${r.latencyMs}ms`
   })
+
+  const conn = conns.getConnection()
+  await step('环境：连接注册表', () => {
+    if (!conn) throw new Error('注册表为空——请先在「连接」页注册（名字与帆软数据连接一致）')
+    return conn.name
+  })
+  if (!conn) {
+    return { ok: false, results }
+  }
+  const connRef = { name: conn.name }
+
   await step('环境：MySQL 可达', async () => {
-    const r = await sql.pingMysql()
-    if (!r.reachable) throw new Error('不可达')
-    return r.version
+    const r = await sql.pingConnection(conn)
+    if (!r.reachable) throw new Error(r.error ?? '不可达')
+    return `${conn.name} ${r.version}`
   })
 
-  await step('存储过程：建表演示表 frdemo_book', () => sql.guardedExec(DDL, 'ddl', 'selftest: frdemo_book'))
-  await step('存储过程：sp_frdemo_book_insert', () => sql.applyProcedure(SP_INSERT, 'sp_frdemo_book_insert'))
-  await step('存储过程：sp_frdemo_book_update', () => sql.applyProcedure(SP_UPDATE, 'sp_frdemo_book_update'))
-  await step('存储过程：sp_frdemo_book_delete', () => sql.applyProcedure(SP_DELETE, 'sp_frdemo_book_delete'))
+  await step('存储过程：建表演示表 frdemo_book', () => sql.guardedExec(DDL, 'ddl', 'selftest: frdemo_book', connRef))
+
+  // 项目（幂等 upsert）
+  await step('项目：frdemo（绑定 ' + conn.name + '）', () => {
+    const existing = projects.listProjects().find((p) => p.name === 'frdemo')
+    if (existing) return '已存在'
+    return projects.createProject('frdemo', [conn.name], 'Report Console 演示项目')
+  })
+
+  await step('存储过程：sp_frdemo_book_insert', () =>
+    projects.saveProcedure('frdemo', { name: 'sp_frdemo_book_insert', connection: conn.name, comment: '演示新增', definition: SP_INSERT }))
+  await step('存储过程：sp_frdemo_book_update', () =>
+    projects.saveProcedure('frdemo', { name: 'sp_frdemo_book_update', connection: conn.name, comment: '演示更新', definition: SP_UPDATE }))
+  await step('存储过程：sp_frdemo_book_delete', () =>
+    projects.saveProcedure('frdemo', { name: 'sp_frdemo_book_delete', connection: conn.name, comment: '演示删除', definition: SP_DELETE }))
+  await step('存储过程：应用 insert（DROP+CREATE）', () => projects.applyProjectProcedure('frdemo', 'sp_frdemo_book_insert'))
+  await step('存储过程：应用 update', () => projects.applyProjectProcedure('frdemo', 'sp_frdemo_book_update'))
+  await step('存储过程：应用 delete', () => projects.applyProjectProcedure('frdemo', 'sp_frdemo_book_delete'))
 
   await step('数据：确保演示记录存在', async () => {
-    const r = await sql.readOnlyQuery('SELECT COUNT(*) AS c FROM frdemo_book')
+    const r = await sql.readOnlyQuery('SELECT COUNT(*) AS c FROM frdemo_book', { connection: connRef })
     const c = Number((r.rows[0] as { c: number | string }).c)
     if (c === 0) {
       await sql.guardedExec(
@@ -88,18 +114,14 @@ export async function runSelftest(_win?: BrowserWindow): Promise<{ ok: boolean; 
          ('活着','余华','文学','在库'),
          ('JavaScript权威指南','David Flanagan','技术','借出'),
          ('小王子','圣埃克苏佩里','文学','在库')`,
-        'dml', 'selftest: seed books'
+        'dml', 'selftest: seed books', connRef
       )
       return '已插入 4 条'
     }
     return `已有 ${c} 条`
   })
 
-  // 模块与接口契约（幂等 upsert）
-  await step('契约：模块 frdemo', () => {
-    try { return modules.createModule('frdemo', getSettings().mysqlDatabase, 'Report Console 演示模块') } catch { return '已存在' }
-  })
-
+  // 接口契约（幂等 upsert）
   const datasets = [
     {
       name: 'book_qry', kind: 'list' as const, comment: '图书列表（分页+搜索）',
@@ -155,13 +177,13 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
   ]
 
   for (const ds of datasets) {
-    await step(`契约：接口 ${ds.name}`, () => modules.saveDataset('frdemo', ds))
+    await step(`契约：接口 ${ds.name}`, () => projects.saveDataset('frdemo', { ...ds, connection: conn.name }))
   }
 
-  await step('构建：frdemo/data/frdemo_data.cpt', () => modules.buildDataCpt('frdemo'))
+  await step('构建：frdemo/data/frdemo_data.cpt', () => projects.buildDataCpt('frdemo'))
 
   await step('实测：全部接口（/api/data）', async () => {
-    const tests = await modules.testAllDatasets('frdemo')
+    const tests = await projects.testAllDatasets('frdemo')
     const failed = tests.filter((t) => !t.ok)
     if (failed.length > 0) throw new Error(JSON.stringify(failed))
     return tests.map((t) => `${t.dataset}: err_code=${t.errCode}, rows=${t.rowCount}, ${t.durationMs}ms`)
@@ -170,7 +192,7 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
   // 写入类接口的副作用验证：insert → 查到 → 删除 → 查不到
   let probeId: number | null = null
   await step('实测：insert 写入闭环', async () => {
-    const r = await modules.testDataset('frdemo', 'book_insert', { p_title: '__selftest_probe__', p_author: 'selftest', p_category: '通用', p_status: '在库' })
+    const r = await projects.testDataset('frdemo', 'book_insert', { p_title: '__selftest_probe__', p_author: 'selftest', p_category: '通用', p_status: '在库' })
     const resp = r.response as { data?: Array<{ result?: string }> }
     const inner = JSON.parse(resp.data?.[0]?.result ?? '{}')
     probeId = Number(inner.id)
@@ -179,8 +201,8 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
   })
   await step('实测：delete 闭环清理', async () => {
     if (!probeId) throw new Error('无探针 id')
-    const r = await modules.testDataset('frdemo', 'book_delete', { p_id: probeId })
-    const q2 = await sql.readOnlyQuery(`SELECT COUNT(*) AS c FROM frdemo_book WHERE title = '__selftest_probe__'`)
+    const r = await projects.testDataset('frdemo', 'book_delete', { p_id: probeId })
+    const q2 = await sql.readOnlyQuery(`SELECT COUNT(*) AS c FROM frdemo_book WHERE title = '__selftest_probe__'`, { connection: connRef })
     if (Number((q2.rows[0] as { c: number }).c) !== 0) throw new Error('探针未删除')
     return r.ok ? 'ok' : JSON.stringify(r.response)
   })
@@ -206,6 +228,12 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
     const res = await fetch(url, { redirect: 'manual' })
     if (res.status >= 500) throw new Error(`HTTP ${res.status}`)
     return url.slice(0, 120) + '…'
+  })
+
+  // 文档（meta/）
+  await step('文档：meta/需求与过程语句', () => {
+    projects.saveDoc('frdemo', '01-需求-图书演示.md', '# 图书演示 · 需求\n\nselftest 自动生成的演示项目：列表 / 字典 / 增删改存储过程闭环。\n')
+    return 'frdemo/meta/01-需求-图书演示.md'
   })
 
   const ok = results.every((r) => r.ok)

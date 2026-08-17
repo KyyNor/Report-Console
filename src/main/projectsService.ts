@@ -1,0 +1,626 @@
+/**
+ * 项目服务 — 项目制核心：项目与连接绑定、接口契约（各绑连接）、数据层构建、实测、
+ * 存储过程归属/关联（定义存 meta/）、项目文档（meta/）
+ */
+
+import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs'
+import { join } from 'path'
+import { getDb, getSettings } from './db'
+import { generateDataCpt } from './cpt/dataWriter'
+import { checkDataCpt, hasError } from './cpt/checker'
+import { callApiData, type ApiDataRequest } from './frClient'
+import { getConnection, requireConnection } from './connectionsService'
+import { applyProcedureMysql, guardedExec, pingConnection } from './mysqlService'
+import type {
+  Project, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
+  BuildResult, CheckerFinding, ConnectionHealth
+} from '@shared/types'
+import dataTemplateRaw from './templates/base_cpt_data.cpt?raw'
+
+const NAME_RE = /^[a-z][a-z0-9_]*$/
+
+export function assertProjectName(name: string): void {
+  if (!NAME_RE.test(name)) throw new Error('名称仅允许小写字母/数字/下划线（= reportlets 子目录名）')
+}
+
+function projectDir(name: string): string {
+  return join(getSettings().reportletsPath, name)
+}
+
+function getProjectByName(name: string): { id: number; name: string; comment: string; createdAt: string } | undefined {
+  const r = getDb().prepare('SELECT * FROM projects WHERE name=?').get(name) as Record<string, unknown> | undefined
+  if (!r) return undefined
+  return { id: r.id as number, name: r.name as string, comment: r.comment as string, createdAt: r.created_at as string }
+}
+
+function projectConnections(pid: number): string[] {
+  const rows = getDb().prepare(`
+    SELECT c.name FROM project_connections pc JOIN connections c ON c.id = pc.connection_id
+    WHERE pc.project_id = ? ORDER BY c.name`).all(pid) as Array<{ name: string }>
+  return rows.map((r) => r.name)
+}
+
+// ── 项目 CRUD ───────────────────────────────────────────────────
+
+export function listProjects(): Project[] {
+  const d = getDb()
+  const rows = d.prepare(`
+    SELECT p.*,
+      (SELECT COUNT(*) FROM datasets ds WHERE ds.project_id = p.id) AS cIfs,
+      (SELECT COUNT(*) FROM procedures sp WHERE sp.project_id = p.id) AS cSps,
+      (SELECT COUNT(*) FROM proc_links pl WHERE pl.project_id = p.id) AS cLnk
+    FROM projects p ORDER BY p.name`).all() as Array<Record<string, unknown>>
+  return rows.map((r) => {
+    const name = r.name as string
+    const dir = projectDir(name)
+    return {
+      id: r.id as number,
+      name,
+      comment: r.comment as string,
+      createdAt: r.created_at as string,
+      dir,
+      missingDir: getSettings().reportletsPath ? !existsSync(dir) : true,
+      connections: projectConnections(r.id as number),
+      counts: {
+        ifs: r.cIfs as number,
+        sps: (r.cSps as number) + (r.cLnk as number),
+        pgs: countPages(name),
+        docs: countDocs(name)
+      }
+    }
+  })
+}
+
+function countPages(project: string): number {
+  const dir = join(projectDir(project), 'pages')
+  if (!existsSync(dir)) return 0
+  try { return readdirSync(dir).filter((f) => f.endsWith('.jsx')).length } catch { return 0 }
+}
+
+function countDocs(project: string): number {
+  const dir = join(projectDir(project), 'meta')
+  if (!existsSync(dir)) return 0
+  try { return readdirSync(dir).filter((f) => /\.(md|sql)$/i.test(f)).length } catch { return 0 }
+}
+
+export function createProject(name: string, connections: string[], comment = ''): Project {
+  assertProjectName(name)
+  if (!connections.length) throw new Error('至少绑定一个连接（来自「连接」注册表）')
+  for (const cn of connections) {
+    if (!getConnection({ name: cn })) throw new Error(`连接不存在：${cn}（先在「连接」页注册）`)
+  }
+  const d = getDb()
+  const info = d.prepare('INSERT INTO projects(name, comment) VALUES(?,?)').run(name, comment)
+  const pid = Number(info.lastInsertRowid)
+  const bind = d.prepare('INSERT OR IGNORE INTO project_connections(project_id, connection_id) VALUES(?,?)')
+  for (const cn of connections) {
+    bind.run(pid, (getConnection({ name: cn }) as { id: number }).id)
+  }
+  // 目录三分：data/ pages/ meta/
+  const root = projectDir(name)
+  for (const sub of ['data', 'pages', 'meta']) mkdirSync(join(root, sub), { recursive: true })
+  return listProjects().find((p) => p.id === pid)!
+}
+
+export function updateProject(id: number, patch: { comment?: string; connections?: string[] }): void {
+  const d = getDb()
+  if (patch.comment !== undefined) d.prepare('UPDATE projects SET comment=? WHERE id=?').run(patch.comment, id)
+  if (patch.connections) {
+    for (const cn of patch.connections) {
+      if (!getConnection({ name: cn })) throw new Error(`连接不存在：${cn}`)
+    }
+    const tx = d.transaction(() => {
+      d.prepare('DELETE FROM project_connections WHERE project_id=?').run(id)
+      const bind = d.prepare('INSERT OR IGNORE INTO project_connections(project_id, connection_id) VALUES(?,?)')
+      for (const cn of patch.connections!) {
+        bind.run(id, (getConnection({ name: cn }) as { id: number }).id)
+      }
+    })
+    tx()
+    // 数据集引用了被解绑的连接时给出提示（不强制阻止，构建时连接名仍会写入）
+  }
+}
+
+export function deleteProject(id: number): void {
+  getDb().prepare('DELETE FROM projects WHERE id=?').run(id)
+}
+
+/** reportlets 下已部署但未建项目的目录（供扫描导入） */
+export function scanDeployedProjects(): string[] {
+  const s = getSettings()
+  if (!s.reportletsPath || !existsSync(s.reportletsPath)) return []
+  const known = new Set(listProjects().map((p) => p.name))
+  return readdirSync(s.reportletsPath)
+    .filter((f) => {
+      const p = join(s.reportletsPath, f)
+      try { return statSync(p).isDirectory() && (existsSync(join(p, 'data')) || existsSync(join(p, 'pages'))) } catch { return false }
+    })
+    .filter((f) => NAME_RE.test(f) && !known.has(f))
+}
+
+// ── 接口契约 ────────────────────────────────────────────────────
+
+function rowToDataset(r: Record<string, unknown>): Dataset {
+  const d = getDb()
+  const conn = d.prepare('SELECT name FROM connections WHERE id=?').get(r.connection_id as number) as { name: string } | undefined
+  return {
+    id: r.id as number,
+    projectId: r.project_id as number,
+    name: r.name as string,
+    kind: r.kind as DatasetKind,
+    comment: r.comment as string,
+    params: JSON.parse((r.params as string) || '[]') as DatasetParam[],
+    sql: r.sql as string,
+    connection: conn?.name ?? '?',
+    updatedAt: r.updated_at as string
+  }
+}
+
+export function listDatasets(project: string): Dataset[] {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const rows = getDb().prepare('SELECT * FROM datasets WHERE project_id=? ORDER BY id').all(p.id) as Array<Record<string, unknown>>
+  return rows.map(rowToDataset)
+}
+
+/** 每个接口的最近实测状态（api_tests 只增不改，取每 dataset 最新一条） */
+export function datasetStatuses(project: string): Record<string, DatasetStatus> {
+  const p = getProjectByName(project)
+  if (!p) return {}
+  const d = getDb()
+  const rows = d.prepare(`
+    SELECT t.dataset, t.ok, t.err_code, t.duration_ms, t.created_at,
+           json_extract(t.response, '$.data') AS data
+    FROM api_tests t
+    WHERE t.dataset_id IN (SELECT id FROM datasets WHERE project_id=?)
+    ORDER BY t.id`).all(p.id) as Array<Record<string, unknown>>
+  const latest = new Map<string, Record<string, unknown>>()
+  for (const r of rows) latest.set(r.dataset as string, r) // 顺序遍历，后者覆盖 → 最新
+  const build = lastDataBuild(project)
+  const out: Record<string, DatasetStatus> = {}
+  for (const [name, r] of latest) {
+    const ok = r.ok === 1
+    let why: string | undefined
+    if (!ok) {
+      try { why = (JSON.parse(String(r.response ?? '{}')) as { err_msg?: string }).err_msg } catch { /* ignore */ }
+    }
+    let rowCount = 0
+    try { const dd = JSON.parse(String(r.data ?? 'null')); if (Array.isArray(dd)) rowCount = dd.length } catch { /* ignore */ }
+    out[name] = {
+      test: {
+        st: ok ? 'ok' : 'fail',
+        t: r.created_at as string,
+        rows: rowCount,
+        ms: r.duration_ms as number,
+        ec: r.err_code as number | null,
+        why
+      },
+      build
+    }
+  }
+  return out
+}
+
+function lastDataBuild(project: string): string | undefined {
+  const r = getDb().prepare(
+    "SELECT created_at FROM builds WHERE kind='data' AND target=? ORDER BY id DESC LIMIT 1"
+  ).get(`${project}/data/${project}_data.cpt`) as { created_at: string } | undefined
+  return r?.created_at
+}
+
+export function saveDataset(project: string, input: {
+  name: string
+  kind?: DatasetKind
+  comment?: string
+  params?: DatasetParam[]
+  sql?: string
+  connection?: string
+}, expectId?: number): Dataset {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  assertProjectName(input.name)
+  const d = getDb()
+  const bound = projectConnections(p.id)
+  let connId: number
+  if (input.connection) {
+    const c = getConnection({ name: input.connection })
+    if (!c) throw new Error(`连接不存在：${input.connection}`)
+    if (!bound.includes(input.connection)) throw new Error(`连接 ${input.connection} 未绑定到项目 ${project}（先在项目设置中绑定）`)
+    connId = c.id
+  } else {
+    if (!bound.length) throw new Error(`项目 ${project} 未绑定任何连接`)
+    connId = (getConnection({ name: bound[0] }) as { id: number }).id
+  }
+  const params = JSON.stringify(input.params ?? [])
+  const existing = d.prepare('SELECT id FROM datasets WHERE project_id=? AND name=?').get(p.id, input.name) as { id: number } | undefined
+  const targetId = expectId ?? existing?.id
+  if (targetId) {
+    d.prepare(`UPDATE datasets SET name=?, kind=?, comment=?, params=?, sql=?, connection_id=?, updated_at=datetime('now','localtime') WHERE id=? AND project_id=?`)
+      .run(input.name, input.kind ?? 'other', input.comment ?? '', params, input.sql ?? '', connId, targetId, p.id)
+  } else {
+    d.prepare('INSERT INTO datasets(project_id, connection_id, name, kind, comment, params, sql) VALUES(?,?,?,?,?,?,?)')
+      .run(p.id, connId, input.name, input.kind ?? 'other', input.comment ?? '', params, input.sql ?? '')
+  }
+  const saved = d.prepare('SELECT * FROM datasets WHERE project_id=? AND name=?').get(p.id, input.name) as Record<string, unknown>
+  return rowToDataset(saved)
+}
+
+export function deleteDataset(project: string, name: string): void {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  getDb().prepare('DELETE FROM datasets WHERE project_id=? AND name=?').run(p.id, name)
+}
+
+// ── 数据层构建（一项目一页 _data.cpt，页内每数据集各带连接名） ──
+
+export function buildDataCpt(project: string): BuildResult {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const log: string[] = []
+  const datasets = listDatasets(project)
+  log.push(`读取契约：${datasets.length} 个接口`)
+
+  const bound = projectConnections(p.id)
+  const defaultDb = bound[0] ?? datasets[0]?.connection ?? requireConnection().name
+
+  const xml = generateDataCpt(dataTemplateRaw, {
+    defaultDbName: defaultDb,
+    datasets: datasets.map((ds) => ({ name: ds.name, sql: ds.sql, params: ds.params, dbConnection: ds.connection }))
+  })
+  log.push(`XML 装配完成（${xml.length} 字符）`)
+
+  // 连接分布（日志可读性）
+  const dist = new Map<string, number>()
+  for (const ds of datasets) dist.set(ds.connection, (dist.get(ds.connection) ?? 0) + 1)
+  log.push(`连接分布：${[...dist.entries()].map(([c, n]) => `${c} ×${n}`).join(' · ') || '（无数据集）'}`)
+
+  const findings: CheckerFinding[] = checkDataCpt(xml)
+  const errCount = findings.filter((f) => f.severity === 'error').length
+  const warnCount = findings.filter((f) => f.severity === 'warning').length
+  log.push(`质量门：${errCount} error / ${warnCount} warning`)
+
+  const outDir = join(projectDir(project), 'data')
+  const outputPath = join(outDir, `${project}_data.cpt`)
+
+  const ok = !hasError(findings)
+  if (ok) {
+    mkdirSync(outDir, { recursive: true })
+    writeFileSync(outputPath, xml, 'utf-8')
+    log.push(`已部署：${outputPath}`)
+  } else {
+    log.push('存在 error，未落盘')
+  }
+
+  getDb().prepare('INSERT INTO builds(kind, target, ok, log) VALUES(?,?,?,?)')
+    .run('data', `${project}/data/${project}_data.cpt`, ok ? 1 : 0, JSON.stringify(log))
+
+  return { ok, kind: 'data', target: `${project}/data/${project}_data.cpt`, outputPath: ok ? outputPath : undefined, findings, log }
+}
+
+// ── 接口实测 ────────────────────────────────────────────────────
+
+export interface TestOutcome {
+  ok: boolean
+  errCode: number | null
+  durationMs: number
+  response: unknown
+  rowCount: number
+}
+
+/** 用契约参数默认值 + 调用方覆盖值实测一个接口 */
+export async function testDataset(project: string, datasetName: string, overrides: Record<string, unknown> = {}): Promise<TestOutcome> {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const row = getDb().prepare('SELECT * FROM datasets WHERE project_id=? AND name=?').get(p.id, datasetName) as Record<string, unknown> | undefined
+  if (!row) throw new Error(`接口不存在：${project}.${datasetName}`)
+  const ds = rowToDataset(row)
+
+  const typeMap: Record<string, string> = { string: 'String', integer: 'Integer', double: 'Double', formula: 'String' }
+  const parameters = ds.params
+    .filter((x) => x.type !== 'formula') // formula 参数由帆软服务端注入当前会话值，不随请求传递
+    .map((x) => ({
+      name: x.name,
+      type: typeMap[x.type] || 'String',
+      value: overrides[x.name] !== undefined ? overrides[x.name] : (x.default ?? '')
+    }))
+
+  const req: ApiDataRequest = {
+    report_path: `${project}/data/${project}_data.cpt`,
+    datasource_name: datasetName,
+    page_number: -1,
+    page_size: -1,
+    parameters
+  }
+  return invokeAndStore(req, p.id, ds.id, datasetName)
+}
+
+export async function testAllDatasets(project: string): Promise<Array<{ dataset: string } & TestOutcome>> {
+  const names = listDatasets(project).map((x) => x.name)
+  const results: Array<{ dataset: string } & TestOutcome> = []
+  for (const n of names) {
+    try {
+      results.push({ dataset: n, ...(await testDataset(project, n)) })
+    } catch (e) {
+      results.push({ dataset: n, ok: false, errCode: null, durationMs: 0, response: { error: (e as Error).message }, rowCount: 0 })
+    }
+  }
+  return results
+}
+
+/** 一键验收：构建 + 全量实测 */
+export async function verifyProject(project: string): Promise<{ build: BuildResult; tests: Array<{ dataset: string } & TestOutcome> }> {
+  const build = buildDataCpt(project)
+  const tests = await testAllDatasets(project)
+  return { build, tests }
+}
+
+async function invokeAndStore(req: ApiDataRequest, projectId: number, datasetId: number, datasetName: string): Promise<TestOutcome> {
+  const { body, durationMs } = await callApiData(req)
+  const ok = body.err_code === 0
+  const rowCount = Array.isArray(body.data) ? body.data.length : 0
+  getDb().prepare(`INSERT INTO api_tests(module_id, dataset_id, dataset, request, response, ok, err_code, duration_ms)
+                   VALUES(?,?,?,?,?,?,?,?)`)
+    .run(projectId, datasetId, datasetName, JSON.stringify(req), JSON.stringify(body), ok ? 1 : 0, body.err_code ?? null, durationMs)
+  return { ok, errCode: body.err_code ?? null, durationMs, response: body, rowCount }
+}
+
+export function listApiTests(limit = 50, projectId?: number): Array<Record<string, unknown>> {
+  const d = getDb()
+  return (projectId
+    ? d.prepare('SELECT * FROM api_tests WHERE module_id=? ORDER BY id DESC LIMIT ?').all(projectId, limit)
+    : d.prepare('SELECT * FROM api_tests ORDER BY id DESC LIMIT ?').all(limit)) as Array<Record<string, unknown>>
+}
+
+export function listBuilds(limit = 50): Array<Record<string, unknown>> {
+  return getDb().prepare('SELECT * FROM builds ORDER BY id DESC LIMIT ?').all(limit) as Array<Record<string, unknown>>
+}
+
+// ── 存储过程（归属项目 + 关联共享） ─────────────────────────────
+
+function metaRoot(project: string): string {
+  return join(projectDir(project), 'meta')
+}
+
+function procMetaPath(project: string, procName: string): string {
+  return join(metaRoot(project), `${procName}.sql`)
+}
+
+export function listProcedures(project: string): ProcRecord[] {
+  const d = getDb()
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const out: ProcRecord[] = []
+
+  const own = d.prepare(`
+    SELECT sp.*, c.name AS conn_name,
+      (SELECT COUNT(*) FROM ddl_log l WHERE l.kind='procedure' AND l.ok=1 AND l.target LIKE '%.' || sp.name) AS applied
+    FROM procedures sp JOIN connections c ON c.id = sp.connection_id
+    WHERE sp.project_id=? ORDER BY sp.name`).all(p.id) as Array<Record<string, unknown>>
+  for (const r of own) {
+    out.push({
+      id: r.id as number,
+      projectId: p.id,
+      connection: r.conn_name as string,
+      name: r.name as string,
+      comment: r.comment as string,
+      updatedAt: r.updated_at as string,
+      own: true,
+      appliedCount: r.applied as number
+    })
+  }
+
+  const linked = d.prepare(`
+    SELECT sp.*, c.name AS conn_name, pr.name AS src_project,
+      (SELECT COUNT(*) FROM ddl_log l WHERE l.kind='procedure' AND l.ok=1 AND l.target LIKE '%.' || sp.name) AS applied
+    FROM proc_links pl
+    JOIN procedures sp ON sp.id = pl.procedure_id
+    JOIN connections c ON c.id = sp.connection_id
+    JOIN projects pr ON pr.id = sp.project_id
+    WHERE pl.project_id=? ORDER BY sp.name`).all(p.id) as Array<Record<string, unknown>>
+  for (const r of linked) {
+    out.push({
+      id: r.id as number,
+      projectId: r.project_id as number,
+      connection: r.conn_name as string,
+      name: r.name as string,
+      comment: r.comment as string,
+      updatedAt: r.updated_at as string,
+      own: false,
+      srcProject: r.src_project as string,
+      appliedCount: r.applied as number
+    })
+  }
+  return out
+}
+
+/** 过程定义：meta/{name}.sql 为源（版本化），缺省回退 SHOW CREATE */
+export async function procedureDefinition(project: string, name: string): Promise<string> {
+  const meta = procMetaPath(project, name)
+  if (existsSync(meta)) return readFileSync(meta, 'utf-8')
+  const rec = listProcedures(project).find((x) => x.name === name)
+  if (!rec) throw new Error(`过程不存在：${project}.${name}`)
+  const { getProcedureDefinition } = await import('./mysqlService')
+  return getProcedureDefinition(name, undefined, { name: rec.connection })
+}
+
+/** 创建/更新过程契约（归属本项目）+ 定义存 meta/ */
+export function saveProcedure(project: string, input: { name: string; connection?: string; comment?: string; definition?: string }): ProcRecord {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(input.name)) throw new Error('过程名仅允许字母开头，字母/数字/下划线')
+  const d = getDb()
+  const bound = projectConnections(p.id)
+  let connName = input.connection ?? bound[0]
+  if (!connName) throw new Error(`项目 ${project} 未绑定任何连接`)
+  const c = getConnection({ name: connName })
+  if (!c) throw new Error(`连接不存在：${connName}`)
+  if (!bound.includes(connName)) throw new Error(`连接 ${connName} 未绑定到项目 ${project}`)
+
+  const existing = d.prepare('SELECT id FROM procedures WHERE project_id=? AND name=?').get(p.id, input.name) as { id: number } | undefined
+  if (existing) {
+    d.prepare(`UPDATE procedures SET connection_id=?, comment=?, updated_at=datetime('now','localtime') WHERE id=?`)
+      .run(c.id, input.comment ?? '', existing.id)
+  } else {
+    d.prepare('INSERT INTO procedures(project_id, connection_id, name, comment) VALUES(?,?,?,?)')
+      .run(p.id, c.id, input.name, input.comment ?? '')
+  }
+  if (input.definition?.trim()) {
+    mkdirSync(metaRoot(project), { recursive: true })
+    writeFileSync(procMetaPath(project, input.name), input.definition, 'utf-8')
+  }
+  return listProcedures(project).find((x) => x.name === input.name && x.own)!
+}
+
+/** 应用过程（DROP IF EXISTS + CREATE）：定义取 meta 文件，应用后审计；own 与关联项目均可应用 */
+export async function applyProjectProcedure(project: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  const rec = listProcedures(project).find((x) => x.name === name)
+  if (!rec) throw new Error(`过程不存在：${project}.${name}`)
+  const ownerProject = rec.own ? project : rec.srcProject!
+  const defPath = procMetaPath(ownerProject, name)
+  if (!existsSync(defPath)) throw new Error(`缺少定义文件：${defPath}（先在「定义」中保存 CREATE PROCEDURE 语句）`)
+  const definition = readFileSync(defPath, 'utf-8')
+  const r = await applyProcedureMysql(definition, name, { name: rec.connection })
+  if (r.ok) {
+    getDb().prepare(`UPDATE procedures SET updated_at=datetime('now','localtime') WHERE id=?`).run(rec.id)
+  }
+  return r
+}
+
+export function linkProcedure(project: string, procedureId: number): void {
+  const d = getDb()
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const target = d.prepare('SELECT project_id FROM procedures WHERE id=?').get(procedureId) as { project_id: number } | undefined
+  if (!target) throw new Error('目标过程不存在')
+  if (target.project_id === p.id) throw new Error('本项目创建的过程无需关联')
+  d.prepare('INSERT OR IGNORE INTO proc_links(project_id, procedure_id) VALUES(?,?)').run(p.id, procedureId)
+}
+
+export function unlinkProcedure(project: string, procedureId: number): void {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  getDb().prepare('DELETE FROM proc_links WHERE project_id=? AND procedure_id=?').run(p.id, procedureId)
+}
+
+export function deleteProcedure(project: string, name: string): void {
+  const d = getDb()
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  const rec = d.prepare('SELECT id FROM procedures WHERE project_id=? AND name=?').get(p.id, name) as { id: number } | undefined
+  if (!rec) throw new Error(`过程不存在：${project}.${name}`)
+  const linked = d.prepare('SELECT COUNT(*) AS c FROM proc_links WHERE procedure_id=?').get(rec.id) as { c: number }
+  if (linked.c > 0) throw new Error(`该过程被 ${linked.c} 个项目关联，先解除关联再删除`)
+  d.prepare('DELETE FROM procedures WHERE id=?').run(rec.id)
+  const meta = procMetaPath(project, name)
+  if (existsSync(meta)) unlinkSync(meta)
+}
+
+/** 可供本项目关联的其他项目过程清单 */
+export function linkableProcedures(project: string): Array<{ id: number; name: string; srcProject: string; connection: string; comment: string; appliedCount: number }> {
+  const d = getDb()
+  const p = getProjectByName(project)
+  if (!p) return []
+  const rows = d.prepare(`
+    SELECT sp.id, sp.name, sp.comment, pr.name AS src_project, c.name AS conn_name,
+      (SELECT COUNT(*) FROM ddl_log l WHERE l.kind='procedure' AND l.ok=1 AND l.target LIKE '%.' || sp.name) AS applied
+    FROM procedures sp
+    JOIN projects pr ON pr.id = sp.project_id
+    JOIN connections c ON c.id = sp.connection_id
+    WHERE sp.project_id != ?
+      AND sp.id NOT IN (SELECT procedure_id FROM proc_links WHERE project_id = ?)
+    ORDER BY pr.name, sp.name`).all(p.id, p.id) as Array<Record<string, unknown>>
+  return rows.map((r) => ({
+    id: r.id as number,
+    name: r.name as string,
+    srcProject: r.src_project as string,
+    connection: r.conn_name as string,
+    comment: r.comment as string,
+    appliedCount: r.applied as number
+  }))
+}
+
+/** 试执行 CALL（真实执行，审计） */
+export async function callProcedureSql(sql: string, connection: string): Promise<{ ok: boolean; error?: string; result?: unknown }> {
+  return guardedExec(sql, 'call', '试执行 CALL', { name: connection })
+}
+
+// ── 项目文档（meta/ 元数据） ────────────────────────────────────
+
+export function listDocs(project: string): DocMeta[] {
+  const dir = metaRoot(project)
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((f) => /\.(md|sql)$/i.test(f))
+    .map((f) => {
+      const st = statSync(join(dir, f))
+      return {
+        name: f,
+        type: /\.md$/i.test(f) ? 'markdown' as const : /\.sql$/i.test(f) ? 'sql' as const : 'other' as const,
+        size: st.size,
+        mtime: st.mtimeMs
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function readDoc(project: string, name: string): string {
+  if (!/^[\w.\-\u4e00-\u9fa5 ]+$/.test(name)) throw new Error('文档名不合法')
+  const p = join(metaRoot(project), name)
+  if (!existsSync(p)) throw new Error(`文档不存在：${name}`)
+  return readFileSync(p, 'utf-8')
+}
+
+export function saveDoc(project: string, name: string, content: string): void {
+  if (!/^[\w.\-\u4e00-\u9fa5 ]+\.(md|sql)$/i.test(name)) throw new Error('文档名仅支持 .md / .sql 结尾')
+  mkdirSync(metaRoot(project), { recursive: true })
+  writeFileSync(join(metaRoot(project), name), content, 'utf-8')
+}
+
+export function deleteDoc(project: string, name: string): void {
+  const p = join(metaRoot(project), name)
+  if (existsSync(p)) unlinkSync(p)
+}
+
+export function renameDoc(project: string, name: string, newName: string): void {
+  if (!/^[\w.\-\u4e00-\u9fa5 ]+\.(md|sql)$/i.test(newName)) throw new Error('文档名仅支持 .md / .sql 结尾')
+  const dir = metaRoot(project)
+  renameSync(join(dir, name), join(dir, newName))
+}
+
+// ── 连接健康（供状态/工作台） ───────────────────────────────────
+
+export async function connectionsHealth(): Promise<ConnectionHealth[]> {
+  const { listConnections } = await import('./connectionsService')
+  const conns = listConnections()
+  return Promise.all(conns.map((c) => pingConnection(c)))
+}
+
+// ── 契约导入/导出（项目级 JSON 备份/共享） ──────────────────────
+
+export function exportProject(project: string): string {
+  const p = getProjectByName(project)
+  if (!p) throw new Error(`项目不存在：${project}`)
+  return JSON.stringify({
+    name: p.name,
+    comment: p.comment,
+    connections: projectConnections(p.id),
+    datasets: listDatasets(project).map((x) => ({ name: x.name, kind: x.kind, comment: x.comment, params: x.params, sql: x.sql, connection: x.connection })),
+    procedures: listProcedures(project).filter((x) => x.own).map((x) => ({ name: x.name, connection: x.connection, comment: x.comment }))
+  }, null, 2)
+}
+
+export function importProject(json: string, overwrite = false): Project {
+  const parsed = JSON.parse(json) as {
+    name: string; comment?: string; connections?: string[]
+    datasets?: Array<{ name: string; kind?: DatasetKind; comment?: string; params?: DatasetParam[]; sql?: string; connection?: string }>
+    procedures?: Array<{ name: string; connection?: string; comment?: string }>
+  }
+  if (!parsed.name) throw new Error('导入 JSON 缺少 name')
+  const existing = getProjectByName(parsed.name)
+  if (existing && !overwrite) throw new Error(`项目已存在：${parsed.name}（如需覆盖请开启 overwrite）`)
+  const conns = parsed.connections?.length ? parsed.connections : [getConnection()?.name].filter(Boolean) as string[]
+  const proj = existing ?? createProject(parsed.name, conns, parsed.comment || '')
+  for (const ds of parsed.datasets ?? []) saveDataset(proj.name, ds)
+  for (const sp of parsed.procedures ?? []) saveProcedure(proj.name, { name: sp.name, connection: sp.connection, comment: sp.comment })
+  return listProjects().find((x) => x.id === proj.id)!
+}

@@ -1,0 +1,1602 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report Console · 项目工作台 · 高保真原型</title>
+<!--
+  Report Console「项目工作台」高保真交互原型
+  对照文档：docs/ui-requirements.md（章节标注 3.x / 4.x / 7 / D1-D7 均指向该文档）
+  使用方式：浏览器直接打开。底部「原型评审工具」条切换场景（或按 1-7）、导航方向（A 侧栏 / B 顶栏）、窗口宽度（1380 / 1024）、标注显隐（N 键）。
+  纯 mockup：无真实逻辑，点击切换状态；同一场景内数据自洽。
+-->
+<style>
+:root{
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --bg0:#08090c; --bg1:#14161b; --bg2:#191c23; --bg3:#1f232c; --bg4:#242935;
+  --line:#262b35; --line2:#1d212a;
+  --tx1:#e8ebf1; --tx2:#9fa8b8; --tx3:#68718271;
+  --tx3:#697182;
+  --acc:#4c7dff; --acc2:#3a6af0; --acc-soft:rgba(76,125,255,.13);
+  --ok:#3fb950; --err:#f2554d; --warn:#d6a032; --idle:#8a93a4;
+  --c-sqlite:#6ea8fe; --c-cpt:#b78cff; --c-mysql:#38c3cd; --c-fr:#e0b03c;
+  --r1:4px; --r2:6px; --r3:10px;
+  --code-bg:#15181f; --code-line:#20242d;
+  --shadow:0 24px 80px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg0);
+  background-image:radial-gradient(1200px 600px at 50% -10%, rgba(76,125,255,.05), transparent 60%);
+  font-family:var(--sans); color:var(--tx1);
+  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:18px;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(76,125,255,.35)}
+button{font-family:inherit}
+svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px}
+
+/* ========== 窗口框架 ========== */
+#frame{
+  position:relative; width:1380px; max-width:100%; height:880px; max-height:calc(100vh - 36px); min-height:620px;
+  background:var(--bg1); border:1px solid #2a303b; border-radius:12px; overflow:hidden;
+  display:flex; flex-direction:column; box-shadow:var(--shadow);
+}
+body.narrow #frame{width:1024px; height:700px}
+.titlebar{
+  height:38px; flex:none; display:flex; align-items:center; gap:14px; padding:0 14px;
+  background:#101217; border-bottom:1px solid var(--line2);
+  -webkit-user-select:none; user-select:none;
+}
+.lights{display:flex; gap:8px}
+.lights i{width:12px;height:12px;border-radius:50%}
+.lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.tb-title{font:600 12.5px/1 var(--sans); color:var(--tx2); letter-spacing:.02em}
+.tb-sub{font:11px/1 var(--mono); color:#5d6675}
+.tb-right{margin-left:auto; display:flex; gap:10px; align-items:center}
+.tb-chip{font:11px/1 var(--mono); color:var(--tx2); background:var(--bg3); border:1px solid var(--line); border-radius:var(--r1); padding:5px 8px; display:flex; gap:6px; align-items:center}
+.tb-chip .dot{width:6px;height:6px;border-radius:50%}
+
+.app{flex:1; display:flex; min-height:0}
+
+/* ========== 全局导航 · 方向A：图标侧栏 ========== */
+.rail{
+  width:52px; flex:none; background:#101217; border-right:1px solid var(--line2);
+  display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:4px;
+}
+.rail .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#3a6af0,#6ea8fe);display:flex;align-items:center;justify-content:center;margin-bottom:10px;box-shadow:0 2px 10px rgba(76,125,255,.35)}
+.rail .logo svg{width:16px;height:16px;color:#fff}
+.rail-it{
+  position:relative; width:38px; height:38px; border-radius:9px; border:0; background:transparent; color:var(--tx3);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s,color .15s;
+}
+.rail-it:hover{background:var(--bg3); color:var(--tx1)}
+.rail-it.on{background:var(--acc-soft); color:var(--acc)}
+.rail-it.on::before{content:""; position:absolute; left:-7px; top:9px; bottom:9px; width:2.5px; border-radius:2px; background:var(--acc)}
+.rail-it .tip{
+  position:absolute; left:46px; top:50%; transform:translateY(-50%); white-space:nowrap;
+  background:#0c0e12; border:1px solid var(--line); color:var(--tx1); font-size:11.5px; padding:5px 9px; border-radius:var(--r2);
+  opacity:0; pointer-events:none; transition:opacity .12s; z-index:40; box-shadow:0 6px 24px rgba(0,0,0,.5);
+}
+.rail-it .tip small{color:var(--tx3); font-family:var(--mono); margin-left:6px}
+.rail-it:hover .tip{opacity:1}
+.rail .spring{flex:1}
+
+/* ========== 全局导航 · 方向B：顶栏 ========== */
+.topnav{display:none; height:42px; flex:none; align-items:center; gap:2px; padding:0 14px; background:#101217; border-bottom:1px solid var(--line2)}
+body.navB .rail{display:none}
+body.navB .topnav{display:flex}
+.topnav .brand{display:flex; align-items:center; gap:8px; margin-right:18px}
+.topnav .brand .logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#3a6af0,#6ea8fe);display:flex;align-items:center;justify-content:center}
+.topnav .brand .logo svg{width:12px;height:12px;color:#fff}
+.topnav .brand b{font-size:12.5px; font-weight:600}
+.tn-it{
+  position:relative; border:0; background:transparent; color:var(--tx2); font-size:12.5px; padding:7px 12px; border-radius:var(--r2); cursor:pointer;
+  display:flex; align-items:center; gap:7px; transition:background .15s,color .15s;
+}
+.tn-it:hover{background:var(--bg3); color:var(--tx1)}
+.tn-it.on{color:var(--acc); background:var(--acc-soft)}
+.topnav .env-mini{margin-left:auto; display:flex; gap:8px; align-items:center; font:11px/1 var(--mono); color:var(--tx2)}
+.topnav .env-mini .pill{display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:99px;padding:4px 9px;background:var(--bg2)}
+
+/* ========== 工作台头 ========== */
+.stage{flex:1; display:flex; flex-direction:column; min-width:0}
+.wb-head{
+  height:46px; flex:none; display:flex; align-items:center; gap:10px; padding:0 14px;
+  background:var(--bg1); border-bottom:1px solid var(--line2);
+}
+.crumb{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--tx2); min-width:0}
+.crumb b{color:var(--tx1); font-weight:600; font-size:13.5px}
+.crumb .dirchip{font:11px/1 var(--mono); color:var(--tx3); background:var(--bg2); border:1px solid var(--line2); padding:4px 8px; border-radius:var(--r1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:230px}
+.proj-chip{display:none; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg2); color:var(--tx1); border-radius:var(--r2); padding:6px 10px; font-size:12.5px; cursor:pointer}
+.proj-chip:hover{background:var(--bg3)}
+body.narrow .crumb{display:none}
+body.narrow .proj-chip{display:inline-flex}
+.wb-head .grow{flex:1}
+.btn{
+  display:inline-flex; align-items:center; gap:6px; border-radius:var(--r2); border:1px solid var(--line);
+  background:var(--bg2); color:var(--tx1); font-size:12px; padding:6px 11px; cursor:pointer; transition:background .15s,border-color .15s;
+}
+.btn:hover{background:var(--bg3); border-color:#333a48}
+.btn:active{transform:translateY(.5px)}
+.btn.pri{background:var(--acc2); border-color:var(--acc2); color:#fff; font-weight:500}
+.btn.pri:hover{background:#4779ff}
+.btn.dgr{background:#b23a32; border-color:#b23a32; color:#fff; font-weight:500}
+.btn.dgr:hover{background:#c4443b}
+.btn.dgr-o{background:transparent; border-color:#8a3a33; color:#f08a83}
+.btn.dgr-o:hover{background:rgba(242,85,77,.1)}
+.btn.acc-o{background:transparent; border-color:#3d5490; color:#9db9ff}
+.btn.acc-o:hover{background:var(--acc-soft)}
+.btn.sm{padding:4px 9px; font-size:11.5px}
+.btn:disabled{opacity:.42; cursor:not-allowed; transform:none}
+.btn svg.ic{width:14px;height:14px}
+.iconbtn{width:28px;height:28px;border-radius:var(--r2);border:1px solid transparent;background:transparent;color:var(--tx3);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.iconbtn:hover{background:var(--bg3); color:var(--tx1)}
+.iconbtn svg.ic{width:15px;height:15px}
+
+/* ========== 三栏 ========== */
+.cols{flex:1; display:flex; min-height:0; background:var(--bg1)}
+
+/* ---- 左栏 · 项目选择器（3.1）---- */
+.col-left{width:264px; flex:none; border-right:1px solid var(--line2); display:flex; flex-direction:column; min-height:0; background:#121419}
+body.narrow .col-left{display:none}
+.cl-head{display:flex; align-items:center; gap:8px; padding:12px 12px 8px}
+.cl-head b{font-size:12px; font-weight:600; color:var(--tx2); letter-spacing:.05em}
+.cl-head .grow{flex:1}
+.cl-list{flex:1; overflow:auto; padding:0 8px 8px}
+.pcard{
+  position:relative; border:1px solid transparent; border-radius:var(--r3); padding:10px 10px 9px; cursor:pointer; margin-bottom:6px;
+  transition:background .15s,border-color .15s;
+}
+.pcard:hover{background:var(--bg2)}
+.pcard.on{background:var(--bg3); border-color:#333b4c}
+.pcard.on::before{content:""; position:absolute; left:0; top:10px; bottom:9px; width:2.5px; border-radius:2px; background:var(--acc)}
+.pc-r1{display:flex; align-items:center; gap:7px}
+.pc-name{font-size:13px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pc-warn{display:inline-flex; align-items:center; gap:4px; color:var(--warn); font-size:10.5px; border:1px solid rgba(214,160,50,.4); border-radius:var(--r1); padding:2px 5px; background:rgba(214,160,50,.08)}
+.pc-r2{display:flex; gap:4px; margin-top:7px; flex-wrap:wrap}
+.pc-r3{display:flex; gap:8px; margin-top:6px; font:10.5px/1 var(--mono); color:var(--tx3)}
+.cbadge{
+  display:inline-flex; align-items:center; gap:4px; font:10.5px/1 var(--mono); color:var(--c-mysql);
+  border:1px solid rgba(56,195,205,.28); background:rgba(56,195,205,.07); border-radius:var(--r1); padding:3px 6px;
+}
+.cbadge .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.cbadge.off{color:var(--err); border-color:rgba(242,85,77,.35); background:rgba(242,85,77,.07)}
+.cl-empty{padding:26px 16px; text-align:center; color:var(--tx2)}
+.cl-empty svg.ic{width:26px;height:26px;color:var(--tx3); margin-bottom:8px}
+.cl-empty p{font-size:12px; margin:0 0 12px; line-height:1.6}
+.cl-foot{flex:none; border-top:1px solid var(--line2); padding:10px 12px 8px; background:#101217}
+.env-t{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--tx2); font-weight:600; margin-bottom:7px}
+.env-row{display:flex; align-items:center; gap:7px; font:11px/1.5 var(--mono); color:var(--tx2); padding:2.5px 0; cursor:default}
+.env-row .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.env-row .k{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.env-row .v{color:var(--tx3)}
+.dot.g{background:var(--ok)} .dot.r{background:var(--err)} .dot.y{background:var(--warn)}
+.env-legend{display:flex; gap:9px; margin-top:8px; padding-top:8px; border-top:1px dashed #232833; font:9.5px/1 var(--mono); color:var(--tx3); flex-wrap:wrap}
+.env-legend span{display:inline-flex; align-items:center; gap:4px}
+.env-legend i{width:6px;height:6px;border-radius:2px;display:inline-block}
+
+/* ---- 中栏 · 资源浏览器（3.2）---- */
+.col-mid{flex:1; min-width:340px; display:flex; flex-direction:column; min-height:0; background:var(--bg1)}
+.mid-head{flex:none; display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line2)}
+.search{flex:1; max-width:320px; display:flex; align-items:center; gap:7px; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r2); padding:6px 10px; color:var(--tx3)}
+.search input{flex:1; border:0; outline:0; background:transparent; color:var(--tx1); font-size:12px; font-family:inherit; min-width:0}
+.search input::placeholder{color:#5b6472}
+.mid-count{font:11px/1 var(--mono); color:var(--tx3)}
+.mid-banner{margin:10px 12px 0; border:1px solid rgba(214,160,50,.35); background:rgba(214,160,50,.07); color:#e5c377; border-radius:var(--r2); padding:8px 12px; font-size:12px; display:flex; gap:8px; align-items:flex-start; line-height:1.5}
+.mid-banner svg.ic{margin-top:1px}
+.mid-scroll{flex:1; overflow:auto; padding:4px 12px 18px}
+.grp{margin-top:12px}
+.grp-h{display:flex; align-items:center; gap:8px; padding:6px 4px; user-select:none}
+.grp-h .gt{font-size:12.5px; font-weight:600; color:var(--tx1); display:flex; align-items:center; gap:7px; cursor:pointer}
+.grp-h .gt svg.ic{width:14px;height:14px;color:var(--tx3)}
+.grp-h .cnt{font:10.5px/1 var(--mono); color:var(--tx3); background:var(--bg2); border:1px solid var(--line2); padding:3px 6px; border-radius:99px}
+.grp-h .grow{flex:1}
+.rows{border:1px solid var(--line2); border-radius:var(--r3); overflow:hidden; background:#12141a}
+.row{
+  position:relative; display:flex; align-items:center; gap:10px; padding:9px 12px 9px 14px; cursor:pointer;
+  border-bottom:1px solid var(--line2); transition:background .12s;
+}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--bg2)}
+.row.on{background:var(--acc-soft)}
+.row.on::before{content:""; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--acc)}
+.row .st{width:8px; height:8px; border-radius:50%; flex:none}
+.st.g{background:var(--ok)} .st.r{background:var(--err)} .st.y{background:var(--warn)} .st.n{background:transparent; border:1.5px solid #4a5262}
+.row .main{flex:1; min-width:0}
+.row .nm{display:flex; align-items:center; gap:7px; min-width:0}
+.row .nm b{font:600 12.5px/1.3 var(--mono); color:var(--tx1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .sub{display:flex; align-items:center; gap:7px; margin-top:4px; font:11px/1 var(--sans); color:var(--tx3); flex-wrap:wrap}
+.row .meta{flex:none; text-align:right; font:10.5px/1.7 var(--mono); color:var(--tx3); white-space:nowrap}
+.tag{display:inline-flex; align-items:center; font:10.5px/1 var(--mono); border-radius:var(--r1); padding:2.5px 6px; border:1px solid}
+.tag.list{color:#7fb0ff; border-color:rgba(76,125,255,.3); background:rgba(76,125,255,.07)}
+.tag.stat{color:#c3a6ff; border-color:rgba(183,140,255,.28); background:rgba(183,140,255,.07)}
+.tag.one{color:#6fd3dc; border-color:rgba(56,195,205,.28); background:rgba(56,195,205,.07)}
+.tag.dict{color:#7ee0a8; border-color:rgba(63,185,80,.3); background:rgba(63,185,80,.07)}
+.tag.ins{color:#8fdd9a; border-color:rgba(63,185,80,.3); background:rgba(63,185,80,.07)}
+.tag.del{color:#f39893; border-color:rgba(242,85,77,.3); background:rgba(242,85,77,.07)}
+.tag.upd{color:#e8c377; border-color:rgba(214,160,50,.3); background:rgba(214,160,50,.07)}
+.tag.src{color:#b9c0cf; border-color:#39404e; background:var(--bg2)}
+.tag.own{color:#9db9ff; border-color:rgba(76,125,255,.32); background:rgba(76,125,255,.08)}
+.tag.lnk{color:var(--c-cpt); border-color:rgba(183,140,255,.32); background:rgba(183,140,255,.08)}
+.stale{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;border-radius:var(--r1);padding:2.5px 6px;border:1px solid}
+.stale.new{color:#7ee0a8;border-color:rgba(63,185,80,.3);background:rgba(63,185,80,.07)}
+.stale.old{color:#e8c377;border-color:rgba(214,160,50,.35);background:rgba(214,160,50,.09)}
+.stale.none{color:#9aa2b1;border-color:#39404e;background:var(--bg2)}
+.grp-empty{padding:22px 18px; text-align:center}
+.grp-empty .e1{font-size:12.5px; color:var(--tx2); margin-bottom:4px}
+.grp-empty .e2{font-size:11.5px; color:var(--tx3); margin-bottom:12px; line-height:1.6}
+.nores{padding:30px; text-align:center; color:var(--tx3); font-size:12px}
+
+/* ---- 右栏 · 操作面板（3.3）---- */
+.col-right{width:420px; flex:none; border-left:1px solid var(--line2); display:flex; flex-direction:column; min-height:0; background:#15171d}
+body.narrow .col-right{width:316px}
+.rp{display:flex; flex-direction:column; height:100%; min-height:0}
+.rp-head{flex:none; padding:13px 14px 0}
+.rp-r1{display:flex; align-items:center; gap:9px}
+.rp-r1 .ttl{font:600 14px/1.2 var(--mono); color:var(--tx1); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.rp-r1 .ttl.reg{font-family:var(--sans)}
+.rp-r2{display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap}
+.rp-acts{display:flex; gap:7px; margin-top:12px; flex-wrap:wrap}
+.rp-tabs{flex:none; display:flex; gap:2px; margin-top:13px; border-bottom:1px solid var(--line2); padding:0 8px}
+.rtab{
+  position:relative; border:0; background:transparent; color:var(--tx3); font-size:12px; padding:8px 10px 9px; cursor:pointer; display:flex; align-items:center; gap:6px;
+}
+.rtab:hover{color:var(--tx1)}
+.rtab.on{color:var(--tx1); font-weight:600}
+.rtab.on::after{content:""; position:absolute; left:8px; right:8px; bottom:-1px; height:2px; border-radius:2px; background:var(--acc)}
+.rtab .bdg{font:9.5px/1 var(--mono); background:rgba(242,85,77,.15); color:#f39893; border-radius:99px; padding:2.5px 5.5px}
+.rp-body{flex:1; overflow:auto; padding:13px 14px 18px; min-height:0}
+.blk{margin-bottom:15px}
+.blk-t{display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:600; color:var(--tx2); margin-bottom:8px}
+.blk-t .lnk{margin-left:auto; font-weight:400; font-size:11px; color:#8fa5d8; cursor:pointer}
+.blk-t .lnk:hover{color:#b3c6f2}
+table.ptab{width:100%; border-collapse:collapse; font-size:11.5px}
+.ptab th{text-align:left; font:600 10.5px/1 var(--mono); color:var(--tx3); padding:6px 8px; border-bottom:1px solid var(--line); letter-spacing:.04em}
+.ptab td{padding:7px 8px; border-bottom:1px solid var(--line2); color:var(--tx2); vertical-align:top}
+.ptab tr:last-child td{border-bottom:0}
+.ptab td.f{font-family:var(--mono); color:var(--tx1)}
+.ptab td.err-row{background:rgba(242,85,77,.06)}
+.ptab tr.err-row td{background:rgba(242,85,77,.06)}
+.codeblk{background:var(--code-bg); border:1px solid var(--code-line); border-radius:8px; overflow:hidden}
+.codeblk .cb-h{display:flex; align-items:center; gap:7px; padding:7px 10px; border-bottom:1px solid var(--code-line); font:10.5px/1 var(--mono); color:var(--tx3)}
+.codeblk .cb-h .grow{flex:1}
+.codeblk pre{margin:0; padding:11px 13px; overflow:auto; font:11.5px/1.65 var(--mono); color:#c7cfdd; max-height:340px}
+.k{color:#c678dd; font-style:normal} .s{color:#98c379} .n{color:#d19a66} .c{color:#697182; font-style:italic} .fn{color:#61afef} .fm{color:#e5c07b}
+.kv{display:grid; grid-template-columns:auto 1fr; gap:5px 14px; font-size:11.5px}
+.kv .k2{color:var(--tx3); white-space:nowrap}
+.kv .v2{color:var(--tx1); font-family:var(--mono); word-break:break-all}
+.pill-o{display:inline-flex;align-items:center;gap:5px;font:11px/1 var(--mono);border-radius:var(--r1);padding:4px 8px;border:1px solid}
+.pill-o.ok{color:#7ee0a8;border-color:rgba(63,185,80,.32);background:rgba(63,185,80,.07)}
+.pill-o.err{color:#f39893;border-color:rgba(242,85,77,.35);background:rgba(242,85,77,.08)}
+.pill-o.warn{color:#e8c377;border-color:rgba(214,160,50,.35);background:rgba(214,160,50,.08)}
+.pill-o.idle{color:#9aa2b1;border-color:#39404e;background:var(--bg2)}
+.banner{border-radius:var(--r2); padding:9px 12px; font-size:12px; line-height:1.55; display:flex; gap:8px; align-items:flex-start; margin-bottom:12px}
+.banner svg.ic{margin-top:1.5px}
+.banner.ok{background:rgba(63,185,80,.08); border:1px solid rgba(63,185,80,.3); color:#95e2aa}
+.banner.err{background:rgba(242,85,77,.08); border:1px solid rgba(242,85,77,.35); color:#f5a29c}
+.banner.warn{background:rgba(214,160,50,.08); border:1px solid rgba(214,160,50,.35); color:#e8c377}
+.banner.info{background:var(--acc-soft); border:1px solid rgba(76,125,255,.3); color:#a9c0ff}
+.banner b{font-weight:600}
+.finding{
+  display:flex; gap:9px; padding:9px 11px; border:1px solid var(--line2); border-radius:var(--r2); margin-bottom:7px; background:#12141a; cursor:pointer; transition:border-color .12s;
+}
+.finding:hover{border-color:#39414f}
+.finding.sev-e{border-left:2.5px solid var(--err)}
+.finding.sev-w{border-left:2.5px solid var(--warn)}
+.finding .fx{flex:none; margin-top:1px}
+.finding .fcode{font:10px/1 var(--mono); color:var(--tx3)}
+.finding .fmsg{font-size:12px; color:var(--tx1); line-height:1.5; margin-top:3px}
+.finding .floc{font:10.5px/1 var(--mono); color:var(--tx3); margin-top:5px}
+.finding.sev-e .fx{color:var(--err)} .finding.sev-w .fx{color:var(--warn)}
+.loglines{background:var(--code-bg); border:1px solid var(--code-line); border-radius:8px; padding:10px 12px; font:11px/1.7 var(--mono); color:var(--tx2)}
+.loglines .lt{color:#5d6675}
+.loglines .lo{color:#7ee0a8} .loglines .le{color:#f39893} .loglines .lw{color:#e8c377}
+.hist{border:1px solid var(--line2); border-radius:var(--r3); overflow:hidden}
+.hrow{display:flex; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line2); font-size:11.5px; align-items:flex-start}
+.hrow:last-child{border-bottom:0}
+.hrow .hi{flex:none; margin-top:1px; color:var(--tx3)}
+.hrow .ht{flex:1; min-width:0; color:var(--tx2); line-height:1.5}
+.hrow .ht b{color:var(--tx1); font-weight:600}
+.hrow .hm{font:10.5px/1.6 var(--mono); color:var(--tx3); white-space:nowrap; text-align:right}
+.pipe{display:flex; align-items:center; gap:0; flex-wrap:nowrap; overflow-x:auto; padding:4px 0}
+.pstep{flex:none; display:flex; align-items:center}
+.pstep .nd{display:flex; flex-direction:column; align-items:center; gap:5px; min-width:58px}
+.pstep .bx{width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:var(--bg2); display:flex; align-items:center; justify-content:center; color:var(--tx3); font:600 10px/1 var(--mono)}
+.pstep.done .bx{border-color:rgba(63,185,80,.4); color:#7ee0a8; background:rgba(63,185,80,.07)}
+.pstep.run .bx{border-color:rgba(76,125,255,.5); color:#9db9ff; background:var(--acc-soft); animation:pulse 1.6s ease-in-out infinite}
+.pstep .lb{font-size:10px; color:var(--tx3); white-space:nowrap}
+.pstep .ar{width:26px; height:1px; background:#333a48; margin:0 2px 15px; position:relative}
+.pstep .ar::after{content:""; position:absolute; right:0; top:-2.5px; border-left:5px solid #333a48; border-top:3px solid transparent; border-bottom:3px solid transparent}
+details.resp{border:1px solid var(--line2); border-radius:var(--r2); background:#12141a}
+details.resp summary{cursor:pointer; padding:8px 12px; font:11px/1 var(--mono); color:var(--tx3); list-style:none; display:flex; align-items:center; gap:7px}
+details.resp summary::-webkit-details-marker{display:none}
+details.resp summary::before{content:"▸"; color:var(--tx3); transition:transform .15s}
+details.resp[open] summary::before{transform:rotate(90deg)}
+details.resp pre{margin:0; padding:0 12px 12px; font:11px/1.6 var(--mono); color:#c7cfdd; overflow:auto}
+.md{font-size:12px; line-height:1.75; color:#c3cad6}
+.md h1{font-size:15px; color:var(--tx1); margin:2px 0 10px; font-weight:600}
+.md h2{font-size:12.5px; color:var(--tx1); margin:14px 0 6px; font-weight:600}
+.md p{margin:6px 0}
+.md ul{margin:6px 0; padding-left:18px}
+.md li{margin:3px 0}
+.md code{font:11px var(--mono); background:var(--bg3); border:1px solid var(--line2); border-radius:3px; padding:1px 5px; color:#a9c0ff}
+.guide{border:1px solid var(--line2); border-radius:var(--r3); overflow:hidden; margin-bottom:15px}
+.gstep{display:flex; gap:11px; padding:10px 13px; border-bottom:1px solid var(--line2); align-items:flex-start}
+.gstep:last-child{border-bottom:0}
+.gstep .no{flex:none; width:20px; height:20px; border-radius:50%; border:1px solid #39414f; color:var(--tx3); font:600 10.5px/18px var(--mono); text-align:center; margin-top:1px}
+.gstep.done .no{border-color:rgba(63,185,80,.45); color:#7ee0a8}
+.gstep .gt2{font-size:12px; color:var(--tx1); font-weight:500}
+.gstep .gd{font-size:11px; color:var(--tx3); margin-top:2px; line-height:1.5}
+.rp-foot{flex:none; padding:10px 14px; border-top:1px solid var(--line2); background:#12141a; display:flex; gap:8px; align-items:center}
+.rp-foot .hint{font-size:11px; color:var(--tx3); line-height:1.5}
+
+/* ---- Agent 视图（D7）---- */
+.ag-head{flex:none; padding:11px 14px; border-bottom:1px solid var(--line2); display:flex; align-items:center; gap:9px}
+.ag-head .ttl{font-size:13px; font-weight:600; flex:1}
+.ag-ctx{flex:none; display:flex; gap:6px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--line2); background:#12141a}
+.ctx-chip{display:inline-flex; align-items:center; gap:5px; font:10.5px/1 var(--mono); color:var(--tx2); border:1px solid var(--line); background:var(--bg2); border-radius:99px; padding:4.5px 9px}
+.ctx-chip b{color:var(--tx1); font-weight:600}
+.ag-thread{flex:1; overflow:auto; padding:14px; min-height:0}
+.msg-u{display:flex; justify-content:flex-end; margin-bottom:14px}
+.msg-u .bub{max-width:85%; background:var(--acc2); color:#fff; border-radius:12px 12px 3px 12px; padding:9px 13px; font-size:12.5px; line-height:1.6}
+.msg-a{margin-bottom:14px}
+.msg-a .who{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--tx3); margin-bottom:7px}
+.msg-a .who .av{width:18px;height:18px;border-radius:6px;background:linear-gradient(135deg,#3a6af0,#6ea8fe);display:flex;align-items:center;justify-content:center}
+.msg-a .who .av svg{width:11px;height:11px;color:#fff}
+.msg-a .txt{font-size:12.5px; line-height:1.75; color:#c9d1de; padding-left:24px}
+.cursor{display:inline-block; width:7px; height:14px; background:var(--acc); vertical-align:-2px; margin-left:2px; animation:blink 1s steps(1) infinite; border-radius:1px}
+.tool{
+  margin:10px 0 10px 24px; border:1px solid var(--line2); border-radius:var(--r2); background:#12141a; overflow:hidden;
+}
+.tool.run{border-color:rgba(76,125,255,.45)}
+.tool-h{display:flex; align-items:center; gap:8px; padding:8px 11px; font:11.5px/1 var(--mono)}
+.tool-h .ti{color:#8fa5d8}
+.tool-h .tn{color:var(--tx1); font-weight:600}
+.tool-h .ta{color:var(--tx3); font-size:10.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tool-h .ts{font-size:10px; color:var(--tx3); display:flex; align-items:center; gap:5px}
+.tool-h .ts.ok{color:#7ee0a8} .tool-h .ts.err{color:#f39893} .tool-h .ts.run{color:#9db9ff}
+.tool-b{border-top:1px solid var(--line2); padding:8px 11px; font:11px/1.65 var(--mono); color:var(--tx2)}
+.tool .spin{width:12px;height:12px;animation:rot 1s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(76,125,255,0)}50%{box-shadow:0 0 0 4px rgba(76,125,255,.14)}}
+.ag-event{display:flex; gap:8px; margin:8px 0 8px 24px; font-size:11px; color:#e8c377; align-items:flex-start; line-height:1.5}
+.ag-event svg.ic{width:13px;height:13px;margin-top:1px}
+.ag-foot{flex:none; border-top:1px solid var(--line2); padding:11px 14px; background:#12141a}
+.ag-inp{display:flex; gap:8px; align-items:flex-end}
+.ag-inp textarea{
+  flex:1; resize:none; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r2); color:var(--tx1);
+  font:12px/1.6 var(--sans); padding:8px 11px; min-height:38px; max-height:110px; outline:none; font-family:inherit;
+}
+.ag-inp textarea:focus{border-color:#3d5490}
+.ag-tools{display:flex; gap:10px; margin-top:8px; align-items:center}
+.ag-tools .esc{font:10.5px/1 var(--mono); color:var(--tx3); margin-left:auto}
+
+/* ========== 弹层 ========== */
+.mask{position:absolute; inset:0; background:rgba(5,6,9,.6); backdrop-filter:blur(2px); display:flex; align-items:center; justify-content:center; z-index:60}
+.modal{
+  width:520px; max-width:calc(100% - 48px); max-height:calc(100% - 60px); overflow:auto;
+  background:#181b22; border:1px solid #2e3442; border-radius:var(--r3); box-shadow:0 30px 90px rgba(0,0,0,.6);
+}
+.m-h{display:flex; align-items:center; gap:9px; padding:15px 18px 0}
+.m-h .mt{font-size:14px; font-weight:600; flex:1}
+.m-b{padding:13px 18px 4px}
+.m-f{display:flex; gap:8px; justify-content:flex-end; padding:12px 18px 16px; align-items:center}
+.m-f .m-note{margin-right:auto; font-size:11px; color:var(--tx3); line-height:1.5}
+.fld{margin-bottom:13px}
+.fld label{display:block; font-size:11.5px; color:var(--tx2); margin-bottom:6px; font-weight:500}
+.fld input[type=text]{
+  width:100%; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r2); color:var(--tx1);
+  font:12px/1 var(--mono); padding:8px 11px; outline:none; font-family:inherit;
+}
+.fld input[type=text]:focus{border-color:#3d5490}
+.fld .fh{font-size:10.5px; color:var(--tx3); margin-top:5px; line-height:1.5}
+.cklist{border:1px solid var(--line2); border-radius:var(--r2); overflow:hidden}
+.ck{display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line2); cursor:pointer; font-size:12px; color:var(--tx2)}
+.ck:last-child{border-bottom:0}
+.ck .cbx{width:15px; height:15px; border-radius:4px; border:1.5px solid #414a5c; flex:none; display:flex; align-items:center; justify-content:center; color:#fff}
+.ck.on .cbx{background:var(--acc2); border-color:var(--acc2)}
+.ck.on .cbx::after{content:""; width:8px; height:4.5px; border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg) translateY(-1px)}
+.ck b{color:var(--tx1); font-family:var(--mono); font-weight:600}
+.ck .ck-m{margin-left:auto; font:10px/1 var(--mono); color:var(--tx3)}
+.tree{background:var(--code-bg); border:1px solid var(--code-line); border-radius:8px; padding:11px 14px; font:11.5px/1.8 var(--mono); color:var(--tx2)}
+.tree .d{color:#e0b03c}
+.tree .c{color:#697182}
+.wz-steps{display:flex; gap:6px; margin-bottom:15px}
+.wz-steps .ws{flex:1; height:3px; border-radius:2px; background:var(--bg3)}
+.wz-steps .ws.on{background:var(--acc)}
+.effects{border:1px solid rgba(242,85,77,.3); background:rgba(242,85,77,.06); border-radius:var(--r2); padding:10px 13px; font-size:12px; color:#f0b0ab; line-height:1.7}
+.effects b{color:#f5b5af}
+.effects code{font:11px var(--mono); color:#ffd7d3}
+
+/* popover / toast */
+#pop{
+  position:fixed; z-index:80; min-width:170px; background:#1b1f27; border:1px solid #323947; border-radius:var(--r2);
+  box-shadow:0 14px 44px rgba(0,0,0,.55); padding:5px; display:none;
+}
+#pop .pi{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:var(--r1); font-size:12px; color:var(--tx1); cursor:pointer}
+#pop .pi:hover{background:var(--bg3)}
+#pop .pi svg.ic{width:14px;height:14px;color:var(--tx3)}
+#pop .pi small{margin-left:auto; font:10px/1 var(--mono); color:var(--tx3)}
+#pop .pi.dgr{color:#f39893}
+#pop .pi.dgr svg.ic{color:#f39893}
+#pop .pdiv{height:1px; background:var(--line2); margin:5px 6px}
+#toasts{position:absolute; right:16px; bottom:16px; z-index:70; display:flex; flex-direction:column; gap:8px; align-items:flex-end}
+.toast{
+  background:#1c2029; border:1px solid #323947; border-left:2.5px solid var(--acc); border-radius:var(--r2);
+  color:var(--tx1); font-size:12px; line-height:1.5; padding:9px 13px; max-width:360px; box-shadow:0 10px 34px rgba(0,0,0,.5);
+  animation:tin .2s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes tin{from{opacity:0; transform:translateY(6px)}}
+
+/* ========== 标注系统 ========== */
+.note{
+  position:absolute; z-index:30; font:10px/1.4 var(--mono); color:#a7afc0; background:rgba(12,14,19,.93);
+  border:1px dashed #4a5266; border-radius:5px; padding:3px 7px; pointer-events:none; white-space:nowrap; max-width:300px;
+}
+.note b{color:#dfe4ee; font-weight:600}
+.note.wide{white-space:normal; max-width:250px; line-height:1.55; font-size:10px}
+body:not(.notes) .note{display:none}
+.n-tl{top:8px; left:10px} .n-tr{top:8px; right:10px} .n-bl{bottom:8px; left:10px} .n-br{bottom:8px; right:10px}
+.col-left,.col-mid,.col-right,.rail,.topnav,.rp-body,.rp-tabs{position:relative}
+
+/* ========== 原型评审工具条 ========== */
+.proto{
+  position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:90;
+  background:rgba(14,16,22,.97); border:1px solid #2b313d; border-radius:12px; box-shadow:0 16px 50px rgba(0,0,0,.6);
+  padding:9px 12px; display:flex; flex-direction:column; gap:8px; max-width:calc(100vw - 24px);
+}
+.pr-row{display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:center}
+.pr-lb{font-size:10.5px; color:var(--tx3); margin-right:2px; white-space:nowrap}
+.pill{
+  border:1px solid var(--line); background:var(--bg2); color:var(--tx2); border-radius:99px; font-size:11px; padding:5px 11px; cursor:pointer; transition:all .13s; white-space:nowrap;
+}
+.pill:hover{color:var(--tx1); border-color:#3a4252}
+.pill.on{background:var(--acc-soft); border-color:rgba(76,125,255,.55); color:#c3d4ff; font-weight:500}
+.pill small{font:9.5px/1 var(--mono); color:var(--tx3); margin-left:5px}
+.pill.on small{color:#8fa5d8}
+.seg{display:flex; border:1px solid var(--line); border-radius:99px; overflow:hidden}
+.seg button{border:0; background:transparent; color:var(--tx3); font-size:11px; padding:5px 11px; cursor:pointer}
+.seg button.on{background:var(--acc-soft); color:#c3d4ff}
+.pr-hint{font:10px/1 var(--mono); color:#59616f; text-align:center}
+.pr-hint i{font-style:normal; color:#7d8698; border:1px dashed #4a5266; border-radius:3px; padding:1px 4px; margin-right:4px}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body class="notes">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="5" rx="1.2"/><rect x="13.5" y="11" width="7.5" height="10" rx="1.2"/><rect x="3" y="15" width="7.5" height="6" rx="1.2"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5a2 2 0 0 1 2-2h4l2.2 2.7h5.8a2 2 0 0 1 2 2v8.3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5z"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v12.6c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9V5.5"/><path d="M4.5 11.8c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9"/></symbol>
+<symbol id="i-ai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l1.7 4.6 4.6 1.7-4.6 1.7L12 16.1l-1.7-4.6-4.6-1.7 4.6-1.7L12 3.5z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v3.5M6 11.5V20M12 4v8.5M12 16.5V20M18 4v2.5M18 10.5V20"/><circle cx="6" cy="9.5" r="2"/><circle cx="12" cy="14.5" r="2"/><circle cx="18" cy="8.5" r="2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5L16 16"/></symbol>
+<symbol id="i-chd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5l5.5 5.5 5.5-5.5"/></symbol>
+<symbol id="i-chr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6.5l5.5 5.5-5.5 5.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12.5l4.5 4.5 9-10"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M10 10.5v6M14 10.5v6M5.5 7l.9 12.1a1.8 1.8 0 0 0 1.8 1.7h7.6a1.8 1.8 0 0 0 1.8-1.7L18.5 7M9.5 7V5.4A1.4 1.4 0 0 1 10.9 4h2.2a1.4 1.4 0 0 1 1.4 1.4V7"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5l4.3-1.1L19.6 7.6a2 2 0 0 0 0-2.8l-.4-.4a2 2 0 0 0-2.8 0L5.6 15.2l-1.1 4.3z"/><path d="M14.5 6.5l3 3"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.5l10.5 6.5L8 18.5v-13z"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2l7.5 4.3v9L12 20.8l-7.5-4.3v-9L12 3.2z"/><path d="M12 12l7.5-4.5M12 12v8.8M12 12L4.5 7.5"/></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7.5H6.5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V13"/><path d="M14 4.5h5.5V10M19.5 4.5L11 13"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.8L3.4 18.9a1.2 1.2 0 0 0 1.05 1.8h15.1a1.2 1.2 0 0 0 1.05-1.8L12 4.8z"/><path d="M12 10.5v4M12 17.8h.01"/></symbol>
+<symbol id="i-cck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.5 12.4l2.4 2.4 4.6-5.2"/></symbol>
+<symbol id="i-cx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></symbol>
+<symbol id="i-cd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="1.4"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 11v5M12 7.8h.01"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l4 4-4 4M12 16.5h7"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 7.5L4.5 12l4 4.5M15.5 7.5l4 4.5-4 4.5M13.5 5l-3 14"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3.5H7a1.8 1.8 0 0 0-1.8 1.8v13.4A1.8 1.8 0 0 0 7 20.5h10a1.8 1.8 0 0 0 1.8-1.8V8.8l-5.3-5.3z"/><path d="M13.5 3.5v5.3h5.3M8.5 13h7M8.5 16.5h4.5"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 3.5L3.5 10.6l6.9 3 3 6.9 7.1-17z"/><path d="M10.4 13.6L20.5 3.5"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="6.5" width="11" height="11" rx="1.8"/></symbol>
+<symbol id="i-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3.8a8.2 8.2 0 1 1-8.2 8.2"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12H5M11 5.5L4.5 12 11 18.5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 2.8v5.1c0 4.3-2.9 7.9-7 9.3-4.1-1.4-7-5-7-9.3V6.3l7-2.8z"/><path d="M8.8 12l2.2 2.2 4.2-4.6"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.2 13.8a3.6 3.6 0 0 1 0-5.1l2-2a3.6 3.6 0 0 1 5.1 5.1l-1.2 1.2"/><path d="M13.8 10.2a3.6 3.6 0 0 1 0 5.1l-2 2a3.6 3.6 0 0 1-5.1-5.1l1.2-1.2"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.3-5.8 9-5.8S21 12 21 12s-3.3 5.8-9 5.8S3 12 3 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8.5V6.5a2 2 0 0 1 2-2h2M15.5 4.5h2a2 2 0 0 1 2 2v2M19.5 15.5v2a2 2 0 0 1-2 2h-2M8.5 19.5h-2a2 2 0 0 1-2-2v-2"/><path d="M4.5 12h15"/></symbol>
+</defs>
+</svg>
+
+<div id="frame">
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <span class="tb-title">Report Console</span>
+    <span class="tb-sub" id="tbSub">项目工作台</span>
+    <div class="tb-right">
+      <span class="tb-chip"><span class="dot g"></span>whjcbb <span style="color:#5d6675">8ms</span></span>
+      <span class="tb-chip" id="tbCrm"><span class="dot g"></span>crm_db <span style="color:#5d6675">11ms</span></span>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- 导航方向A：图标侧栏（第5章） -->
+    <nav class="rail" id="rail">
+      <div class="logo"><svg class="ic"><use href="#i-box"/></svg></div>
+      <button class="rail-it" data-act="navstub" data-n="总览"><svg class="ic"><use href="#i-dash"/></svg><span class="tip">总览<small>⌘1</small></span></button>
+      <button class="rail-it on" data-act="navstub" data-n="项目"><svg class="ic"><use href="#i-folder"/></svg><span class="tip">项目（工作台）<small>⌘2</small></span></button>
+      <button class="rail-it" data-act="navstub" data-n="连接"><svg class="ic"><use href="#i-db"/></svg><span class="tip">连接<small>⌘3</small></span></button>
+      <button class="rail-it" data-act="navstub" data-n="Agent"><svg class="ic"><use href="#i-ai"/></svg><span class="tip">Agent<small>⌘4</small></span></button>
+      <button class="rail-it" data-act="navstub" data-n="设置"><svg class="ic"><use href="#i-set"/></svg><span class="tip">设置<small>⌘5</small></span></button>
+      <span class="spring"></span>
+      <div class="note wide" style="position:absolute;left:58px;top:14px"><b>第5章 导航A（推荐）</b><br>图标侧栏，五入口常驻可快捷键；工作台拿满剩余宽度，三栏在 1024px 仍有最大空间</div>
+    </nav>
+
+    <div class="stage">
+      <!-- 导航方向B：顶栏（第5章），默认隐藏 -->
+      <nav class="topnav" id="topnav">
+        <div class="brand"><div class="logo"><svg class="ic"><use href="#i-box"/></svg></div><b>Report Console</b></div>
+        <button class="tn-it" data-act="navstub" data-n="总览"><svg class="ic"><use href="#i-dash"/></svg>总览</button>
+        <button class="tn-it on" data-act="navstub" data-n="项目"><svg class="ic"><use href="#i-folder"/></svg>项目</button>
+        <button class="tn-it" data-act="navstub" data-n="连接"><svg class="ic"><use href="#i-db"/></svg>连接</button>
+        <button class="tn-it" data-act="navstub" data-n="Agent"><svg class="ic"><use href="#i-ai"/></svg>Agent</button>
+        <button class="tn-it" data-act="navstub" data-n="设置"><svg class="ic"><use href="#i-set"/></svg>设置</button>
+        <div class="env-mini">
+          <span class="pill"><span class="dot g"></span>whjcbb</span>
+          <span class="pill" id="tnCrm"><span class="dot g"></span>crm_db</span>
+        </div>
+        <div class="note wide" style="position:static;margin-left:auto"><b>第5章 导航B</b>　顶栏：横向空间全让给三栏，适合沉浸单项目；层级感与 Agent 曝光弱于侧栏</div>
+      </nav>
+
+      <!-- 工作台头 -->
+      <header class="wb-head">
+        <button class="proj-chip" data-act="projpop"><svg class="ic"><use href="#i-folder"/></svg><b id="pcName">订单管理</b><svg class="ic" style="width:12px;height:12px"><use href="#i-chd"/></svg></button>
+        <div class="crumb">
+          <b id="wbProject">订单管理</b>
+          <span class="dirchip" id="wbDir">~/Projects/reportlets/order</span>
+          <span id="wbConns"></span>
+        </div>
+        <div class="grow"></div>
+        <button class="btn" data-act="newmenu"><svg class="ic"><use href="#i-plus"/></svg>新建<svg class="ic" style="width:12px;height:12px"><use href="#i-chd"/></svg></button>
+        <button class="btn acc-o" data-act="verify"><svg class="ic"><use href="#i-shield"/></svg>一键验收</button>
+        <div class="note n-tr" style="top:auto;bottom:6px">工作台头：项目上下文 + 全局动作</div>
+      </header>
+
+      <div class="cols">
+        <!-- 左栏：项目选择器（3.1） -->
+        <aside class="col-left" id="colLeft"></aside>
+
+        <!-- 中栏：资源浏览器（3.2） -->
+        <section class="col-mid">
+          <div class="mid-head">
+            <label class="search"><svg class="ic"><use href="#i-search"/></svg><input id="q" placeholder="按名称过滤资源…" data-act="search"></label>
+            <span class="mid-count" id="midCount"></span>
+            <div class="grow"></div>
+            <button class="iconbtn" title="组内排序（名称/时间/状态）" data-act="sort"><svg class="ic"><use href="#i-set"/></svg></button>
+          </div>
+          <div id="midBanner"></div>
+          <div class="mid-scroll" id="midScroll"></div>
+          <div class="note n-br">3.2 中栏：四组可折叠 + 搜索过滤 + 组头主操作</div>
+        </section>
+
+        <!-- 右栏：操作面板（3.3） -->
+        <aside class="col-right" id="colRight"></aside>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toasts"></div>
+</div>
+
+<div id="pop"></div>
+
+<!-- 原型评审工具条（非应用 UI） -->
+<div class="proto">
+  <div class="pr-row">
+    <span class="pr-lb">场景</span>
+    <button class="pill" data-act="sc" data-s="cold">冷启动<small>4.1</small></button>
+    <button class="pill on" data-act="sc" data-s="default">默认态<small>4.2·4.7</small></button>
+    <button class="pill" data-act="sc" data-s="empty">空项目<small>4.1</small></button>
+    <button class="pill" data-act="sc" data-s="gate">质量门失败<small>4.3</small></button>
+    <button class="pill" data-act="sc" data-s="agent">Agent 会话<small>4.5</small></button>
+    <button class="pill" data-act="sc" data-s="unreach">连接不可达<small>7</small></button>
+    <button class="pill" data-act="sc" data-s="confirm">破坏性确认<small>7</small></button>
+  </div>
+  <div class="pr-row">
+    <span class="pr-lb">导航</span>
+    <div class="seg">
+      <button class="on" data-act="nav" data-d="A">A 侧栏</button>
+      <button data-act="nav" data-d="B">B 顶栏</button>
+    </div>
+    <span class="pr-lb" style="margin-left:6px">宽度</span>
+    <div class="seg">
+      <button class="on" data-act="width" data-w="1380">1380</button>
+      <button data-act="width" data-w="1024">1024</button>
+    </div>
+    <button class="pill on" data-act="notes">◈ 需求标注</button>
+  </div>
+  <div class="pr-hint"><i>◈</i>标注对应 ui-requirements.md 章节 · 快捷键 1-7 切场景 · N 标注 · 纯 mockup 无真实逻辑</div>
+</div>
+
+<script>
+/* ================================================================
+   Report Console 项目工作台原型 · 数据 + 渲染
+   ================================================================ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const ic=(n,s)=>`<svg class="ic${s?' '+s:''}"><use href="#i-${n}"/></svg>`;
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* ---------- 轻量语法高亮（SQL / JS / JSON） ---------- */
+const KW='SELECT|FROM|WHERE|ORDER|GROUP|BY|LIMIT|CALL|CREATE|DROP|PROCEDURE|IF|EXISTS|BEGIN|END|DECLARE|INSERT|INTO|VALUES|SET|COUNT|SUM|JSON_OBJECT|INT|VARCHAR|DECIMAL|DATETIME|AND|OR|NOT|NULL|AS|LAST_INSERT_ID|NOW|USE|SHOW|DATABASE|TABLE|const|let|var|function|return|await|async|new|true|false|if|else|for|map';
+function hl(code){
+  let s=esc(code);
+  const re=new RegExp(`(--[^\\n]*|\\/\\/[^\\n]*)|('(?:[^'\\\\]|\\\\.)*'|"(?:[^"\\\\]|\\\\.)*")|(\\$\\{[^}]*\\})|\\b(${KW})\\b|\\b(\\d+(?:\\.\\d+)?)\\b`,'g');
+  return s.replace(re,(m,c,st,fm,kw,nm)=>{
+    if(c)return`<i class="c">${m}</i>`;
+    if(st)return`<i class="s">${m}</i>`;
+    if(fm)return`<i class="fm">${m}</i>`;
+    if(kw)return`<i class="k">${m}</i>`;
+    if(nm)return`<i class="n">${m}</i>`;
+    return m;
+  });
+}
+const codeblk=(title,body,extra)=>`<div class="codeblk"><div class="cb-h">${title}<span class="grow"></span>${extra||''}</div><pre>${hl(body)}</pre></div>`;
+
+/* ---------- 基础数据（场景切换时深拷贝，保证可回退） ---------- */
+const CONNS={
+  whjcbb:{name:'whjcbb',host:'10.20.8.11:3306',db:'whjcbb',st:'ok',ms:8},
+  crm_db:{name:'crm_db',host:'10.20.8.21:3306',db:'crm_prd',st:'ok',ms:11},
+};
+const BASE={
+  projects:[
+    {id:'order',name:'订单管理',dir:'~/Projects/reportlets/order',conns:['whjcbb','crm_db'],created:'2026-07-22'},
+    {id:'base',name:'系统基础',dir:'~/Projects/reportlets/base',conns:['whjcbb'],created:'2026-06-10'},
+    {id:'stock',name:'库存盘点',dir:'~/Projects/reportlets/stock',conns:['whjcbb','crm_db'],created:'2026-08-17'},
+    {id:'legacy',name:'报表迁移(旧)',dir:'~/Projects/reportlets/legacy_old',conns:['whjcbb'],created:'2026-05-04',missingDir:true},
+  ],
+  res:{
+    order:{
+      ifs:[
+        {n:'order_qry',type:'list',tag:'列表',conn:'whjcbb',
+         sql:`-- 列表（自行分页 + 可选条件，帆软公式注入）
+SELECT id, order_no, customer_name, amount, status, created_at
+FROM t_order
+WHERE 1=1
+\${if(len(p_keyword)==0,""," AND order_no LIKE '%"+p_keyword+"%'")}
+\${if(len(p_status)==0,""," AND status = '"+p_status+"'")}
+ORDER BY id DESC
+LIMIT \${(p_page-1)*p_pagesize}, \${p_pagesize}`,
+         params:[['p_page','integer','1'],['p_pagesize','integer','20'],['p_keyword','string',''],['p_status','string','']],
+         test:{st:'ok',t:'今天 14:32',rows:23,ms:187,ec:0},
+         tests:[['今天 14:32',1,23,187],['昨天 17:05',1,20,203],['08-14 10:11',0,0,96,'err_code=1：参数 p_pagesize 缺失']],
+         build:'今天 14:30'},
+        {n:'order_total',type:'stat',tag:'统计',conn:'whjcbb',
+         sql:`-- 汇总统计
+SELECT COUNT(*) AS total_cnt, SUM(amount) AS total_amt
+FROM t_order
+WHERE created_at >= '\${p_date_start}'
+  AND created_at < DATE_ADD('\${p_date_end}', INTERVAL 1 DAY)`,
+         params:[['p_date_start','string','2026-08-01'],['p_date_end','string','2026-08-17']],
+         test:{st:'ok',t:'今天 14:33',rows:1,ms:92,ec:0},tests:[['今天 14:33',1,1,92]],build:'今天 14:30'},
+        {n:'order_by_id',type:'one',tag:'单条',conn:'whjcbb',
+         sql:`-- 单条明细
+SELECT id, order_no, customer_name, amount, status, created_at, remark
+FROM t_order
+WHERE id = \${p_id}`,
+         params:[['p_id','int','1']],
+         test:{st:'none'},tests:[],build:'今天 14:30'},
+        {n:'order_insert',type:'ins',tag:'增',conn:'whjcbb',
+         sql:`-- 写操作走存储过程（约定：SELECT JSON_OBJECT 返回结果）
+CALL sp_order_insert(
+  '\${p_order_no}',
+  \${p_customer_id},
+  \${p_amount},
+  '\${fine_username}'
+)`,
+         params:[['p_order_no','string',''],['p_customer_id','integer',''],['p_amount','double',''],['fine_username','formula','=$fine_username']],
+         test:{st:'ok',t:'今天 14:35',rows:1,ms:318,ec:0,note:'插入→查到→删除 闭环通过'},tests:[['今天 14:35',1,1,318]],build:'今天 14:30'},
+        {n:'dict_customer',type:'dict',tag:'字典',conn:'crm_db',
+         sql:`-- 数据字典（crm_db 连接，随本模块 _data.cpt 一并装配）
+SELECT customer_id, customer_name
+FROM t_customer
+ORDER BY customer_name`,
+         params:[],test:{st:'ok',t:'今天 14:34',rows:126,ms:141,ec:0},tests:[['今天 14:34',1,126,141]],build:'今天 14:30'},
+      ],
+      sps:[
+        {n:'sp_order_insert',own:'own',conn:'whjcbb',mod:'08-12 16:40',audits:12,note:'订单新增，返回 JSON_OBJECT',
+         sql:`CREATE PROCEDURE \`sp_order_insert\`(
+  IN p_order_no     VARCHAR(32),
+  IN p_customer_id  INT,
+  IN p_amount       DECIMAL(12,2),
+  IN p_operator     VARCHAR(64)
+)
+BEGIN
+  DECLARE v_id INT;
+  INSERT INTO t_order(order_no, customer_id, amount, status, created_by, created_at)
+  VALUES (p_order_no, p_customer_id, p_amount, '新建', p_operator, NOW());
+  SET v_id = LAST_INSERT_ID();
+  CALL sp_common_log('order', v_id, 'INSERT', p_operator);
+  SELECT JSON_OBJECT('err_code', 0, 'err_msg', 'ok',
+                     'data', JSON_OBJECT('id', v_id)) AS result;
+END`},
+        {n:'sp_order_update',own:'own',conn:'whjcbb',mod:'08-12 16:41',audits:7,note:'订单状态更新',
+         sql:`CREATE PROCEDURE \`sp_order_update\`(
+  IN p_id       INT,
+  IN p_status   VARCHAR(16),
+  IN p_operator VARCHAR(64)
+)
+BEGIN
+  UPDATE t_order SET status = p_status, updated_by = p_operator, updated_at = NOW()
+  WHERE id = p_id;
+  CALL sp_common_log('order', p_id, 'UPDATE', p_operator);
+  SELECT JSON_OBJECT('err_code', 0, 'err_msg', 'ok', 'rows', ROW_COUNT()) AS result;
+END`},
+        {n:'sp_common_log',own:'lnk',src:'系统基础',conn:'whjcbb',mod:'07-30 09:15',audits:34,note:'通用操作日志，两个项目共用',
+         sql:`CREATE PROCEDURE \`sp_common_log\`(
+  IN p_biz      VARCHAR(32),
+  IN p_biz_id   INT,
+  IN p_action   VARCHAR(16),
+  IN p_operator VARCHAR(64)
+)
+BEGIN
+  INSERT INTO t_op_log(biz, biz_id, action, operator, created_at)
+  VALUES (p_biz, p_biz_id, p_action, p_operator, NOW());
+  SELECT JSON_OBJECT('err_code', 0, 'err_msg', 'ok') AS result;
+END`},
+      ],
+      pgs:[
+        {n:'order_list.jsx',stale:'old',size:'18.4 KB',scaf:'list',mod:'今天 15:02',
+         src:`// 订单列表页 · list 脚手架起步（直接用全局 React/antd，不写 import）
+const { Search, Table, Tag, Space, Button, message } = antd
+const { useState, useEffect } = React
+
+const columns = [
+  { title: '订单号', dataIndex: 'order_no', width: 140 },
+  { title: '客户', dataIndex: 'customer_name' },
+  { title: '金额', dataIndex: 'amount', align: 'right',
+    render: v => '¥ ' + Number(v).toFixed(2) },
+  { title: '状态', dataIndex: 'status', width: 90,
+    render: v => React.createElement(Tag,
+      v === '已付款' ? { color: 'green' } : {}, v) },
+]
+
+function Page() {
+  const [rows, setRows] = useState([])
+  const [keyword, setKeyword] = useState('')
+  const load = () => {
+    $.ajax({ url: PATH.api, data: PATH.params({
+      dataset: 'order_qry', p_keyword: keyword,
+      p_page: 1, p_pagesize: 20 }) })
+     .then(r => setRows(r.data || []))
+  }
+  useEffect(load, [keyword])
+  return (
+    React.createElement('div', null,
+      React.createElement(Space, { style: { marginBottom: 12 } },
+        React.createElement(Search, {
+          placeholder: '订单号/客户', onSearch: setKeyword })),
+      React.createElement(Table, {
+        rowKey: 'id', columns, dataSource: rows,
+        pagination: { pageSize: 20 } })))
+}`,
+         buildLog:`[15:03:41] jsx -> esbuild(iife) 完成
+[15:03:41] 净化：去注释（字符串保护）/ uXXXX 解码 / Hook 解构转两步赋值
+[15:03:41] 注入骨架「开发者代码区」base_cpt_page.cpt
+[15:03:42] 质量门：0 error / 0 warning，通过
+[15:03:42] 产出 order_list.mjs（21.6 KB）+ order_list.cpt（33.2 KB）`,
+         lastBuild:{t:'08-15 11:02',ok:true}},
+        {n:'order_form.jsx',stale:'new',size:'12.1 KB',scaf:'form',mod:'昨天 18:20',lastBuild:{t:'昨天 18:21',ok:true},
+         src:`// 订单表单页 · form 脚手架起步
+const { Form, Input, InputNumber, Button, message } = antd
+
+function Page() {
+  const submit = (v) => {
+    $.ajax({ url: PATH.api, method: 'POST',
+      data: PATH.params({ dataset: 'order_insert', ...v }) })
+     .then(r => r.err_code === 0
+       ? message.success('已创建')
+       : message.error(r.err_msg))
+  }
+  return (
+    React.createElement(Form, { onFinish: submit, labelCol: { span: 6 } },
+      React.createElement(Form.Item, { name: 'p_order_no', label: '订单号' },
+        React.createElement(Input)),
+      React.createElement(Form.Item, { name: 'p_amount', label: '金额' },
+        React.createElement(InputNumber, { precision: 2 })),
+      React.createElement(Button, { type: 'primary', htmlType: 'submit' },
+        '创建订单')))
+}`},
+      ],
+      docs:[
+        {n:'01-需求-订单管理.md',type:'markdown',mod:'08-10 11:20',
+         md:`<h1>订单管理 · 需求</h1>
+<p>维护 whjcbb 库的订单数据，供经营日报与客户对账使用。</p>
+<h2>功能点</h2>
+<ul>
+<li>订单列表：按订单号/状态筛选，分页 20 条，金额右对齐</li>
+<li>订单创建：必填订单号与金额，操作人取当前登录用户</li>
+<li>字典：客户下拉来自 crm_db（客户主数据在 CRM 侧维护）</li>
+<li>所有写操作必须走存储过程并返回 JSON_OBJECT 结果</li>
+</ul>
+<h2>验收口径</h2>
+<ul>
+<li>每个列表/统计接口实测 err_code=0 才进入页面开发</li>
+<li>删除操作为软删除，保留操作日志（复用系统基础项目 sp_common_log）</li>
+</ul>`},
+        {n:'02-设计-订单列表页.md',type:'markdown',mod:'08-11 09:35',
+         md:`<h1>订单列表页 · 设计</h1>
+<p>list 脚手架起步，数据取 <code>order_qry</code>（whjcbb），字典取 <code>dict_customer</code>（crm_db）。</p>
+<ul>
+<li>查询区：订单号关键字 + 状态下拉，回车即查</li>
+<li>表格列：订单号 / 客户 / 金额 / 状态 / 创建时间</li>
+<li>导出：复用当前查询参数，全量导出 Excel（待办）</li>
+</ul>`},
+        {n:'sp_order_insert.sql',type:'sql',mod:'08-12 16:40',sqlRef:'sp_order_insert'},
+        {n:'sp_order_update.sql',type:'sql',mod:'08-12 16:41',sqlRef:'sp_order_update'},
+      ],
+      build:{t:'今天 14:30',ok:true,ds:5,conns:'whjcbb ×4 · crm_db ×1',size:'12.4 KB',
+        log:`[14:30:02] 装配 5 个数据集 -> order_data.cpt
+[14:30:02] order_qry / order_total / order_insert / order_by_id -> DatabaseName=whjcbb
+[14:30:02] dict_customer -> DatabaseName=crm_db
+[14:30:03] 参数类型映射：integer->t="I"，formula->Formula
+[14:30:03] 质量门：0 error / 0 warning，通过
+[14:30:03] 落盘 reportlets/order/data/order_data.cpt（12.4 KB）`},
+    },
+    base:{
+      ifs:[
+        {n:'sys_log_qry',type:'list',tag:'列表',conn:'whjcbb',sql:`SELECT id, biz, action, operator, created_at\nFROM t_op_log\nWHERE 1=1\nORDER BY id DESC\nLIMIT \${(p_page-1)*p_pagesize}, \${p_pagesize}`,params:[['p_page','integer','1'],['p_pagesize','integer','20']],test:{st:'ok',t:'昨天 09:12',rows:40,ms:132,ec:0},tests:[['昨天 09:12',1,40,132]],build:'昨天 09:10'},
+        {n:'dict_area',type:'dict',tag:'字典',conn:'whjcbb',sql:`SELECT code, name FROM t_area ORDER BY code`,params:[],test:{st:'none'},tests:[],build:'昨天 09:10'},
+      ],
+      sps:[
+        {n:'sp_common_log',own:'own',conn:'whjcbb',mod:'07-30 09:15',audits:34,note:'通用操作日志，被订单管理项目关联',
+         sql:`CREATE PROCEDURE \`sp_common_log\`(
+  IN p_biz      VARCHAR(32),
+  IN p_biz_id   INT,
+  IN p_action   VARCHAR(16),
+  IN p_operator VARCHAR(64)
+)
+BEGIN
+  INSERT INTO t_op_log(biz, biz_id, action, operator, created_at)
+  VALUES (p_biz, p_biz_id, p_action, p_operator, NOW());
+  SELECT JSON_OBJECT('err_code', 0, 'err_msg', 'ok') AS result;
+END`},
+        {n:'sp_dict_sync',own:'own',conn:'whjcbb',mod:'07-18 14:02',audits:5,note:'字典同步',sql:`CREATE PROCEDURE \`sp_dict_sync\`()\nBEGIN\n  -- 略：同步地区字典\n  SELECT JSON_OBJECT('err_code', 0, 'err_msg', 'ok') AS result;\nEND`},
+        {n:'sp_user_reset',own:'own',conn:'whjcbb',mod:'06-28 10:44',audits:2,note:'用户密码重置',sql:`CREATE PROCEDURE \`sp_user_reset\`(IN p_user VARCHAR(64))\nBEGIN\n  UPDATE t_user SET pwd_expired = 1 WHERE username = p_user;\n  SELECT JSON_OBJECT('err_code', 0, 'err_msg', 'ok') AS result;\nEND`},
+      ],
+      pgs:[{n:'sys_log.jsx',stale:'new',size:'9.8 KB',scaf:'list',mod:'07-22 10:03',lastBuild:{t:'07-22 10:05',ok:true},src:`// 系统日志页（示例：其他项目的页面，源码略）\n// 构建产物最新，staleness = new`,buildLog:'',}],
+      docs:[{n:'01-需求-通用日志.md',type:'markdown',mod:'07-20 15:00',md:`<h1>通用日志 · 需求</h1><p>各业务表写操作统一落 t_op_log，由 sp_common_log 过程负责写入。</p>`}],
+      build:{t:'昨天 09:10',ok:true,ds:2,conns:'whjcbb ×2',size:'6.1 KB',log:'[09:10:11] 装配 2 个数据集，质量门通过，落盘'},
+    },
+    stock:{ifs:[],sps:[],pgs:[],docs:[],build:null},
+    legacy:{
+      ifs:[{n:'legacy_qry',type:'list',tag:'列表',conn:'whjcbb',sql:`SELECT * FROM t_legacy_report`,params:[],test:{st:'none'},tests:[],build:'05-30 16:12',cached:true}],
+      sps:[],pgs:[],docs:[{n:'迁移说明.md',type:'markdown',mod:'05-30 15:02',md:`<h1>迁移说明</h1><p>旧报表目录。目录已从原位置移走，资源条目来自 SQLite 账本缓存。</p>`}],
+      build:null,missingDir:true,
+    },
+  },
+};
+
+/* 场景静态附加：质量门失败 findings */
+const GATE_FAIL={
+  ok:false,
+  findings:[
+    {sev:'e',code:'E101',loc:'数据集 order_by_id · 参数 p_id',msg:'参数类型 "int" 非法，允许值：string / integer / double / formula'},
+    {sev:'e',code:'E203',loc:'数据集 order_by_id · SQL',msg:'检测到多条语句（2 个分号），构建拒绝。写操作请封装为存储过程后 CALL'},
+    {sev:'w',code:'W301',loc:'数据集 order_qry',msg:'列表接口建议补充 p_page / p_pagesize 分页参数（已有，跳过）'},
+    {sev:'w',code:'W302',loc:'数据集 order_qry · 参数 p_status',msg:'参数在 SQL 中未被引用，将随请求空传'},
+    {sev:'w',code:'W303',loc:'产物 order_data.cpt',msg:'_data.cpt 自上次构建后被外部修改（mtime 14:11 晚于上次构建 13:40），本次构建将覆盖外部改动'},
+  ],
+  log:`[15:20:10] 装配 5 个数据集 -> order_data.cpt
+[15:20:10] order_by_id 参数校验失败（E101）
+[15:20:10] order_by_id SQL 语句数校验失败（E203）
+[15:20:11] 质量门：2 error / 3 warning，未通过
+[15:20:11] <span class="le">拒绝落盘：reportlets/order/data/order_data.cpt 保持上次产物（今天 14:30）</span>`,
+};
+
+/* ---------- 状态 ---------- */
+let W, S={
+  sc:'default', proj:'order', sel:'if:order_qry', tab:{},
+  search:'', collapsed:{}, agent:false, modal:null,
+};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const resById=id=>{
+  const r=(W.res[S.proj]||{});
+  const [k,n]=id.split(':');
+  const pool={if:r.ifs,sp:r.sps,pg:r.pgs,doc:r.docs}[k]||[];
+  return pool.find(x=>x.n===n);
+};
+const counts=p=>{const r=W.res[p]||{};return{if:(r.ifs||[]).length,sp:(r.sps||[]).length,pg:(r.pgs||[]).length,doc:(r.docs||[]).length}};
+
+/* ---------- 场景定义 ---------- */
+const SCEN={
+  cold:{proj:null,sel:null,
+    enter(){W.projects=[];S.modal='wizard';},
+    desc:'首次打开：无任何项目。中栏为引导态，弹层为「新建项目」向导（名称 / 绑定目录 / 勾选多个连接）'},
+  default:{proj:'order',sel:'if:order_qry',
+    enter(){},
+    desc:'日常开发：订单管理（绑定 whjcbb + crm_db 双连接），五接口 / 三过程 / 两页面 / 四文档'},
+  empty:{proj:'stock',sel:null,enter(){}},
+  gate:{proj:'order',sel:'if:order_by_id',
+    enter(){
+      const r=resById('if:order_by_id'); r.gate=clone(GATE_FAIL); r.gateFail=true; r.build='今天 15:20 · 失败';
+      S.tab['if:order_by_id']='build';
+    }},
+  agent:{proj:'order',sel:'pg:order_list.jsx',
+    enter(){S.agent=true;}},
+  unreach:{proj:'order',sel:'if:dict_customer',
+    enter(){
+      W.conns.crm_db.st='down'; W.conns.crm_db.ms='超时';
+      const d=resById('if:dict_customer'); d.test={st:'unreach',why:'connect ETIMEDOUT 10.20.8.21:3306'};
+    }},
+  confirm:{proj:'order',sel:'sp:sp_common_log',
+    enter(){S.tab['sp:sp_common_log']='def'; S.modal='applyproc';}},
+};
+function enterScene(sc){
+  W={conns:clone(CONNS),projects:clone(BASE.projects),res:clone(BASE.res)};
+  S.sc=sc; S.search=''; S.tab={}; S.collapsed={}; S.agent=false; S.modal=null;
+  const def=SCEN[sc];
+  S.proj=def.proj; S.sel=def.sel;
+  def.enter();
+  $('#q').value='';
+  renderAll();
+  $$('.pill[data-act=sc]').forEach(b=>b.classList.toggle('on',b.dataset.s===sc));
+}
+
+/* ---------- 渲染：左栏 ---------- */
+function renderLeft(){
+  const el=$('#colLeft');
+  if(!W.projects.length){
+    el.innerHTML=`<div class="cl-head"><b>项目</b></div>
+    <div class="cl-empty">${ic('folder')}<p>还没有项目<br>从右侧引导开始，或从已有目录扫描导入</p>
+    <button class="btn sm" data-act="modal" data-m="wizard">${ic('plus')}新建项目</button></div>
+    <div class="cl-foot">${envHTML()}</div>`;
+    return;
+  }
+  el.innerHTML=`
+  <div class="cl-head"><b>项目（${W.projects.length}）</b><span class="grow"></span>
+    <button class="iconbtn" title="新建项目" data-act="modal" data-m="wizard">${ic('plus')}</button></div>
+  <div class="cl-list">${W.projects.map(p=>{
+    const c=counts(p.id);
+    const off=p.conns.filter(cn=>W.conns[cn].st==='down');
+    return `<div class="pcard${S.proj===p.id?' on':''}" data-act="proj" data-p="${p.id}">
+      <div class="pc-r1"><span class="pc-name">${esc(p.name)}</span>
+        ${p.missingDir?`<span class="pc-warn" title="绑定目录不存在（可能被移动或删除）">${ic('alert')}目录缺失</span>`:''}
+        <button class="iconbtn" style="width:22px;height:22px" data-act="projmenu" data-p="${p.id}" title="项目设置 / 删除">${ic('dots')}</button></div>
+      <div class="pc-r2">${p.conns.map(cn=>`<span class="cbadge${off.includes(cn)?' off':''}">${ic('db')}${cn}</span>`).join('')}</div>
+      <div class="pc-r3"><span>接口 ${c.if}</span><span>过程 ${c.sp}</span><span>页面 ${c.pg}</span></div>
+    </div>`;}).join('')}
+  </div>
+  <div class="cl-foot">
+    <div class="env-t">${ic('info')}环境状态</div>
+    ${envHTML()}
+    <div class="note wide n-bl" style="bottom:auto;top:-4px;right:8px;left:auto">3.1：红绿点 + 延迟；点击跳「连接 / 设置」</div>
+  </div>
+  <div class="note wide" style="position:absolute;top:44px;left:10px"><b>3.1 左栏</b>　项目选择器：连接 badge + 资源规模 + 选中态</div>`;
+}
+function envHTML(){
+  const c=W.conns;
+  return `
+  <div class="env-row" data-act="navstub" data-n="连接" title="在「连接」视图管理"><span class="dot g"></span><span class="k">帆软 localhost:8075</span><span class="v">42ms</span></div>
+  <div class="env-row" data-act="navstub" data-n="设置"><span class="dot ${W.frDown?'r':'g'}"></span><span class="k">reportlets 可写</span><span class="v">本地</span></div>
+  <div class="env-row" data-act="navstub" data-n="连接"><span class="dot ${c.whjcbb.st==='ok'?'g':'r'}"></span><span class="k">whjcbb ${c.whjcbb.host}</span><span class="v">${c.whjcbb.ms}ms</span></div>
+  <div class="env-row" data-act="navstub" data-n="连接"><span class="dot ${c.crm_db.st==='ok'?'g':'r'}"></span><span class="k">crm_db ${c.crm_db.host}</span><span class="v">${c.crm_db.st==='ok'?c.crm_db.ms+'ms':'超时 4.0s'}</span></div>
+  <div class="env-legend">
+    <span><i style="background:var(--c-sqlite)"></i>SQLite 账本</span>
+    <span><i style="background:var(--c-cpt)"></i>reportlets 产物</span>
+    <span><i style="background:var(--c-mysql)"></i>MySQL</span>
+    <span><i style="background:var(--c-fr)"></i>帆软</span>
+  </div>`;
+}
+
+/* ---------- 渲染：中栏 ---------- */
+const TYPE_TAG={list:'list',stat:'stat',one:'one',dict:'dict',ins:'ins',del:'del',upd:'upd'};
+function renderMiddle(){
+  const r=W.res[S.proj]||{ifs:[],sps:[],pgs:[],docs:[]};
+  const proj=W.projects.find(p=>p.id===S.proj);
+  const bannerEl=$('#midBanner');
+  let banner='';
+  if(proj&&proj.missingDir) banner=`<div class="mid-banner">${ic('alert')}<div><b>项目目录缺失</b>：${esc(proj.dir)} 不存在（可能被移动或删除）。以下条目来自 SQLite 账本缓存，浏览与编辑可用，<b>构建 / 实测 / 预览已禁用</b>。可在项目设置中重新绑定目录。</div></div>`;
+  if(S.sc==='unreach') banner=`<div class="mid-banner">${ic('alert')}<div><b>crm_db 连接不可达</b>（connect ETIMEDOUT 10.20.8.21:3306）：绑定该连接的接口构建 / 实测暂不可用，浏览与编辑不受影响，其余连接（whjcbb）资源不受影响。</div></div>`;
+  bannerEl.innerHTML=banner;
+
+  const q=S.search.trim().toLowerCase();
+  const match=x=>!q||x.n.toLowerCase().includes(q);
+  const groups=[
+    {k:'ifs',t:'数据接口',one:'接口',rows:r.ifs.map(x=>ifRow(x)),note:'3.2-1：类型 tag + 所属连接 badge + 最近实测（err_code=0 绿 / 失败红 / 未测灰）+ 最近构建'},
+    {k:'sps',t:'存储过程',one:'过程',rows:r.sps.map(x=>spRow(x)),note:'3.2-2 / D3：归属 = 本项目创建 或 关联自其他项目（引用不复制）'},
+    {k:'pgs',t:'页面',one:'页面',rows:r.pgs.map(x=>pgRow(x)),note:'3.2-3：staleness（cpt 落后 jsx 待重建 / 最新 / 从未构建）'},
+    {k:'docs',t:'文档（元数据）',one:'文档',rows:r.docs.map(x=>docRow(x)),note:'3.2-4 / D4：需求 / 设计文档与过程创建语句，存于项目 meta/ 目录'},
+  ];
+  let total=0;
+  const html=groups.map((g,i)=>{
+    const items=g.rows.filter((_,idx)=>match((r[g.k]||[])[idx]));
+    total+=items.length;
+    const col=!q&&S.collapsed[g.k];
+    let bodyHtml='';
+    if(col){}
+    else if(items.length)bodyHtml=`<div class="rows">${items.join('')}</div>`;
+    else if(q)bodyHtml=`<div class="rows"><div class="nores">「${g.t}」无匹配「${esc(q)}」</div></div>`;
+    else bodyHtml=grpEmpty(g.k);
+    return `<div class="grp" data-note="${g.note}">
+      <div class="grp-h">
+        <span class="gt" data-act="grp" data-g="${g.k}">${ic(col?'chr':'chd')}${g.t}</span>
+        <span class="cnt">${(r[g.k]||[]).length}</span>
+        <span class="grow"></span>
+        ${g.k==='sps'?`<button class="btn sm" data-act="modal" data-m="linkproc">${ic('link')}关联</button>`:''}
+        <button class="btn sm" data-act="newres" data-k="${g.k}">${ic('plus')}新建${g.one}</button>
+      </div>
+      ${bodyHtml}
+      <div class="note wide" style="position:static;margin:6px 4px 0;align-self:flex-start">${g.note}</div>
+    </div>`;
+  }).join('');
+  $('#midCount').textContent=`${total} 项${q?` · 匹配「${esc(q)}」`:''}`;
+  const sc=$('#midScroll');
+  sc.innerHTML=S.proj?html:(`
+    <div style="padding:48px 20px;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--acc-soft);display:inline-flex;align-items:center;justify-content:center;color:var(--acc);margin-bottom:16px">${ic('box','')}</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px">开始第一个项目</div>
+      <div style="font-size:12.5px;color:var(--tx2);line-height:1.7;max-width:400px;margin:0 auto 18px">项目是 Report Console 的顶层组织单元：绑定一个 reportlets 目录与若干 MySQL 连接，收纳数据接口、存储过程、页面与文档。已有目录也可以扫描导入。</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn pri" data-act="modal" data-m="wizard">${ic('plus')}新建项目</button>
+        <button class="btn" data-act="toast" data-msg="原型：扫描 reportlets 已部署目录，反向纳入管理">${ic('scan')}从目录扫描导入</button>
+      </div>
+      <div style="margin-top:22px;font-size:11.5px;color:var(--tx3)">还没有 MySQL 连接？先到「连接」注册（与帆软设计器里的数据连接同名）</div>
+    </div>
+    <div class="note wide" style="position:static;max-width:420px;margin:10px auto 0"><b>4.1 冷启动</b>　无项目引导：新建 / 从目录扫描导入；向导弹层展示 D1（项目绑定多连接）与 D4（目录三分 data/ pages/ meta/）</div>`);
+}
+function grpEmpty(k){
+  const M={
+    ifs:{t:'还没有数据接口',d:'顺序约定：建表 → 存储过程 → 接口契约 → 构建实测，接口先行',
+      p:`<button class="btn sm" data-act="newres" data-k="ifs">${ic('plus')}新建接口</button>`,
+      s:`<button class="btn acc-o sm" data-act="agent">${ic('ai')}用 Agent 做</button>`},
+    sps:{t:'还没有存储过程',d:'写操作的唯一入口。可关联其他项目已有的过程（引用不复制），或从模板起步（约定返回 SELECT JSON_OBJECT）',
+      p:`<button class="btn sm" data-act="modal" data-m="linkproc">${ic('link')}关联现有过程</button>`,
+      s:`<button class="btn sm" data-act="toast" data-msg="原型：从模板新建过程（返回 SELECT JSON_OBJECT）">${ic('plus')}从模板新建</button>`},
+    pgs:{t:'还没有页面',d:'页面 jsx 是全流程唯一手写产物，接口实测通过（err_code=0）后再开发页面',
+      p:`<button class="btn sm" data-act="newres" data-k="pgs">${ic('plus')}新建页面</button>`,s:''},
+    docs:{t:'还没有文档',d:'把需求 / 设计文档放进项目 meta/ 目录，Agent 可读取作为开发上下文',
+      p:`<button class="btn sm" data-act="toast" data-msg="原型：在 meta/ 下创建 Markdown 需求文档">${ic('plus')}新建文档</button>`,s:''},
+  }[k];
+  return `<div class="rows"><div class="grp-empty">
+    <div class="e1">${M.t}</div><div class="e2">${M.d}</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${M.p}${M.s}</div>
+  </div></div>`;
+}
+function ifRow(x){
+  let st,sub;
+  if(x.test.st==='ok'){st='g';sub=`<span style="color:#7ee0a8">实测通过</span> ${x.test.rows} 行 ${x.test.ms}ms · err_code=0`;}
+  else if(x.test.st==='fail'){st='r';sub=`<span style="color:#f39893">实测失败</span> ${x.test.why||''}`;}
+  else if(x.test.st==='unreach'){st='n';sub=`<span style="color:#9aa2b1">连接不可达</span>（crm_db，非接口失败）`;}
+  else{st='n';sub='未测';}
+  if(x.cached)sub='账本缓存 · 目录缺失';
+  return `<div class="row${S.sel==='if:'+x.n?' on':''}" data-act="sel" data-id="if:${esc(x.n)}">
+    <span class="st ${st}" title="${x.test.st==='ok'?'err_code=0':x.test.st==='unreach'?'连接不可达':'未测'}"></span>
+    <div class="main"><div class="nm"><b>${esc(x.n)}</b><span class="tag ${TYPE_TAG[x.type]}">${x.tag}</span>
+      ${x.callSp?`<span class="tag lnk">CALL ${x.callSp}</span>`:''}</div>
+      <div class="sub"><span class="cbadge">${ic('db')}${x.conn}</span>${sub}</div></div>
+    <div class="meta">构建<br>${x.build||'-'}</div></div>`;
+}
+function spRow(x){
+  const own=x.own==='own'?`<span class="tag own">本项目创建</span>`:`<span class="tag lnk" title="关联引用，不复制">${ic('link')}关联自「${x.src}」</span>`;
+  return `<div class="row${S.sel==='sp:'+x.n?' on':''}" data-act="sel" data-id="sp:${esc(x.n)}">
+    <span class="st n" style="border-radius:3px"></span>
+    <div class="main"><div class="nm"><b>${esc(x.n)}</b>${own}</div>
+      <div class="sub">${esc(x.note||'')}</div></div>
+    <div class="meta">${x.mod}<br>${x.audits} 次应用</div></div>`;
+}
+function pgRow(x){
+  const st=x.stale==='old'?['old','cpt 落后 jsx，待重建']:x.stale==='new'?['new','最新']:['none','从未构建'];
+  return `<div class="row${S.sel==='pg:'+x.n?' on':''}" data-act="sel" data-id="pg:${esc(x.n)}">
+    <span class="st ${x.stale==='old'?'y':'g'}" title="${st[1]}"></span>
+    <div class="main"><div class="nm"><b>${esc(x.n)}</b><span class="stale ${st[0]}">${st[1]}</span><span class="tag src">${x.scaf}</span></div>
+      <div class="sub">${x.size} · 源码 ${x.mod}</div></div>
+    <div class="meta">构建<br>${x.lastBuild?x.lastBuild.t:'-'}</div></div>`;
+}
+function docRow(x){
+  const t=x.type==='markdown'?'Markdown':'SQL';
+  return `<div class="row${S.sel==='doc:'+x.n?' on':''}" data-act="sel" data-id="doc:${esc(x.n)}">
+    ${ic('file')}
+    <div class="main"><div class="nm"><b style="font-family:var(--mono)">${esc(x.n)}</b></div>
+      <div class="sub">${t} · meta/ 目录</div></div>
+    <div class="meta">${x.mod}</div></div>`;
+}
+
+/* ---------- 渲染：右栏 ---------- */
+function renderRight(){
+  const el=$('#colRight');
+  if(S.agent){el.innerHTML=agentHTML();return;}
+  const r=S.sel?resById(S.sel):null;
+  el.innerHTML=!r?rpProject():(
+    r.n&&(S.sel.startsWith('if:'))?rpIf(r):
+    S.sel.startsWith('sp:')?rpSp(r):
+    S.sel.startsWith('pg:')?rpPg(r):rpDoc(r));
+}
+function connChip(c){return `<span class="cbadge">${ic('db')}${c}</span>`;}
+function actBtns(buildDisabled,testDisabled,extra){
+  const bd=buildDisabled?` disabled title="连接不可达：构建 / 实测依赖绑定连接（第7章）"`:'';
+  return `<div class="rp-acts">
+    <button class="btn pri"${buildDisabled?bd:''} data-act="${buildDisabled?'':'build'}">${ic('box')}构建</button>
+    <button class="btn"${testDisabled?bd:''} data-act="${testDisabled?'':'test'}">${ic('play')}实测</button>
+    <button class="btn acc-o" data-act="agent">${ic('ai')}用 Agent 做</button>
+    <button class="iconbtn" data-act="resmenu" title="更多操作">${ic('dots')}</button>
+    ${extra||''}</div>`;
+}
+function tabsBar(tabs,cur,key){
+  return `<div class="rp-tabs">${tabs.map(t=>`<button class="rtab${cur===t.k?' on':''}" data-act="tab" data-k="${key}" data-t="${t.k}">${t.n}${t.bdg?`<span class="bdg">${t.bdg}</span>`:''}</button>`).join('')}
+  <div class="note n-br" style="bottom:-2px">3.3：构建 / 实测 / 历史结果可回看</div></div>`;
+}
+
+/* --- 接口 --- */
+function rpIf(x){
+  const key='if:'+x.n, tab=S.tab[key]||'detail';
+  const connDown=x.conn&&W.conns[x.conn]&&W.conns[x.conn].st==='down';
+  const head=`<div class="rp-head">
+    <div class="rp-r1"><span class="ttl">${esc(x.n)}</span>
+      ${x.test.st==='ok'?`<span class="pill-o ok">${ic('cck')}err_code=0</span>`:x.test.st==='unreach'?`<span class="pill-o idle">${ic('cd')}连接不可达</span>`:x.test.st==='fail'?`<span class="pill-o err">${ic('cx')}失败</span>`:`<span class="pill-o idle">${ic('cd')}未测</span>`}</div>
+    <div class="rp-r2"><span class="tag ${TYPE_TAG[x.type]}">${x.tag}</span>${connChip(x.conn)}<span style="font:10.5px/1 var(--mono);color:var(--tx3)">模块 ${S.proj} · 单一归属（D2）</span></div>
+    ${actBtns(connDown,connDown)}
+  </div>`;
+  let body='';
+  if(tab==='detail'){
+    body=`<div class="rp-body">
+    <div class="blk"><div class="blk-t">${ic('set')}契约参数</div>
+    <table class="ptab"><tr><th>NAME</th><th>TYPE</th><th>DEFAULT</th></tr>
+    ${x.params.map(p=>`<tr${p[1]==='int'?' class="err-row"':''}><td class="f">${esc(p[0])}</td><td class="f"${p[1]==='int'?' style="color:#f39893"':''}>${esc(p[1])}${p[1]==='int'?' ← E101':''}</td><td class="f">${esc(p[2])||'<span style="color:#5d6675">-</span>'}</td></tr>`).join('')||'<tr><td colspan=3 style="color:#5d6675">无参数</td></tr>'}
+    </table>
+    ${x.params.some(p=>p[1]==='formula')?`<div style="margin-top:8px" class="banner info">${ic('info')}<div><b>formula 参数</b>（如 =$fine_username）由帆软会话注入，<b>不随请求传递</b>；testDataset 构造请求时自动过滤。</div></div>`:''}</div>
+    <div class="blk"><div class="blk-t">${ic('code')}SQL（只读）<span class="lnk" data-act="toast" data-msg="原型：进入 CodeMirror 编辑契约，保存为幂等 upsert">编辑</span></div>
+    ${codeblk('sql · 只读，构建产物只能由 build 生成（D1）',x.sql)}</div>
+    <div class="blk"><div class="blk-t">${ic('box')}产物归属</div>
+    <div class="kv">
+      <span class="k2">_data.cpt</span><span class="v2" style="color:var(--c-cpt)">reportlets/order/data/order_data.cpt</span>
+      <span class="k2">数据集连接</span><span class="v2">${x.conn}</span>
+      <span class="k2">最近构建</span><span class="v2">${x.build}</span>
+    </div></div></div>`;
+  }else if(tab==='build'){
+    const g=x.gate;
+    const pb=W.res[S.proj].build;
+    const ec=g?g.findings.filter(f=>f.sev==='e').length:0, wc=g?g.findings.filter(f=>f.sev==='w').length:0;
+    body=`<div class="rp-body">
+    ${g?`<div class="banner err">${ic('cx')}<div><b>构建未通过：${ec} error / ${wc} warning</b><br>数据层整体未落盘，reportlets 保持上次产物（今天 14:30）。</div></div>`
+        :`<div class="banner ok">${ic('cck')}<div><b>构建通过</b>　质量门 0 error / 0 warning${pb?`，产物已落盘（${pb.t}）`:''}</div></div>`}
+    <div class="blk"><div class="blk-t">${ic('shield')}质量门 Findings${g?'':'（无）'}</div>
+    ${g?g.findings.map(f=>`<div class="finding sev-${f.sev}">
+      <span class="fx">${ic(f.sev==='e'?'cx':'alert')}</span>
+      <div><div class="fcode">${f.code}</div><div class="fmsg">${esc(f.msg)}</div><div class="floc">${esc(f.loc)} · 点击定位到契约字段</div></div>
+    </div>`).join(''):`<div style="font-size:11.5px;color:var(--tx3);padding:6px 2px">本次构建没有 findings。</div>`}
+    <div class="note wide" style="position:static;margin-top:6px"><b>D6 质量门</b>　error 一票否决拒绝落盘；findings 高频信息固定呈现，<b>无绕过入口</b></div></div>
+    <div class="blk"><div class="blk-t">${ic('term')}构建日志</div>
+    <div class="loglines">${g?g.log:((pb||{}).log)||'（暂无构建日志）'}</div></div>
+    <div class="blk"><div class="blk-t">${ic('box')}模块产物（D2 · 4.7 多连接）</div>
+    <div class="kv"><span class="k2">_data.cpt</span><span class="v2" style="color:var(--c-cpt)">${S.proj}/data/${S.proj}_data.cpt${pb?` · ${pb.ds} 数据集 · ${pb.size}`:''}</span>
+    <span class="k2">连接分布</span><span class="v2">${pb?pb.conns:'-'}</span>
+    <span class="k2">说明</span><span class="v2" style="font-family:var(--sans);color:var(--tx2)">一项目一 _data.cpt，页内每个 TableData 各自携带 DatabaseName</span></div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn pri" data-act="build">${ic('box')}${g?'修复后重新构建':'重新构建'}</button>
+      <button class="btn" data-act="verify">${ic('shield')}一键验收全部接口</button></div></div>`;
+  }else if(tab==='test'){
+    const t0=x.test;
+    body=`<div class="rp-body">
+    ${connDown?`<div class="banner warn">${ic('alert')}<div><b>实测不可用</b>：绑定连接 crm_db 不可达（connect ETIMEDOUT）。浏览与编辑不受影响，恢复连接后自动解禁。</div></div>`:
+      t0.st==='ok'?`<div class="banner ok">${ic('cck')}<div><b>err_code=0</b>　POST /webroot/decision/api/data（page_number/page_size 恒 -1，业务分页走参数）</div></div>`:
+      t0.st==='fail'?`<div class="banner err">${ic('cx')}<div><b>实测失败</b>　${t0.why||''}</div></div>`:
+      `<div class="banner info">${ic('info')}<div>尚未实测。用契约默认参数打真实帆软接口，err_code=0 才算通过。</div></div>`}
+    ${t0.st==='ok'?`<div class="blk"><div class="blk-t">${ic('clock')}最近一次实测</div>
+    <div class="kv"><span class="k2">时间</span><span class="v2">${t0.t}</span><span class="k2">行数</span><span class="v2">${t0.rows}</span><span class="k2">耗时</span><span class="v2">${t0.ms}ms</span><span class="k2">err_code</span><span class="v2" style="color:#7ee0a8">0</span>${t0.note?`<span class="k2">说明</span><span class="v2" style="font-family:var(--sans);color:var(--tx2)">${t0.note}</span>`:''}</div>
+    <div style="height:10px"></div>
+    <details class="resp"><summary>响应 JSON（截取前 2 行）</summary><pre>${hl(`{"err_code": 0, "data": [\n  {"id": 1024, "order_no": "SO-20260816-0042", "customer_name": "宏基建材", "amount": 18320.00, "status": "已付款"},\n  {"id": 1023, "order_no": "SO-20260816-0041", "customer_name": "蓝湾物流", "amount": 4210.50, "status": "新建"}\n], "page": {"number": -1, "size": -1}}`)}</pre></details></div>`:''}
+    <div class="blk"><div class="blk-t">${ic('clock')}测试历史（api_tests 只增不改）</div>
+    <div class="hist">${(x.tests||[]).map(t=>`<div class="hrow"><span class="hi">${ic(t[1]?'cck':'cx')}</span><div class="ht"><b>${t[1]?'err_code=0':'err_code=1'}</b>${t[4]?'　'+esc(t[4]):''}</div><div class="hm">${t[0]}<br>${t[2]} 行 ${t[3]}ms</div></div>`).join('')||'<div class="hrow"><div class="ht" style="color:#5d6675">暂无历史</div></div>'}</div></div>
+    <button class="btn pri" ${connDown?'disabled':''} data-act="test">${ic('play')}${connDown?'实测（连接不可达）':'再次实测'}</button></div>`;
+  }else{
+    const bs=W.res[S.proj].build;
+    const items=[
+      ...((x.tests||[]).map(t=>({i:t[1]?'cck':'cx',h:`<b>实测</b>　${t[1]?'err_code=0':'失败'}`,m:t[0]}))),
+      {i:'box',h:`<b>构建</b>　数据层 ${x.gate?'失败（'+x.gate.findings.filter(f=>f.sev==='e').length+' error）':'通过'}`,m:x.gate?'今天 15:20':bs.t},
+    ];
+    body=`<div class="rp-body"><div class="blk"><div class="blk-t">${ic('clock')}历史（构建 + 实测）</div>
+    <div class="hist">${items.map(t=>`<div class="hrow"><span class="hi">${ic(t.i)}</span><div class="ht">${t.h}</div><div class="hm">${t.m}</div></div>`).join('')}</div>
+    <div class="note wide" style="position:static;margin-top:8px">3.3：历史侧栏改为右栏内 tab，构建 / 实测 / 过程审计各自留痕（SQLite 只增不改）</div></div></div>`;
+  }
+  return `<div class="rp">${head}${tabsBar([{k:'detail',n:'详情'},{k:'build',n:'构建',bdg:x.gate?String(x.gate.findings.filter(f=>f.sev==='e').length):''},{k:'test',n:'实测'},{k:'hist',n:'历史'}],tab,key)}${body}</div>`;
+}
+
+/* --- 存储过程 --- */
+function rpSp(x){
+  const key='sp:'+x.n, tab=S.tab[key]||'def';
+  const linked=x.own==='lnk';
+  const head=`<div class="rp-head">
+    <div class="rp-r1"><span class="ttl">${esc(x.n)}</span>${linked?`<span class="pill-o warn">${ic('link')}关联</span>`:`<span class="pill-o ok">${ic('cck')}本项目</span>`}</div>
+    <div class="rp-r2">${linked?`<span class="tag lnk">${ic('link')}关联自「${x.src}」</span>`:`<span class="tag own">本项目创建</span>`}${connChip(x.conn)}<span style="font:10.5px/1 var(--mono);color:var(--tx3)">最后修改 ${x.mod} · ${x.audits} 次应用</span></div>
+    <div class="rp-acts">
+      <button class="btn dgr-o" data-act="modal" data-m="applyproc">${ic('box')}应用 DROP+CREATE</button>
+      <button class="btn" data-act="modal" data-m="callproc">${ic('play')}试执行 CALL</button>
+      <button class="btn acc-o" data-act="agent">${ic('ai')}用 Agent 做</button>
+      <button class="iconbtn" data-act="resmenu">${ic('dots')}</button></div>
+    ${linked?`<div class="banner info" style="margin-bottom:0">${ic('info')}<div><b>D3 关联引用，不复制</b>：定义来自「${x.src}」，应用（DROP+CREATE）作用于源连接 whjcbb，被 2 个项目引用。</div></div>`:''}
+  </div>`;
+  const sql=x.sql||'';
+  let body='';
+  if(tab==='def'){
+    body=`<div class="rp-body">
+    <div class="blk"><div class="blk-t">${ic('code')}过程定义（可编辑 · CodeMirror SQL）</div>
+    ${codeblk('sql · 应用时执行 DROP IF EXISTS + CREATE（幂等）',sql,`<span style="color:#5d6675">模板约定返回 SELECT JSON_OBJECT</span>`)}</div>
+    <div class="blk"><div class="blk-t">${ic('link')}复用</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm" data-act="modal" data-m="linkproc">${ic('link')}关联其他项目的过程</button>
+      ${linked?`<button class="btn sm dgr-o" data-act="toast" data-msg="原型：解除关联（二次确认），不影响源项目">${ic('x')}解除关联</button>`:''}
+      <button class="btn sm" data-act="toast" data-msg="原型：从模板新建过程（返回 SELECT JSON_OBJECT）">${ic('plus')}从模板新建</button></div></div></div>`;
+  }else if(tab==='call'){
+    body=`<div class="rp-body">
+    <div class="banner warn">${ic('alert')}<div><b>试执行是破坏性操作</b>：真实执行 CALL，将写入业务库并落审计。执行前需二次确认。</div></div>
+    <div class="blk"><div class="blk-t">${ic('play')}CALL 语句（可编辑）</div>
+    ${codeblk('sql',`-- 试执行：请使用可回滚的测试数据\nCALL ${x.n}('order', 1024, 'INSERT', 'kyynor');`,`<span class="lnk" data-act="modal" data-m="callproc">执行</span>`)}
+    <div style="height:10px"></div>
+    <div class="kv"><span class="k2">上次结果</span><span class="v2" style="color:#7ee0a8">{"err_code":0,"err_msg":"ok"} · 34ms</span><span class="k2">审计</span><span class="v2">ddl_log 已记录（语句 + 结果）</span></div></div></div>`;
+  }else{
+    body=`<div class="rp-body"><div class="blk"><div class="blk-t">${ic('term')}审计记录（ddl_log）</div>
+    <div class="hist">
+      <div class="hrow"><span class="hi">${ic('cck')}</span><div class="ht"><b>应用成功</b>　DROP IF EXISTS + CREATE，耗时 96ms</div><div class="hm">07-30 09:15</div></div>
+      <div class="hrow"><span class="hi">${ic('cck')}</span><div class="ht"><b>CALL 试执行</b>　操作人 kyynor，err_code=0</div><div class="hm">昨天 15:41</div></div>
+      <div class="hrow"><span class="hi">${ic('cx')}</span><div class="ht"><b>应用失败</b>　Duplicate procedure 变更冲突（已重试成功）</div><div class="hm">07-12 11:03</div></div>
+    </div></div></div>`;
+  }
+  return `<div class="rp">${head}${tabsBar([{k:'def',n:'定义'},{k:'call',n:'试执行'},{k:'audit',n:'审计'}],tab,key)}${body}</div>`;
+}
+
+/* --- 页面 --- */
+function rpPg(x){
+  const key='pg:'+x.n, tab=S.tab[key]||'src';
+  const stale=x.stale==='old';
+  const head=`<div class="rp-head">
+    <div class="rp-r1"><span class="ttl">${esc(x.n)}</span><span class="stale ${x.stale}">${stale?'cpt 落后 jsx · 待重建':'最新'}</span></div>
+    <div class="rp-r2"><span class="tag src">${x.scaf} 脚手架</span><span style="font:10.5px/1 var(--mono);color:var(--tx3)">${x.size} · 源码 ${x.mod}</span></div>
+    <div class="rp-acts">
+      <button class="btn pri" data-act="build">${ic('box')}${stale?'构建（待重建）':'构建'}</button>
+      <button class="btn" data-act="toast" data-msg="原型：独立窗口（或外部浏览器）打开帆软 op=write 预览">${ic('ext')}预览</button>
+      <button class="btn acc-o" data-act="agent">${ic('ai')}用 Agent 做</button>
+      <button class="iconbtn" data-act="resmenu" title="删除（连带 .mjs / .cpt，需确认）">${ic('dots')}</button></div>
+  </div>`;
+  let body='';
+  if(tab==='src'){
+    body=`<div class="rp-body">
+    <div class="blk"><div class="blk-t">${ic('code')}jsx 源码（CodeMirror javascript）<span class="lnk" data-act="toast" data-msg="原型：进入编辑态，保存后 staleness 变为待重建">编辑</span></div>
+    ${codeblk('javascript · 全流程唯一手写产物',x.src)}</div>
+    <div class="note wide" style="position:static"><b>页面运行约定</b>　jsx 直接用全局 React / antd / $ / PATH，不写 import、不重建 PATH、不自建 app-root，骨架负责兜底加载</div></div>`;
+  }else if(tab==='build'){
+    body=`<div class="rp-body">
+    <div class="blk"><div class="blk-t">${ic('box')}构建管线</div>
+    <div class="pipe">
+      <span class="pstep done"><span class="nd"><span class="bx">jsx</span><span class="lb">esbuild(iife)</span></span><span class="ar"></span></span>
+      <span class="pstep done"><span class="nd"><span class="bx">净化</span><span class="lb">去注释/解码</span></span><span class="ar"></span></span>
+      <span class="pstep done"><span class="nd"><span class="bx">注入</span><span class="lb">骨架代码区</span></span><span class="ar"></span></span>
+      <span class="pstep ${stale?'run':'done'}"><span class="nd"><span class="bx">门</span><span class="lb">质量门</span></span><span class="ar"></span></span>
+      <span class="pstep ${stale?'':'done'}"><span class="nd"><span class="bx">cpt</span><span class="lb">.mjs + .cpt</span></span></span>
+    </div>
+    ${stale?`<div class="banner warn">${ic('alert')}<div><b>待重建</b>：cpt mtime 落后于 jsx（源码 ${x.mod} 有改动）。质量门查 XML 良构 / PATH 遮盖 / _MJS_ 残留 / Unicode 转义 / 自创标签；有 error 则 .cpt 不落盘、.mjs 保留供排查。</div></div>`
+          :`<div class="banner ok">${ic('cck')}<div><b>最新</b>　上次构建 ${x.lastBuild.t}，质量门 0 error / 0 warning。</div></div>`}</div>
+    <div class="blk"><div class="blk-t">${ic('term')}上次构建日志</div>
+    <div class="loglines">${x.buildLog||`[${x.lastBuild.t}] 质量门通过，产出 .mjs + .cpt`}</div></div>
+    <button class="btn pri" data-act="build">${ic('box')}${stale?'构建（待重建）':'重新构建'}</button></div>`;
+  }else{
+    body=`<div class="rp-body">
+    <div class="blk"><div class="blk-t">${ic('ext')}预览（帆软 op=write）</div>
+    ${codeblk('url · 时间戳防缓存',`http://localhost:8075/webroot/decision/view/report?viewlet=${S.proj}/pages/${x.n.replace('.jsx','')}.cpt&op=write&t=1786636800000`,`<span class="lnk" data-act="toast" data-msg="原型：独立窗口（或外部浏览器）打开预览">打开预览</span>`)}
+    <div style="height:10px"></div>
+    <button class="btn pri" data-act="toast" data-msg="原型：独立窗口打开帆软预览">${ic('ext')}打开预览</button></div>
+    <div class="note wide" style="position:static"><b>4.4 页面全流程</b>　脚手架新建（blank / list / form）→ 编辑 jsx → 构建（质量门）→ 预览；删除连带 .mjs / .cpt 需确认</div></div>`;
+  }
+  return `<div class="rp">${head}${tabsBar([{k:'src',n:'源码'},{k:'build',n:'构建'},{k:'prev',n:'预览'}],tab,key)}${body}</div>`;
+}
+
+/* --- 文档 --- */
+function rpDoc(x){
+  const key='doc:'+x.n, tab=S.tab[key]||(x.type==='markdown'?'view':'src');
+  const head=`<div class="rp-head">
+    <div class="rp-r1"><span class="ttl reg">${esc(x.n)}</span></div>
+    <div class="rp-r2"><span class="tag src">${x.type==='markdown'?'Markdown':'SQL 源码'}</span><span style="font:10.5px/1 var(--mono);color:var(--tx3)">meta/ · ${x.mod}</span></div>
+    <div class="rp-acts">
+      <button class="btn" data-act="toast" data-msg="原型：重命名 / 编辑 / 删除（删除需确认）">${ic('pen')}编辑</button>
+      <button class="btn acc-o" data-act="agent">${ic('ai')}用 Agent 做</button>
+      <button class="iconbtn" data-act="resmenu">${ic('dots')}</button></div>
+  </div>`;
+  let body;
+  if(x.type==='markdown'){
+    body=tab==='view'
+      ?`<div class="rp-body"><div class="md">${x.md}</div>
+        <div class="note wide" style="position:static;margin-top:12px"><b>3.3 文档</b>　Markdown 渲染 / 源码双模式；Agent 可读取 meta/ 文档作为开发上下文</div></div>`
+      :`<div class="rp-body">${codeblk('markdown',`# ${x.n.replace('.md','').replace(/^\d+-/,'')}\n\n（源码编辑模式，略）`)}</div>`;
+  }else{
+    const sp=BASE.res.order.sps.find(s=>s.n===x.sqlRef);
+    body=`<div class="rp-body">${codeblk('sql · 存储过程创建语句（元数据）',sp?sp.sql:'-- 略')}
+    <div class="note wide" style="position:static;margin-top:10px"><b>D4</b>　过程创建语句存于项目 meta/ 目录，与库内实际定义互为备份</div></div>`;
+  }
+  return `<div class="rp">${head}${tabsBar(x.type==='markdown'?[{k:'view',n:'阅读'},{k:'src',n:'源码'}]:[{k:'src',n:'源码'}],tab,key)}${body}</div>`;
+}
+
+/* --- 项目总览（未选资源 / 空项目） --- */
+function rpProject(){
+  const p=W.projects.find(x=>x.id===S.proj)||{name:'-',dir:'-',conns:[]};
+  const c=counts(S.proj);
+  const empty=c.if+c.sp+c.pg+c.doc===0;
+  return `<div class="rp">
+  <div class="rp-head">
+    <div class="rp-r1"><span class="ttl reg">${esc(p.name)}</span></div>
+    <div class="rp-r2">${p.conns.map(cn=>connChip(cn)).join('')}<span style="font:10.5px/1 var(--mono);color:var(--tx3)">创建于 ${p.created}</span></div>
+    <div class="rp-acts">
+      <button class="btn" data-act="toast" data-msg="原型：一键验收 = 构建 + 实测模块内全部接口" ${empty?'disabled title="还没有接口可验证"':''}>${ic('shield')}一键验收</button>
+      <button class="btn pri" data-act="agent" ${empty?'':''}>${ic('ai')}${empty?'让 Agent 从需求开始':'用 Agent 做'}</button>
+      <button class="iconbtn" data-act="resmenu">${ic('dots')}</button></div>
+  </div>
+  <div class="rp-tabs"><button class="rtab on">总览</button>
+    <div class="note n-br" style="bottom:-2px">3.3：未选资源时右栏为项目面板</div></div>
+  <div class="rp-body">
+    <div class="blk"><div class="blk-t">${ic('folder')}项目信息</div>
+    <div class="kv"><span class="k2">绑定目录</span><span class="v2">${esc(p.dir)}</span>
+    <span class="k2">目录三分（D4）</span><span class="v2">data/（数据层产物）+ pages/（页面）+ meta/（文档与过程语句）</span>
+    <span class="k2">资源规模</span><span class="v2">接口 ${c.if} · 过程 ${c.sp} · 页面 ${c.pg} · 文档 ${c.doc}</span></div></div>
+    ${empty?`<div class="guide">
+      <div class="gstep done"><span class="no">✓</span><div><div class="gt2">创建项目</div><div class="gd">绑定目录与连接（whjcbb、crm_db）</div></div></div>
+      <div class="gstep"><span class="no">2</span><div><div class="gt2">建表与存储过程</div><div class="gd">数据先行：过程返回 SELECT JSON_OBJECT，或关联已有过程</div></div></div>
+      <div class="gstep"><span class="no">3</span><div><div class="gt2">接口契约 → 构建实测</div><div class="gd">err_code=0 之后才进入页面开发（顺序强约定）</div></div></div>
+      <div class="gstep"><span class="no">4</span><div><div class="gt2">页面 jsx → 构建 → 预览</div><div class="gd">脚手架起步，过质量门，帆软 op=write 预览</div></div></div>
+    </div>
+    <div class="banner info">${ic('ai')}<div><b>把需求文档交给 Agent</b>：在「文档」组新建或粘贴需求，然后点上方「让 Agent 从需求开始」。Agent 与手工共用同一工具链与质量门（D7）。</div></div>`
+    :`<div class="blk"><div class="blk-t">${ic('clock')}项目动态</div>
+    <div class="hist">
+      <div class="hrow"><span class="hi">${ic('box')}</span><div class="ht"><b>数据层构建通过</b>　5 数据集 · 2 连接</div><div class="hm">今天 14:30</div></div>
+      <div class="hrow"><span class="hi">${ic('cck')}</span><div class="ht"><b>order_insert 实测闭环</b>　插入→查到→删除</div><div class="hm">今天 14:35</div></div>
+      <div class="hrow"><span class="hi">${ic('pen')}</span><div class="ht"><b>order_list.jsx 被修改</b>　页面进入待重建</div><div class="hm">今天 15:02</div></div>
+    </div></div>`}
+  </div></div>`;
+}
+
+/* --- Agent 会话（D7 · 4.5） --- */
+function agentHTML(){
+  const r=S.sel?resById(S.sel):null;
+  const ctxName=r?r.n:(W.projects.find(p=>p.id===S.proj)||{}).name;
+  return `<div class="rp">
+  <div class="ag-head">
+    <button class="iconbtn" data-act="agentback" title="返回详情">${ic('back')}</button>
+    <span class="ttl">Agent 会话 #214</span>
+    <span class="tag own">OpenAI 兼容 · glm-4.6</span>
+    <button class="iconbtn" title="会话落 SQLite（agent_sessions），可回溯">${ic('clock')}</button>
+    <div class="note n-tr" style="top:-4px">D7：与手工共用同一工具链与质量门</div>
+  </div>
+  <div class="ag-ctx">
+    <span class="ctx-chip">项目 <b>订单管理</b></span>
+    <span class="ctx-chip">资源 <b>pg:${esc(ctxName)}</b></span>
+    <span class="ctx-chip">携带 jsx 源码 38 行</span>
+    <span class="ctx-chip">契约 order_qry（5 数据集）</span>
+  </div>
+  <div class="ag-thread">
+    <div class="msg-u"><div class="bub">给这个页面加一个导出按钮，导出当前查询结果为 Excel。</div></div>
+    <div class="msg-a">
+      <div class="who"><span class="av">${ic('ai')}</span>Agent · 正在处理</div>
+      <div class="txt">我先读取页面现状与可用接口，再动手。计划：1) 工具栏加「导出 Excel」按钮；2) 复用 order_qry 当前查询参数全量取数；3) 走构建过质量门后刷新状态。<span class="cursor"></span></div>
+    </div>
+    <div class="tool"><div class="tool-h"><span class="ti">${ic('code')}</span><span class="tn">read_page</span><span class="ta">{ page: "order_list.jsx" }</span><span class="ts ok">${ic('cck')}0.4s</span></div>
+      <div class="tool-b">38 行。检测到现有 columns 与查询区（Search + Table），无 import（符合运行约定）</div></div>
+    <div class="tool"><div class="tool-h"><span class="ti">${ic('db')}</span><span class="tn">list_datasets</span><span class="ta">{ module: "order" }</span><span class="ts ok">${ic('cck')}0.3s</span></div>
+      <div class="tool-b">5 个数据集。order_qry 支持分页与关键字，导出可复用（page_number=-1 全量）</div></div>
+    <div class="tool"><div class="tool-h"><span class="ti">${ic('pen')}</span><span class="tn">write_page</span><span class="ta">{ page: "order_list.jsx", +41 行 }</span><span class="ts ok">${ic('cck')}1.2s</span></div>
+      <div class="tool-b">工具栏新增导出按钮与 exportOrders()。与手工编辑共用同一写入口（无旁路）</div></div>
+    <div class="ag-event">${ic('alert')}<div>15:03　build_page 被质量门拒绝：<b>E303 发现自创标签 &lt;ExpotButton&gt;</b>（拼写错误）。已修正为 antd Button 重写后重试。<br><span style="color:var(--tx3)">错误 / 中断 / 超时事件均以时间线条目呈现，可展开看完整工具结果</span></div></div>
+    <div class="tool run"><div class="tool-h"><span class="ti">${ic('box')}</span><span class="tn">build_page</span><span class="ta">{ page: "order_list.jsx" }</span><span class="ts run"><svg class="ic spin"><use href="#i-spin"/></svg>运行中</span></div>
+      <div class="tool-b">esbuild → 净化 → 注入骨架 → 质量门 → .mjs + .cpt　<button class="btn sm dgr-o" style="margin-left:8px" data-act="toast" data-msg="原型：中断当前工具调用，会话标记「已中断」，可继续对话">${ic('stop')}中断</button></div></div>
+  </div>
+  <div class="ag-foot">
+    <div class="ag-inp">
+      <textarea rows="1" placeholder="继续描述你要的改动…"></textarea>
+      <button class="btn dgr-o" data-act="toast" data-msg="原型：中断当前回复（Esc），已产出的工具结果保留">${ic('stop')}停止</button>
+      <button class="btn pri" data-act="toast" data-msg="原型：发送指令，Agent 流式响应">${ic('send')}发送</button>
+    </div>
+    <div class="ag-tools"><span style="font:10.5px/1 var(--mono);color:var(--tx3)">流式文本 · 工具调用名与参数摘要 · 结果状态 · 可中断</span><span class="esc">Esc 中断</span></div>
+  </div></div>`;
+}
+
+/* ---------- 弹层 ---------- */
+function renderModal(){
+  const root=$('#modalRoot');
+  if(!S.modal){root.innerHTML='';return;}
+  const m=S.modal;
+  let html='';
+  if(m==='wizard'){
+    html=`<div class="mask" data-act="closemask"><div class="modal" data-stop>
+      <div class="m-h">${ic('folder')}<span class="mt">新建项目</span><button class="iconbtn" data-act="closemodal">${ic('x')}</button></div>
+      <div class="m-b">
+        <div class="wz-steps"><span class="ws on"></span><span class="ws"></span><span class="ws"></span></div>
+        <div class="fld"><label>项目名（= 目录名，仅 [a-z][a-z0-9_]*）</label><input type="text" value="stock" spellcheck="false"><div class="fh">将创建 reportlets 子目录；中文名不可用（会成为目录 / 文件名）</div></div>
+        <div class="fld"><label>绑定目录</label><input type="text" value="~/Projects/reportlets/stock" spellcheck="false"><div class="fh">应用直接原地读写 reportlets 目录（可浏览选择）</div></div>
+        <div class="fld"><label>勾选连接（可多选，来自「连接」注册表）</label>
+          <div class="cklist">
+            <div class="ck on"><span class="cbx"></span><b>whjcbb</b>　10.20.8.11:3306 / whjcbb<span class="ck-m">延迟 8ms</span></div>
+            <div class="ck on"><span class="cbx"></span><b>crm_db</b>　10.20.8.21:3306 / crm_prd<span class="ck-m">延迟 11ms</span></div>
+            <div class="ck" data-act="navstub" data-n="连接"><span class="cbx"></span>注册新连接…<span class="ck-m">跳「连接」</span></div>
+          </div><div class="fh">连接名与帆软设计器数据连接一致（D1：项目可绑定多个连接）</div></div>
+        <div class="fld"><label>目录结构（自动创建）</label>
+          <div class="tree">~/Projects/reportlets/stock/<br>├─ <span class="d">data/</span>　<span class="c">数据层产物（构建生成 _data.cpt）</span><br>├─ <span class="d">pages/</span>　<span class="c">页面 jsx 源码与 .mjs/.cpt 产物</span><br>└─ <span class="d">meta/</span>　<span class="c">需求 / 设计文档、过程创建语句</span></div>
+          <div class="fh">D4：项目目录三分。meta/ 不被帆软模板扫描影响（命名待实现期定）</div></div>
+      </div>
+      <div class="m-f"><span class="m-note">3.1 新建入口（向导）：名称 + 绑定目录 + 多连接勾选</span>
+        <button class="btn" data-act="closemodal">取消</button>
+        <button class="btn pri" data-act="toast" data-msg="原型：创建项目并进入空工作台（见「空项目」场景）">创建项目</button></div>
+    </div></div>`;
+  }else if(m==='applyproc'){
+    const sp=resById('sp:sp_common_log')||{n:'sp_common_log'};
+    html=`<div class="mask" data-act="closemask"><div class="modal" data-stop>
+      <div class="m-h" style="color:#f5a29c">${ic('alert')}<span class="mt">应用存储过程（破坏性操作）</span><button class="iconbtn" data-act="closemodal">${ic('x')}</button></div>
+      <div class="m-b">
+        <div class="effects">
+          将在连接 <b>whjcbb</b> 上执行：<br>
+          <code>DROP PROCEDURE IF EXISTS \`sp_common_log\`;</code><br>
+          <code>CREATE PROCEDURE \`sp_common_log\`(...) ...</code><br>
+          影响范围：被 <b>系统基础 / 订单管理</b> 两个项目引用；执行瞬间若有并发 CALL 会失败。<br>
+          审计：语句与结果全量落 <b>ddl_log</b>（只增不改）。
+        </div>
+        <div class="fld" style="margin-top:13px"><label>输入过程名以确认</label><input type="text" placeholder="sp_common_log" spellcheck="false"></div>
+      </div>
+      <div class="m-f"><span class="m-note">第7章：DROP+CREATE 需二次确认；删除资源、CALL 试执行同款弹层</span>
+        <button class="btn" data-act="closemodal">取消</button>
+        <button class="btn dgr" data-act="toast" data-msg="原型：已应用（DROP+CREATE），审计已落 ddl_log" data-close="1">确认应用</button></div>
+    </div></div>`;
+  }else if(m==='callproc'){
+    html=`<div class="mask" data-act="closemask"><div class="modal" data-stop>
+      <div class="m-h" style="color:#e8c377">${ic('play')}<span class="mt">试执行 CALL（真实执行）</span><button class="iconbtn" data-act="closemodal">${ic('x')}</button></div>
+      <div class="m-b">
+        <div class="effects">将真实执行并写入业务库（whjcbb）：<br><code>CALL sp_common_log('order', 1024, 'INSERT', 'kyynor');</code><br>结果与审计同落 ddl_log / api_tests。</div>
+        <div class="fld" style="margin-top:13px"><label>CALL 语句（可编辑）</label><input type="text" value="CALL sp_common_log('order', 1024, 'INSERT', 'kyynor');" spellcheck="false"></div>
+      </div>
+      <div class="m-f"><span class="m-note">第7章：试执行 CALL 属破坏性操作，需二次确认</span>
+        <button class="btn" data-act="closemodal">取消</button>
+        <button class="btn dgr" data-act="toast" data-msg="原型：CALL 已执行，结果 JSON 呈现在「试执行」tab" data-close="1">执行 CALL</button></div>
+    </div></div>`;
+  }else if(m==='linkproc'){
+    html=`<div class="mask" data-act="closemask"><div class="modal" data-stop>
+      <div class="m-h">${ic('link')}<span class="mt">关联其他项目的过程</span><button class="iconbtn" data-act="closemodal">${ic('x')}</button></div>
+      <div class="m-b">
+        <div class="fld"><label>选择项目</label>
+          <div class="cklist">
+            <div class="ck on"><span class="cbx"></span><b>系统基础</b>　whjcbb<span class="ck-m">6 个过程</span></div>
+            <div class="ck"><span class="cbx"></span><b>库存盘点</b>　（空）<span class="ck-m">0 个过程</span></div>
+          </div></div>
+        <div class="fld"><label>选择过程</label>
+          <div class="cklist">
+            <div class="ck on"><span class="cbx"></span><b>sp_common_log</b>　通用操作日志<span class="ck-m">34 次应用</span></div>
+            <div class="ck"><span class="cbx"></span><b>sp_dict_sync</b>　字典同步<span class="ck-m">5 次应用</span></div>
+            <div class="ck"><span class="cbx"></span><b>sp_user_reset</b>　用户密码重置<span class="ck-m">2 次应用</span></div>
+          </div></div>
+        <div class="banner info">${ic('info')}<div><b>D3 关联 = 引用，不复制</b>：定义仍归源项目管理；在本项目接口 SQL 里可直接 CALL。解除关联不影响源项目。</div></div>
+      </div>
+      <div class="m-f"><span class="m-note">4.6 共用存储过程：新建写接口时关联已有 sp_xxx</span>
+        <button class="btn" data-act="closemodal">取消</button>
+        <button class="btn pri" data-act="toast" data-msg="原型：已关联，中栏「存储过程」组出现关联条目" data-close="1">关联</button></div>
+    </div></div>`;
+  }
+  root.innerHTML=html;
+}
+
+/* ---------- toast / popover ---------- */
+function toast(msg,close){
+  if(close)S.modal=null,renderModal();
+  const el=document.createElement('div');el.className='toast';el.innerHTML=msg;
+  $('#toasts').appendChild(el);
+  setTimeout(()=>{el.style.transition='opacity .3s';el.style.opacity='0';setTimeout(()=>el.remove(),320)},2600);
+}
+function pop(x,y,items){
+  const p=$('#pop');
+  p.innerHTML=items.map(i=>i.div?`<div class="pdiv"></div>`:
+    `<div class="pi${i.dgr?' dgr':''}" ${i.attrs||`data-act="${i.act}"${i.m?` data-m="${i.m}"`:''}${i.msg?` data-msg="${esc(i.msg)}"`:''}${i.k?` data-k="${i.k}"`:''}`}>${ic(i.i)}${i.t}<small>${i.s||''}</small></div>`).join('');
+  p.style.display='block';
+  const r=p.getBoundingClientRect();
+  p.style.left=Math.min(x,innerWidth-r.width-10)+'px';
+  p.style.top=Math.min(y,innerHeight-r.height-10)+'px';
+}
+
+/* ---------- 总渲染 ---------- */
+function renderAll(){
+  renderLeft();renderMiddle();renderRight();renderModal();
+  const p=W.projects.find(x=>x.id===S.proj);
+  $('#wbProject').textContent=p?p.name:'项目';
+  $('#wbDir').textContent=p?p.dir:'';
+  $('#wbDir').style.display=p?'':'none';
+  $('#wbConns').innerHTML=p?p.conns.map(cn=>`<span class="cbadge${W.conns[cn].st==='down'?' off':''}">${ic('db')}${cn}</span>`).join(''):'';
+  $('#pcName').textContent=p?p.name:'选择项目';
+  $('#tbCrm').innerHTML=`<span class="dot ${W.conns.crm_db.st==='ok'?'g':'r'}"></span>crm_db <span style="color:#5d6675">${W.conns.crm_db.st==='ok'?'11ms':'超时'}</span>`;
+  $('#tnCrm').innerHTML=`<span class="dot ${W.conns.crm_db.st==='ok'?'g':'r'}"></span>crm_db`;
+  $('#tbSub').textContent=S.agent?'Agent 会话':'项目工作台';
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener('click',e=>{
+  const pm=e.target.closest('[data-stop]');if(pm)return;
+  const el=e.target.closest('[data-act]');
+  $('#pop').style.display='none';
+  if(!el)return;
+  const a=el.dataset.act;
+  if(a==='sc')enterScene(el.dataset.s);
+  else if(a==='nav'){document.body.classList.toggle('navB',el.dataset.d==='B');
+    $$('.seg [data-act=nav]').forEach(b=>b.classList.toggle('on',b.dataset.d===el.dataset.d));}
+  else if(a==='width'){document.body.classList.toggle('narrow',el.dataset.w==='1024');
+    $$('.seg [data-act=width]').forEach(b=>b.classList.toggle('on',b.dataset.w===el.dataset.w));}
+  else if(a==='notes'){document.body.classList.toggle('notes');
+    el.classList.toggle('on',document.body.classList.contains('notes'));}
+  else if(a==='proj'){S.proj=el.dataset.p;S.sel=null;S.agent=false;renderAll();}
+  else if(a==='sel'){S.sel=el.dataset.id;S.agent=false;renderRight();
+    $$('#midScroll .row').forEach(r=>r.classList.toggle('on',r.dataset.id===el.dataset.id));}
+  else if(a==='tab'){S.tab[el.dataset.k]=el.dataset.t;renderRight();}
+  else if(a==='grp'){S.collapsed[el.dataset.g]=!S.collapsed[el.dataset.g];renderMiddle();}
+  else if(a==='agent'){S.agent=true;renderAll();}
+  else if(a==='agentback'){S.agent=false;renderAll();}
+  else if(a==='modal'){S.modal=el.dataset.m;renderModal();}
+  else if(a==='closemodal'){S.modal=null;renderModal();}
+  else if(a==='closemask'){if(e.target.classList.contains('mask')){S.modal=null;renderModal();}}
+  else if(a==='toast'){toast(el.dataset.msg,el.dataset.close);}
+  else if(a==='build'){toast('原型：执行构建 → 质量门。error 拒绝落盘（无绕过入口，D6）；成功后中栏状态刷新');}
+  else if(a==='test'){toast('原型：POST /webroot/decision/api/data（page_number/page_size 恒 -1），err_code=0 才算通过');}
+  else if(a==='verify'){toast('原型：一键验收 = 构建 + 实测模块内全部接口（verify），逐条回填状态');}
+  else if(a==='sort'){toast('原型：组内排序（名称 / 时间 / 状态）');}
+  else if(a==='newres'){
+    const k=el.dataset.k;
+    if(k==='pgs'){const r=el.getBoundingClientRect();pop(r.left,r.bottom+6,[
+      {i:'file',t:'blank 脚手架',s:'空白页',act:'toast',msg:'原型：创建 blank 脚手架页面'},
+      {i:'file',t:'list 脚手架',s:'列表页',act:'toast',msg:'原型：创建 list 脚手架页面（Search + Table + 分页）'},
+      {i:'file',t:'form 脚手架',s:'表单页',act:'toast',msg:'原型：创建 form 脚手架页面'},]);return;}
+    const names={ifs:['数据接口','登记契约（名称 / 类型 / 参数 / SQL）'],sps:['存储过程','从模板起步，返回 SELECT JSON_OBJECT'],docs:['文档','Markdown 需求 / 设计文档']};
+    const n=names[k];toast(`原型：新建${n[0]}，${n[1]}`);
+  }
+  else if(a==='resmenu'){
+    const r=el.getBoundingClientRect();pop(r.left-140,r.bottom+6,[
+      {i:'pen',t:'编辑',s:'',act:'toast',msg:'原型：进入编辑（CodeMirror / Markdown）'},
+      {i:'box',t:'重新构建',act:'build'},
+      {i:'ext',t:'复制名称',act:'toast',msg:'原型：已复制'},
+      {div:1},
+      {i:'trash',t:'删除（需确认）',act:'toast',msg:'原型：删除弹二次确认层；页面删除连带 .mjs / .cpt'},]);
+  }
+  else if(a==='projmenu'){
+    e.stopPropagation();
+    const r=el.getBoundingClientRect();pop(r.left-120,r.bottom+6,[
+      {i:'set',t:'项目设置',s:'改绑定连接 / 注释',act:'toast',msg:'原型：项目设置（改绑定连接、目录、注释）'},
+      {i:'scan',t:'重新扫描目录',act:'toast',msg:'原型：以 reportlets 实际文件刷新账本'},
+      {div:1},
+      {i:'trash',t:'删除项目（需确认）',act:'toast',msg:'原型：输入项目名二次确认；仅解除管理，可选保留产物'},]);
+  }
+  else if(a==='projpop'){
+    const r=el.getBoundingClientRect();
+    pop(r.left,r.bottom+6,
+      W.projects.map(p=>{const c=counts(p.id);return{i:'folder',t:p.name,s:`接口${c.if} 过程${c.sp}`,attrs:`data-act="proj2" data-p="${p.id}"`};})
+      .concat([{div:1},{i:'plus',t:'新建项目…',s:'3.1',act:'modal',m:'wizard'}]));
+  }
+  else if(a==='proj2'){S.proj=el.dataset.p;S.sel=null;renderAll();}
+  else if(a==='newmenu'){
+    const r=el.getBoundingClientRect();pop(r.left,r.bottom+6,[
+      {i:'db',t:'数据接口',s:'3.2-1',act:'newres',k:'ifs'},
+      {i:'term',t:'存储过程',s:'3.2-2',act:'newres',k:'sps'},
+      {i:'code',t:'页面',s:'3.2-3',act:'newres',k:'pgs'},
+      {i:'file',t:'文档',s:'3.2-4',act:'newres',k:'docs'},
+      {div:1},
+      {i:'folder',t:'新建项目…',s:'3.1',act:'modal',m:'wizard'},]);
+  }
+  else if(a==='navstub'){toast(`原型：本原型聚焦「项目」工作台，「${el.dataset.n}」入口仅占位（五入口见导航 A/B 切换）`);}
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='q'){S.search=e.target.value;renderMiddle();}
+});
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,textarea'))return;
+  const map={'1':'cold','2':'default','3':'empty','4':'gate','5':'agent','6':'unreach','7':'confirm'};
+  if(map[e.key])enterScene(map[e.key]);
+  if(e.key==='n'||e.key==='N'){document.body.classList.toggle('notes');$('[data-act=notes]').classList.toggle('on',document.body.classList.contains('notes'));}
+  if(e.key==='Escape'){S.modal=null;renderModal();}
+});
+
+/* 测试钩子（供自动截图） */
+window.__wb={setScenario:enterScene,setNav:d=>{document.body.classList.toggle('navB',d==='B');},setWidth:w=>{document.body.classList.toggle('narrow',w==='1024');},setNotes:on=>{document.body.classList.toggle('notes',on);}};
+
+enterScene('default');
+</script>
+</body>
+</html>

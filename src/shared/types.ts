@@ -1,6 +1,41 @@
 /**
- * 共享类型定义（main / renderer / agent 工具共用）
+ * 共享类型定义（main / renderer / agent 工具共用）· v2 项目制
  */
+
+// ── 数据连接（注册表，与帆软数据连接一一对应） ──────────────────
+
+export interface DbConnection {
+  id: number
+  name: string          // 与帆软设计器里的数据连接同名（写入 _data.cpt 的 DatabaseName）
+  host: string
+  port: string
+  user: string
+  password: string
+  database: string
+  comment: string
+  createdAt: string
+}
+
+export interface ConnectionHealth {
+  name: string
+  reachable: boolean
+  latencyMs?: number
+  version?: string
+  error?: string
+}
+
+// ── 项目 ────────────────────────────────────────────────────────
+
+export interface Project {
+  id: number
+  name: string          // = reportlets 子目录名 [a-z][a-z0-9_]*
+  comment: string
+  createdAt: string
+  dir: string           // reportlets/{name} 绝对路径
+  missingDir: boolean   // 目录被移动/删除
+  connections: string[] // 绑定的连接名
+  counts: { ifs: number; sps: number; pgs: number; docs: number }
+}
 
 // ── 接口（数据集）契约 ──────────────────────────────────────────
 
@@ -24,24 +59,22 @@ export type DatasetKind =
 
 export interface Dataset {
   id: number
-  moduleId: number
+  projectId: number
   name: string
   kind: DatasetKind
   comment: string
   params: DatasetParam[]
   sql: string
+  connection: string    // 所属连接名（从项目绑定清单中选）
   updatedAt: string
 }
 
-export interface Module {
-  id: number
-  name: string
-  datasource: string
-  comment: string
-  createdAt: string
+export interface DatasetStatus {
+  test: { st: 'ok' | 'fail' | 'unreach' | 'none'; t?: string; rows?: number; ms?: number; ec?: number | null; why?: string }
+  build?: string        // 最近构建时间（项目级，同组共享）
 }
 
-// ── 构建 / 测试记录 ─────────────────────────────────────────────
+// ── 构建记录 ────────────────────────────────────────────────────
 
 export interface CheckerFinding {
   rule: string
@@ -59,23 +92,24 @@ export interface BuildResult {
   log: string[]
 }
 
-export interface ApiTestResult {
+// ── 存储过程（归属项目；可被其他项目关联） ──────────────────────
+
+export interface ProcRecord {
   id: number
-  moduleId: number | null
-  datasetId: number | null
-  datasetName: string
-  request: unknown
-  response: unknown
-  ok: boolean
-  errCode?: number | null
-  durationMs: number
-  createdAt: string
+  projectId: number          // 拥有者项目
+  connection: string
+  name: string
+  comment: string
+  updatedAt: string
+  own: boolean               // 视图语义：本项目创建（true）/ 关联自其他项目（false）
+  srcProject?: string        // own=false 时的来源项目名
+  appliedCount: number       // ddl_log 中应用次数
 }
 
 // ── 页面 ────────────────────────────────────────────────────────
 
 export interface PageMeta {
-  module: string
+  project: string
   name: string       // 不含扩展名
   jsxExists: boolean
   mjsExists: boolean
@@ -84,6 +118,17 @@ export interface PageMeta {
   cptMtime?: number  // cpt 早于 jsx 则需要重新构建
   stale: boolean
   size?: number
+  lastBuildAt?: string
+  lastBuildOk?: boolean
+}
+
+// ── 文档（项目 meta/ 元数据） ───────────────────────────────────
+
+export interface DocMeta {
+  name: string       // 含扩展名（.md / .sql）
+  type: 'markdown' | 'sql' | 'other'
+  size: number
+  mtime: number
 }
 
 // ── 设置 ────────────────────────────────────────────────────────
@@ -91,11 +136,6 @@ export interface PageMeta {
 export interface AppSettings {
   frServerUrl: string
   reportletsPath: string
-  mysqlHost: string
-  mysqlPort: string
-  mysqlUser: string
-  mysqlPassword: string
-  mysqlDatabase: string
   llmProvider: 'openai' | 'anthropic'
   llmBaseUrl: string
   llmApiKey: string
@@ -105,40 +145,13 @@ export interface AppSettings {
 export interface StatusPayload {
   frReachable: boolean
   frLatencyMs?: number
-  mysqlReachable: boolean
-  mysqlLatencyMs?: number
-  mysqlVersion?: string
   reportletsWritable: boolean
   reportletsPath: string
-  database: string
-  counts: { modules: number; datasets: number; pages: number; procedures: number }
-}
-
-// ── 存储过程 ────────────────────────────────────────────────────
-
-export interface ProcedureMeta {
-  name: string
-  database: string
-  definer: string
-  created: string
-  altered: string
-  comment: string
+  connections: ConnectionHealth[]
+  counts: { projects: number; datasets: number; pages: number; procedures: number; docs: number }
 }
 
 // ── Agent ───────────────────────────────────────────────────────
-
-export type AgentEvent =
-  | { type: 'text-delta'; text: string }
-  | { type: 'tool-call'; tool: string; args: unknown; callId: string }
-  | { type: 'tool-result'; tool: string; result: unknown; callId: string }
-  | { type: 'finish'; finishReason: string; usage?: unknown }
-  | { type: 'error'; message: string }
-
-export interface AgentMessage {
-  id: number
-  sessionId: number
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  toolJson?: string | null
-  createdAt: string
-}
+// Agent 引擎为 pi（渲染层 @earendil-works/pi-agent-core + pi-web-ui），
+// 会话持久化走 IndexedDB（官方 SessionsStore），平台工具经 piBridge 的
+// pi:toolDefs / pi:toolExec IPC 通道回主进程执行——详见 src/main/agent/。

@@ -1,67 +1,79 @@
-import React, { useState } from 'react'
-import { Layout, Menu, Typography, Tag } from 'antd'
-import {
-  DashboardOutlined, ApiOutlined, DatabaseOutlined, CodeOutlined,
-  RobotOutlined, SettingOutlined
-} from '@ant-design/icons'
+import React, { useEffect, useState } from 'react'
+import { Icon } from './components/Icon'
+import { call } from './api'
+import type { StatusPayload } from '@shared/types'
 import DashboardView from './views/DashboardView'
-import DatasetsView from './views/DatasetsView'
-import ProceduresView from './views/ProceduresView'
-import PagesView from './views/PagesView'
+import WorkbenchView from './views/workbench'
+import ConnectionsView from './views/ConnectionsView'
 import AgentView from './views/AgentView'
 import SettingsView from './views/SettingsView'
 
-const { Sider, Header, Content } = Layout
+type ViewKey = 'dashboard' | 'workbench' | 'connections' | 'agent' | 'settings'
 
-type ViewKey = 'dashboard' | 'datasets' | 'procedures' | 'pages' | 'agent' | 'settings'
-
-const ITEMS: Array<{ key: ViewKey; icon: React.ReactNode; label: string }> = [
-  { key: 'dashboard', icon: <DashboardOutlined />, label: '总览' },
-  { key: 'datasets', icon: <ApiOutlined />, label: '数据接口' },
-  { key: 'procedures', icon: <DatabaseOutlined />, label: '存储过程' },
-  { key: 'pages', icon: <CodeOutlined />, label: '页面' },
-  { key: 'agent', icon: <RobotOutlined />, label: 'Agent' },
-  { key: 'settings', icon: <SettingOutlined />, label: '设置' }
+const ITEMS: Array<{ key: ViewKey; icon: string; label: string }> = [
+  { key: 'dashboard', icon: 'dash', label: '总览' },
+  { key: 'workbench', icon: 'folder', label: '项目（工作台）' },
+  { key: 'connections', icon: 'db', label: '连接' },
+  { key: 'agent', icon: 'ai', label: 'Agent' },
+  { key: 'settings', icon: 'set', label: '设置' }
 ]
 
-const VALID_VIEWS: ViewKey[] = ['dashboard', 'datasets', 'procedures', 'pages', 'agent', 'settings']
+const VALID_VIEWS: string[] = ['dashboard', 'workbench', 'connections', 'agent', 'settings', 'datasets', 'procedures', 'pages']
 
-/** 支持以 #view 打开指定视图（如 #agent），供深链与冒烟验收使用 */
+/** 支持以 #view 打开指定视图（如 #agent），供深链与冒烟验收使用；旧视图名映射到工作台 */
 function initialView(): ViewKey {
   const h = window.location.hash.replace(/^#/, '')
-  return (VALID_VIEWS as string[]).includes(h) ? (h as ViewKey) : 'dashboard'
+  if (!VALID_VIEWS.includes(h)) return 'dashboard'
+  if (['datasets', 'procedures', 'pages'].includes(h)) return 'workbench'
+  return h as ViewKey
 }
 
-export default function App() {
+export default function App(): React.ReactElement {
   const [view, setView] = useState<ViewKey>(initialView)
+  const [status, setStatus] = useState<StatusPayload | null>(null)
+
+  const refreshStatus = async () => {
+    try { setStatus(await call<StatusPayload>('status:get')) } catch { /* 总览页会展示错误 */ }
+  }
+  useEffect(() => {
+    void refreshStatus()
+    const t = setInterval(() => void refreshStatus(), 30000)
+    return () => clearInterval(t)
+  }, [view])
 
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Sider width={190} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
-        <div style={{ padding: '18px 16px 10px' }}>
-          <Typography.Text strong style={{ fontSize: 16 }}>Report Console</Typography.Text>
-          <div style={{ marginTop: 2 }}>
-            <Tag color="blue" style={{ fontSize: 11 }}>帆软加壳开发控制台</Tag>
-          </div>
+    <div className="app-frame">
+      <header className="titlebar">
+        {/* macOS 红绿灯由 trafficLightPosition 停在此区；Windows/Linux 用系统 overlay */}
+        <div className="lights" />
+        <span className="tb-title">Report Console</span>
+        <span className="tb-sub">{ITEMS.find((i) => i.key === view)?.label ?? ''}</span>
+        <div className="tb-right">
+          <span className="tb-chip"><span className={`dot ${status?.frReachable ? 'g' : 'r'}`} />帆软 {status?.frLatencyMs !== undefined ? `${status.frLatencyMs}ms` : '…'}</span>
+          {(status?.connections ?? []).slice(0, 3).map((c) => (
+            <span key={c.name} className="tb-chip"><span className={`dot ${c.reachable ? 'g' : 'r'}`} />{c.name}{c.reachable && c.latencyMs !== undefined ? ` ${c.latencyMs}ms` : !c.reachable ? ' 不可达' : ''}</span>
+          ))}
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[view]}
-          onClick={({ key }) => setView(key as ViewKey)}
-          items={ITEMS}
-          style={{ borderInlineEnd: 'none' }}
-        />
-      </Sider>
-      <Layout>
-        <Content style={{ overflow: 'auto', background: '#f5f6f8' }}>
-          {view === 'dashboard' && <DashboardView onNavigate={(v) => setView(v as ViewKey)} />}
-          {view === 'datasets' && <DatasetsView />}
-          {view === 'procedures' && <ProceduresView />}
-          {view === 'pages' && <PagesView />}
-          {view === 'agent' && <AgentView />}
-          {view === 'settings' && <SettingsView />}
-        </Content>
-      </Layout>
-    </Layout>
+      </header>
+
+      <div className="app-body">
+        <nav className="rail">
+          <div className="logo"><Icon n="box" /></div>
+          {ITEMS.map((it) => (
+            <button key={it.key} className={`rail-it${view === it.key ? ' on' : ''}`} onClick={() => setView(it.key)}>
+              <Icon n={it.icon} />
+              <span className="tip">{it.label}<small>⌘{ITEMS.findIndex((x) => x.key === it.key) + 1}</small></span>
+            </button>
+          ))}
+          <span className="spring" />
+        </nav>
+
+        {view === 'dashboard' && <DashboardView onNavigate={(v) => setView(v as ViewKey)} />}
+        {view === 'workbench' && <WorkbenchView />}
+        {view === 'connections' && <ConnectionsView onChanged={refreshStatus} />}
+        {view === 'agent' && <AgentView />}
+        {view === 'settings' && <SettingsView onSaved={refreshStatus} />}
+      </div>
+    </div>
   )
 }

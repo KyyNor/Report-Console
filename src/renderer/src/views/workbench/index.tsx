@@ -257,9 +257,6 @@ export default function WorkbenchView(): React.ReactElement {
           <div className="colhead">
             <span className="t">项目</span>
             <span className="sub">{projects.length ? `${projects.length} 个` : ''}</span>
-            <span className="grow" />
-            <button className="iconbtn" title="打开本地项目（含 project.json 的目录）" onClick={() => void openLocalProject()}><Icon n="folderOpen" /></button>
-            <button className="iconbtn" title="新建项目" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" /></button>
           </div>
           <div className="cl-list">
             {projects.length === 0 && (

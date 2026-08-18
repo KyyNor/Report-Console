@@ -3,8 +3,8 @@
  * SQLite 只保存“本机是否已添加这个目录”及本机连接/设置；绝不保存资源布局。
  */
 
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
-import { basename, extname, join, relative, resolve, sep } from 'path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
 import { parse, stringify } from 'yaml'
 import { getDb, getSettings } from './db'
 import type { DatasetKind, DatasetParam, TraditionalCptMeta } from '@shared/types'
@@ -156,6 +156,19 @@ export function manifestPath(root: string): string {
   return join(root, PROJECT_MANIFEST)
 }
 
+/** 旧版固定布局中，pages/ 下的 JSX 曾是唯一的页面源文件。 */
+function appendLegacyPages(root: string, manifest: ProjectManifest): void {
+  const pagesDir = join(root, 'pages')
+  if (!existsSync(pagesDir)) return
+  for (const file of readdirSync(pagesDir)) {
+    if (extname(file) !== '.jsx') continue
+    const id = basename(file, '.jsx')
+    if (NAME_RE.test(id) && !manifest.managed.pages.some((page) => page.id === id)) {
+      manifest.managed.pages.push({ id, jsx: `pages/${id}.jsx`, mjs: `pages/${id}.mjs`, cpt: `pages/${id}.cpt` })
+    }
+  }
+}
+
 /** 兼容旧 project.json：读取后在下次写入时升级为 project.yaml。 */
 export function readManifest(root: string): ProjectManifest {
   const yamlPath = manifestPath(root)
@@ -172,14 +185,7 @@ export function readManifest(root: string): ProjectManifest {
       const manifest = createManifest(old.name, old.comment ?? '', old.connections ?? [])
       // v2 固定布局项目的无损兼容：把旧 pages/ 下已有 JSX 识别为受管页面，
       // 但不扫描或收录任意传统 CPT。
-      const pagesDir = join(root, 'pages')
-      if (existsSync(pagesDir)) {
-        for (const file of readdirSync(pagesDir)) {
-          if (extname(file) !== '.jsx') continue
-          const id = basename(file, '.jsx')
-          if (NAME_RE.test(id)) manifest.managed.pages.push({ id, jsx: `pages/${id}.jsx`, mjs: `pages/${id}.mjs`, cpt: `pages/${id}.cpt` })
-        }
-      }
+      appendLegacyPages(root, manifest)
       return manifest
     } catch (e) {
       throw new Error(`${LEGACY_CONFIG} 解析失败：${(e as Error).message}`)
@@ -214,7 +220,26 @@ export function reportletFile(project: string, projectRelativePath: string): str
 }
 
 export function manifestForProject(name: string): ProjectManifest {
-  return readManifest(projectRoot(name))
+  const root = projectRoot(name)
+  try {
+    return readManifest(root)
+  } catch (error) {
+    // v2 初版项目没有 project.json，资源布局仅保存在固定的 pages/ 目录中。
+    // 仅对本机已注册项目做一次无损升级；已有但损坏的清单仍应报错，不能静默覆盖。
+    if (existsSync(manifestPath(root)) || existsSync(join(root, LEGACY_CONFIG))) throw error
+    const project = getDb().prepare('SELECT id, name, comment FROM projects WHERE name=?').get(name) as { id: number; name: string; comment: string } | undefined
+    if (!project || !existsSync(root)) throw error
+    const connections = (getDb().prepare(`
+      SELECT c.name FROM connections c
+      JOIN project_connections pc ON pc.connection_id=c.id
+      WHERE pc.project_id=? ORDER BY c.name
+    `).all(project.id) as Array<{ name: string }>).map((x) => x.name)
+    const migrated = createManifest(project.name, project.comment, connections)
+    appendLegacyPages(root, migrated)
+    // 目录只读时仍返回推导结果，保证旧项目可浏览；可写时落盘使它可迁移。
+    try { writeManifest(root, migrated) } catch { /* 由后续编辑操作报告目录不可写 */ }
+    return migrated
+  }
 }
 
 export function resolveProjectFile(root: string, path: string): string {
@@ -250,6 +275,45 @@ export function removeManagedPage(project: string, id: string): void {
   manifest.managed.pages = manifest.managed.pages.filter((x) => x.id !== id)
   if (before === manifest.managed.pages.length) throw new Error(`页面不存在：${id}`)
   writeManifest(root, manifest)
+}
+
+/**
+ * 修改受管页面的三种路径，并将已存在的受管文件一并移动。
+ * 未被清单声明的既有文件（特别是传统 CPT）绝不允许被覆盖。
+ */
+export function updateManagedPagePaths(project: string, id: string, next: Omit<ManagedPage, 'id'>): void {
+  const root = projectRoot(project)
+  const manifest = manifestForProject(project)
+  const index = manifest.managed.pages.findIndex((x) => x.id === id)
+  if (index < 0) throw new Error(`页面不存在：${id}`)
+  const current = manifest.managed.pages[index]
+  const candidate: ProjectManifest = {
+    ...manifest,
+    managed: { ...manifest.managed, pages: manifest.managed.pages.map((x) => x.id === id ? { id, ...next } : x) }
+  }
+  // 复用清单校验（相对路径、扩展名、同一页面三路径不重复）。
+  const checked = normalize(candidate)
+  const all = checked.managed.pages.flatMap((x) => [x.jsx, x.mjs, x.cpt])
+  if (new Set(all).size !== all.length) throw new Error('受管页面之间的 JSX / MJS / CPT 路径不能重复')
+  const oldPaths = new Set([current.jsx, current.mjs, current.cpt])
+  const moves: Array<{ from: string; to: string; label: string }> = [
+    { from: current.jsx, to: next.jsx, label: 'JSX' },
+    { from: current.mjs, to: next.mjs, label: 'MJS' },
+    { from: current.cpt, to: next.cpt, label: 'CPT' }
+  ].filter((x) => x.from !== x.to)
+  for (const move of moves) {
+    const destination = resolveProjectFile(root, move.to)
+    // 目标若不是本页面当前受管文件，即使是传统 CPT 也不能被覆盖。
+    if (existsSync(destination) && !oldPaths.has(move.to)) throw new Error(`${move.label} 目标已存在，拒绝覆盖未受管文件：${move.to}`)
+  }
+  for (const move of moves) {
+    const source = resolveProjectFile(root, move.from)
+    if (!existsSync(source)) continue
+    const destination = resolveProjectFile(root, move.to)
+    mkdirSync(dirname(destination), { recursive: true })
+    renameSync(source, destination)
+  }
+  writeManifest(root, checked)
 }
 
 /** 未在 project.yaml 的 managed 产物中声明的 CPT，全部视为传统 CPT。 */

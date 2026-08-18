@@ -592,10 +592,13 @@ export default function WorkbenchView(): React.ReactElement {
       )}
       {modal?.k === 'projsettings' && curProject && (
         <ProjectSettingsModal
-          name={curProject.name} comment={curProject.comment} dir={curProject.dir} connections={curProject.connections} allConns={conns}
+          name={curProject.name} comment={curProject.comment} dir={curProject.dir} connections={curProject.connections} allConns={conns} pages={pages}
           onClose={() => setModal(null)}
-          onSave={async (comment, cs, dir) => {
+          onSave={async (comment, cs, dir, pagePaths) => {
             await call('projects:update', { id: curProject.id, comment, connections: cs, dir })
+            for (const page of pagePaths) {
+              await call('pages:updatePaths', { project: curProject.name, page: page.name, paths: { jsx: page.jsx, mjs: page.mjs, cpt: page.cpt } })
+            }
             toast('项目设置已保存', 'ok')
             setModal(null)
             await refresh()

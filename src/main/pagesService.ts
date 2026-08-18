@@ -9,7 +9,7 @@ import { getDb } from './db'
 import { compileJsx, generatePageCpt } from './cpt/displayWriter'
 import { checkPageCpt, hasError } from './cpt/checker'
 import { previewPageUrl } from './frClient'
-import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, type ManagedPage } from './projectManifest'
+import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPagePaths, type ManagedPage } from './projectManifest'
 import type { PageMeta, BuildResult } from '@shared/types'
 import pageTemplateRaw from './templates/base_cpt_page.cpt?raw'
 import starterBlank from './templates/starters/blank.jsx?raw'
@@ -111,6 +111,11 @@ export function deletePage(projectName: string, pageName: string): void {
   const paths = pagePaths(projectName, pageForProject(projectName, pageName))
   for (const path of [paths.jsx, paths.mjs, paths.cpt]) if (existsSync(path)) unlinkSync(path)
   removeManagedPage(projectName, pageName)
+}
+
+export function updatePagePaths(projectName: string, pageName: string, paths: Omit<ManagedPage, 'id'>): void {
+  assertName(projectName); assertName(pageName)
+  updateManagedPagePaths(projectName, pageName, paths)
 }
 
 // ── 构建 ────────────────────────────────────────────────────────

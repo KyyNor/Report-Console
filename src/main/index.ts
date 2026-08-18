@@ -21,6 +21,17 @@ function bootstrap(): void {
       const waitMs = Number(process.env.SMOKE_WAIT_MS) || 2500
       setTimeout(async () => {
         try {
+          // 仅供界面验收：打开工作台的项目设置弹层后再截图。
+          if (process.env.SMOKE_OPEN_PROJECT_SETTINGS) {
+            const clicked = await win.webContents.executeJavaScript(`(() => {
+              const button = Array.from(document.querySelectorAll('button')).find((node) => node.getAttribute('title') === '项目设置')
+              if (!button) return false
+              button.click()
+              return true
+            })()`) as boolean
+            if (!clicked) console.warn('[smoke] project settings button not found')
+            await new Promise((resolve) => setTimeout(resolve, 250))
+          }
           const info = await win.webContents.executeJavaScript(`(async () => {
             const p = document.querySelector('.rc-chat')
             const text = p ? (p.textContent || '') : ''

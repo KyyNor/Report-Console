@@ -148,6 +148,10 @@ export function registerIpc(): void {
   handle('pages:save', (a) => { pages.savePage((a as { project: string }).project, (a as { page: string }).page, (a as { content: string }).content); return true })
   handle('pages:create', (a) => { pages.createPage((a as { project: string }).project, (a as { page: string }).page, (a as { starter: 'blank' | 'list' | 'form' }).starter ?? 'blank'); return true })
   handle('pages:delete', (a) => { pages.deletePage((a as { project: string }).project, (a as { page: string }).page); return true })
+  handle('pages:updatePaths', (a) => {
+    pages.updatePagePaths((a as { project: string }).project, (a as { page: string }).page, (a as { paths: { jsx: string; mjs: string; cpt: string } }).paths)
+    return true
+  })
   handle('pages:build', (a) => pages.buildPage((a as { project: string }).project, (a as { page: string }).page))
   handle('pages:previewUrl', (a) => pages.pagePreviewUrl((a as { project: string }).project, (a as { page: string }).page))
   handle('pages:open', (a) => {

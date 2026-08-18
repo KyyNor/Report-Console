@@ -46,7 +46,7 @@ const PROJECT_TOOLS = new Set([
   'list_datasets', 'read_dataset', 'save_dataset', 'delete_dataset', 'build_data_cpt', 'test_dataset',
   'list_procedures', 'read_procedure', 'save_procedure', 'apply_procedure',
   'list_docs', 'read_doc', 'write_doc',
-  'list_pages', 'read_page', 'write_page', 'create_page', 'build_page', 'open_page'
+  'list_pages', 'read_page', 'write_page', 'create_page', 'update_page_paths', 'build_page', 'open_page'
 ])
 const SQL_TOOLS = new Set(['sql_query', 'sql_exec', 'list_tables', 'describe_table'])
 

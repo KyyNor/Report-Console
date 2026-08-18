@@ -94,7 +94,7 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   agentCtx: { project: string; resource?: string } | null
   onExitAgent: () => void
 }): React.ReactElement {
-  if (agentMode) return <AgentPanel ctx={agentCtx} project={ctx.project} data={data} />
+  if (agentMode) return <AgentPanel ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} />
   const { sel } = ctx
   const r = sel ? sel : null
   if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} />
@@ -601,7 +601,12 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
-function AgentPanel({ ctx, project, data }: { ctx: { project: string; resource?: string } | null; project: Project | null; data: WBData }): React.ReactElement {
+function AgentPanel({ ctx, project, data, onProjectSettings }: {
+  ctx: { project: string; resource?: string } | null
+  project: Project | null
+  data: WBData
+  onProjectSettings: () => void
+}): React.ReactElement {
   const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const options = useMemo(() => resourceAttachments(data), [data.datasets, data.procs, data.pages, data.docs, data.traditionalCpts])
@@ -637,6 +642,7 @@ function AgentPanel({ ctx, project, data }: { ctx: { project: string; resource?:
       <div className="ag-head">
         <span className="ttl">Agent 会话</span>
         {state.handle && <span className="ctx-chip" title={`当前项目：${project?.name ?? '-'}；模型在「设置」页配置`}>{state.handle.modelId} · {project?.name}</span>}
+        {project && <button className="iconbtn" title="项目设置" onClick={onProjectSettings}><Icon n="set" /></button>}
       </div>
       <div className="ag-thread-wrap" style={{ padding: '8px 10px 10px', display: 'flex' }}>
         {state.error

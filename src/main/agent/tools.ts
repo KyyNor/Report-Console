@@ -188,6 +188,24 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
       execute: async ({ project, page, starter }) => { pages.createPage(project, page, starter); return { ok: true } }
     }),
 
+    update_page_paths: tool({
+      description: `修改已受管页面的 JSX / MJS / CPT 项目内相对路径，并移动已有受管文件。
+仅在用户明确要求调整目录或产物位置时调用；不会覆盖传统 CPT 或其他未受管文件。必须 confirm=true。`,
+      parameters: z.object({
+        project: z.string(),
+        page: z.string(),
+        jsx: z.string().min(5).describe('项目根目录内的 .jsx 相对路径'),
+        mjs: z.string().min(5).describe('项目根目录内的 .mjs 相对路径'),
+        cpt: z.string().min(5).describe('项目根目录内的 .cpt 相对路径'),
+        confirm: z.literal(true).describe('确认移动现有受管文件并修改 project.yaml')
+      }),
+      execute: async ({ project, page, jsx, mjs, cpt, confirm }) => {
+        if (!confirm) return { ok: false, error: '需要 confirm=true' }
+        pages.updatePagePaths(project, page, { jsx, mjs, cpt })
+        return { ok: true, page, paths: { jsx, mjs, cpt } }
+      }
+    }),
+
     build_page: tool({
       description: '编译页面：jsx → esbuild → 净化 → 注入骨架 → 同目录产出 .mjs 和 .cpt（质量门不过则 CPT 不落盘）',
       parameters: z.object({ project: z.string(), page: z.string() }),

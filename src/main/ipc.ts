@@ -12,7 +12,7 @@ import { piToolDefs, piToolExec } from './agent/piBridge'
 import { listBuiltinSkills } from './agent/skills'
 import { promptScenarios } from '@shared/agentPrompt'
 import { pingFrServer, callApiData } from './frClient'
-import { openPreviewWindow } from './windows'
+import { collectPreviewDataLogs, evaluatePreviewSql, openPreviewWindow } from './windows'
 import * as checkpoints from './checkpointService'
 import type { AppSettings, StatusPayload } from '@shared/types'
 import { existsSync, accessSync, constants } from 'fs'
@@ -228,6 +228,8 @@ export function registerIpc(): void {
     openPreviewWindow(url, { project, page })
     return url
   })
+  handle('preview:dataLogs', (a) => collectPreviewDataLogs((a as { project: string }).project, (a as { page?: string }).page))
+  handle('preview:evaluateSql', (a) => evaluatePreviewSql((a as { project: string }).project, (a as { page: string }).page, (a as { callId: number }).callId))
 
   // ── 开发检查点（RC 本地版本历史）──────────────────────
   handle('versions:list', (a) => checkpoints.listCheckpoints((a as { project: string }).project))

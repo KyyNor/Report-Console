@@ -8,6 +8,9 @@ import {
   fineReportDataError, isFineReportDataUrl, previewDiagnostics,
   type PreviewDiagnosticReport, type PreviewScope
 } from './previewDiagnostics'
+import { applyFormulaResults, fineReportFormulaExpressions, previewDataLogs } from './previewDataLogs'
+import { pageForProject } from './projectManifest'
+import type { PreviewDataReport } from '@shared/types'
 
 export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -57,7 +60,7 @@ interface PreviewEntry {
   load: Promise<void>
   debuggerAttached: boolean
   debuggerReady: boolean
-  cdpRequests: Map<string, { method: string; url: string; requestBody?: string; status?: number }>
+  cdpRequests: Map<string, { logId: number; method: string; url: string; requestBody?: string; status?: number }>
 }
 
 interface PendingDataRequest {
@@ -66,6 +69,7 @@ interface PendingDataRequest {
   method: string
   url: string
   requestBody?: string
+  logId: number
 }
 
 const previewWindows = new Map<string, PreviewEntry>()
@@ -85,7 +89,7 @@ function uploadBody(uploadData: Array<{ bytes?: Buffer }> | undefined): string |
   if (!uploadData?.length) return undefined
   const text = uploadData.flatMap((part) => part.bytes ? [Buffer.from(part.bytes).toString('utf8')] : []).join('')
   if (!text) return undefined
-  return text.length > 2_000 ? `${text.slice(0, 2_000)}…（截断）` : text
+  return text
 }
 
 /** 通过 Electron 网络层持续采集 data 接口的 HTTP 4xx/5xx 与网络失败。 */
@@ -96,12 +100,15 @@ function installDataCapture(session: Session): void {
   session.webRequest.onBeforeRequest(filter, (details, callback) => {
     const entry = previewByWebContents.get(details.webContentsId ?? -1)
     if (entry && isFineReportDataUrl(details.url)) {
+      const requestBody = uploadBody(details.uploadData)
+      const logId = previewDataLogs.startOrReuse(entry.scope, entry.win.webContents.id, { method: details.method, url: details.url, requestBody })
       pendingDataRequests.set(requestKey(details.id), {
         scope: entry.scope,
         windowId: entry.win.webContents.id,
         method: details.method,
         url: details.url,
-        requestBody: uploadBody(details.uploadData)
+        requestBody,
+        logId
       })
     }
     callback({})
@@ -109,7 +116,9 @@ function installDataCapture(session: Session): void {
   session.webRequest.onCompleted(filter, (details) => {
     const request = pendingDataRequests.get(requestKey(details.id))
     pendingDataRequests.delete(requestKey(details.id))
-    if (!request || details.statusCode < 400) return
+    if (!request) return
+    previewDataLogs.complete(request.logId, { status: details.statusCode })
+    if (details.statusCode < 400) return
     const entry = previewByWebContents.get(request.windowId)
     // CDP 可读取响应正文时由它记录；DevTools 打开或 CDP 不可用时退回 HTTP 层。
     if (entry?.debuggerReady) return
@@ -126,6 +135,7 @@ function installDataCapture(session: Session): void {
     const request = pendingDataRequests.get(requestKey(details.id))
     pendingDataRequests.delete(requestKey(details.id))
     if (!request) return
+    previewDataLogs.complete(request.logId, { networkError: details.error })
     previewDiagnostics.record(request.scope, request.windowId, {
       kind: 'data_error',
       message: `FineReport data 接口请求失败：${details.error}`,
@@ -206,8 +216,11 @@ function attachPreviewListeners(entry: PreviewEntry): void {
     if (method === 'Network.requestWillBeSent') {
       const request = data.request as { url?: string; method?: string; postData?: string } | undefined
       if (typeof data.requestId === 'string' && request?.url && isFineReportDataUrl(request.url)) {
-        entry.cdpRequests.set(data.requestId, {
+        const logId = previewDataLogs.startOrReuse(entry.scope, win.webContents.id, {
           method: request.method ?? 'POST', url: request.url, requestBody: request.postData
+        })
+        entry.cdpRequests.set(data.requestId, {
+          logId, method: request.method ?? 'POST', url: request.url, requestBody: request.postData
         })
       }
       return
@@ -230,6 +243,7 @@ function attachPreviewListeners(entry: PreviewEntry): void {
         const response = result as { body?: unknown; base64Encoded?: unknown }
         const rawBody = typeof response.body === 'string' ? response.body : ''
         const body = response.base64Encoded === true ? Buffer.from(rawBody, 'base64').toString('utf8') : rawBody
+        previewDataLogs.complete(request.logId, { status: request.status, responseBody: body })
         const message = fineReportDataError(request.status ?? 0, body)
         if (!message) return
         previewDiagnostics.record(entry.scope, win.webContents.id, {
@@ -239,6 +253,7 @@ function attachPreviewListeners(entry: PreviewEntry): void {
       })
       .catch(() => {
         if (win.isDestroyed()) return
+        previewDataLogs.complete(request.logId, { status: request.status })
         if ((request.status ?? 0) < 400) return
         previewDiagnostics.record(entry.scope, win.webContents.id, {
           kind: 'data_error', message: `FineReport data 接口返回 HTTP ${request.status}`,
@@ -269,6 +284,7 @@ function attachPreviewListeners(entry: PreviewEntry): void {
 
 function navigatePreview(entry: PreviewEntry, url: string): void {
   previewDiagnostics.begin(entry.scope, url, entry.win.webContents.id)
+  previewDataLogs.begin(entry.scope, url, entry.win.webContents.id)
   entry.cdpRequests.clear()
   attachDiagnosticsDebugger(entry)
   entry.load = entry.win.loadURL(url).catch(() => undefined)
@@ -300,6 +316,7 @@ export function openPreviewWindow(url: string, scope: PreviewScope): BrowserWind
   const windowId = win.webContents.id
   win.on('closed', () => {
     previewDiagnostics.close(entry.scope, windowId)
+    previewDataLogs.close(entry.scope, windowId)
     previewByWebContents.delete(windowId)
     for (const [id, request] of pendingDataRequests) if (request.windowId === windowId) pendingDataRequests.delete(id)
     previewWindows.delete(key)
@@ -310,6 +327,45 @@ export function openPreviewWindow(url: string, scope: PreviewScope): BrowserWind
 
 export function collectPreviewErrors(project: string, page?: string): PreviewDiagnosticReport {
   return previewDiagnostics.collect(project, page)
+}
+
+export function collectPreviewDataLogs(project: string, page?: string): PreviewDataReport {
+  return previewDataLogs.collect(project, page)
+}
+
+/**
+ * 在对应桌面预览窗口中显式计算一条日志的帆软公式片段。
+ * 这是调试 SQL，不是数据库 general log；移动 SPA 禁止二次 remoteEvaluate，避免挂起。
+ */
+export async function evaluatePreviewSql(project: string, page: string, callId: number): Promise<{ sql: string; source: 'template' | 'FR.remoteEvaluate' }> {
+  const call = previewDataLogs.call(project, page, callId)
+  if (!call?.sqlPrepared) throw new Error('该调用无法匹配当前项目的接口契约 SQL')
+  if (pageForProject(project, page).platform === 'mobile') {
+    const message = '移动 SPA 中重复调用 FR.remoteEvaluate 可能挂起；已保留 SQL 模板与参数代入表达式，不执行公式求值。'
+    previewDataLogs.resolve(callId, undefined, message)
+    throw new Error(message)
+  }
+  const expressions = fineReportFormulaExpressions(call.sqlPrepared)
+  if (expressions.length === 0) {
+    previewDataLogs.resolve(callId, call.sqlPrepared)
+    return { sql: call.sqlPrepared, source: 'template' }
+  }
+  const entry = previewWindows.get(previewKey({ project, page }))
+  if (!entry || entry.win.isDestroyed()) throw new Error('对应预览窗口已关闭，无法执行 FR.remoteEvaluate；请重新打开页面后重试')
+  const script = `(() => {
+    if (typeof FR === 'undefined' || typeof FR.remoteEvaluate !== 'function') throw new Error('当前页面没有 FR.remoteEvaluate');
+    const expressions = ${JSON.stringify(expressions)};
+    return Promise.all(expressions.map((expression) => Promise.resolve(FR.remoteEvaluate('=' + expression))));
+  })()`
+  try {
+    const values = await entry.win.webContents.executeJavaScript(script) as unknown[]
+    const sql = applyFormulaResults(call.sqlPrepared, values)
+    previewDataLogs.resolve(callId, sql)
+    return { sql, source: 'FR.remoteEvaluate' }
+  } catch (error) {
+    previewDataLogs.resolve(callId, undefined, (error as Error).message)
+    throw error
+  }
 }
 
 /** open_page 使用：等待主页面完成及一小段异步初始化，再返回本轮初始错误。 */

@@ -8,7 +8,7 @@ import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
-import type { AgentMode, Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
+import type { AgentMode, Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff, PreviewDataCall, PreviewDataReport, PreviewDataSession } from '@shared/types'
 import { buildUnifiedLineDiff } from '@shared/textDiff'
 
 export interface WBData {
@@ -87,7 +87,7 @@ function connChip(c: string): React.ReactElement {
 
 // ── 主入口 ──────────────────────────────────────────────────────
 
-export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExitAgent, onShowVersions, onResourcesChanged }: {
+export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExitAgent, onShowVersions, onShowDataLogs, onResourcesChanged }: {
   ctx: SelCtx
   data: WBData
   acts: WBActs
@@ -95,10 +95,11 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   agentCtx: { project: string; resource?: string; nonce?: number } | null
   onExitAgent: () => void
   onShowVersions: () => void
+  onShowDataLogs: () => void
   onResourcesChanged?: () => void
 }): React.ReactElement {
   // 项目切换必须卸载旧会话面板：附件、输入草稿和聊天快照都不能跨项目保留。
-  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onShowVersions={onShowVersions} onResourcesChanged={onResourcesChanged} />
+  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onShowVersions={onShowVersions} onShowDataLogs={onShowDataLogs} onResourcesChanged={onResourcesChanged} />
   const { sel } = ctx
   const r = sel ? sel : null
   if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
@@ -166,9 +167,10 @@ function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; da
           <button className="iconbtn" title="删除项目（需确认）" onClick={acts.deleteProject}><Icon n="trash" /></button>
         </div>
       </div>
-      <TabsBar tabs={[{ k: 'ov', n: '总览' }, { k: 'versions', n: '版本' }]} cur={tab} onSelect={(next) => ctx.setTab(key, next)} />
+      <TabsBar tabs={[{ k: 'ov', n: '总览' }, { k: 'versions', n: '版本' }, { k: 'dataLogs', n: 'Data 日志' }]} cur={tab} onSelect={(next) => ctx.setTab(key, next)} />
       <div className="rp-body">
         {tab === 'versions' && <VersionPanel project={p} onRestored={onResourcesChanged} />}
+        {tab === 'dataLogs' && <DataLogPanel project={p} />}
         {tab === 'ov' && <>
         <div className="blk">
           <div className="blk-t"><Icon n="folder" />项目信息</div>
@@ -204,6 +206,96 @@ function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; da
       </div>
     </div>
   )
+}
+
+// ── 预览 Data API 日志 ─────────────────────────────────────────
+
+function prettyJson(text?: string): string {
+  if (!text) return '—'
+  try { return JSON.stringify(JSON.parse(text), null, 2) } catch { return text }
+}
+
+function dataCallState(item: PreviewDataCall): { label: string; cls: string } {
+  if (item.networkError) return { label: '网络错误', cls: 'bad' }
+  if (item.status === undefined) return { label: '进行中', cls: 'run' }
+  if (item.status >= 400) return { label: `HTTP ${item.status}`, cls: 'bad' }
+  if (item.responseBody) {
+    try {
+      const response = JSON.parse(item.responseBody) as Record<string, unknown>
+      const code = response.errorCode ?? response.err_code
+      if (code !== undefined && String(code) !== '0') return { label: `业务错误 ${String(code)}`, cls: 'bad' }
+    } catch { /* 非 JSON 响应只按 HTTP 状态展示 */ }
+  }
+  return { label: `HTTP ${item.status}`, cls: 'ok' }
+}
+
+function DataLogPanel({ project }: { project: Project }): React.ReactElement {
+  const [report, setReport] = useState<PreviewDataReport | null>(null)
+  const [open, setOpen] = useState<number | null>(null)
+  const [busy, setBusy] = useState<number | null>(null)
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const next = await call<PreviewDataReport>('preview:dataLogs', { project: project.name })
+        if (alive) setReport(next)
+      } catch (e) { if (alive) setNote((e as Error).message) }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 1_500)
+    return () => { alive = false; window.clearInterval(timer) }
+  }, [project.name])
+
+  const rows = useMemo(() => (report?.sessions.flatMap((session) => session.calls.map((item) => ({ session, item }))) ?? [])
+    .sort((a, b) => b.item.at.localeCompare(a.item.at)), [report])
+
+  const resolveSql = async (session: PreviewDataSession, item: PreviewDataCall) => {
+    setBusy(item.id)
+    setNote('')
+    try {
+      const next = await call<{ sql?: string; error?: string }>('preview:evaluateSql', { project: project.name, page: session.page, callId: item.id })
+      setNote(next.error || '已通过当前桌面预览窗口计算帆软公式。')
+      const updated = await call<PreviewDataReport>('preview:dataLogs', { project: project.name })
+      setReport(updated)
+    } catch (e) { setNote((e as Error).message) } finally { setBusy(null) }
+  }
+
+  return <div className="data-log-panel">
+    <div className="banner info"><Icon n="info" /><div><b>当前预览会话的 Data API 调用</b><br />记录按项目、页面和预览窗口隔离，只保存在本次应用进程。SQL 来自当前项目接口契约；“公式求值 SQL”是利用桌面预览页的 <span className="mono">FR.remoteEvaluate</span> 生成的调试视图，不等同于数据库 general log。</div></div>
+    {project.platform !== 'desktop' && <div className="banner warn"><Icon n="alert" /><div>移动端页面不自动调用 <span className="mono">FR.remoteEvaluate</span>，避免其同步求值造成页面卡死；仍会显示 SQL 模板和已代入请求参数的公式表达式。双端项目的桌面页面可正常解析。</div></div>}
+    {note && <div className="vp-note">{note}</div>}
+    {!rows.length ? <div className="nores">还没有 Data API 调用。请先打开项目页面并触发查询。</div> : <div className="data-log-list">
+      {rows.map(({ session, item }) => {
+        const state = dataCallState(item)
+        const expanded = open === item.id
+        return <div className="data-log-call" key={`${session.windowId}:${item.id}`}>
+          <button className="data-log-summary" onClick={() => setOpen(expanded ? null : item.id)}>
+            <span className={`data-log-status ${state.cls}`}>{state.label}</span>
+            <span className="data-log-name">{item.datasourceName || '未识别数据集'}</span>
+            <span className="data-log-page">{session.page}</span>
+            <span className="data-log-time">{fmtTime(item.at)}{item.durationMs !== undefined ? ` · ${item.durationMs}ms` : ''}</span>
+            <Icon n={expanded ? 'up' : 'down'} size={12} />
+          </button>
+          {expanded && <div className="data-log-detail">
+            <div className="data-log-meta"><b>报告</b><span className="mono">{item.reportPath || '—'}</span><b>请求</b><span className="mono">{item.method} {item.url}</span></div>
+            {item.sqlTemplate ? <>
+              <CodeBlk title="接口契约 SQL" body={item.sqlTemplate} />
+              {item.sqlPrepared && item.sqlPrepared !== item.sqlTemplate && <CodeBlk title="参数代入后的帆软公式" body={item.sqlPrepared} />}
+              {item.sqlResolved && <CodeBlk title="公式求值 SQL（调试）" body={item.sqlResolved} />}
+              {item.sqlResolutionError && <div className="banner warn"><Icon n="alert" /><div>{item.sqlResolutionError}</div></div>}
+              {!session.closedAt && <button className="btn sm" disabled={busy === item.id} onClick={() => void resolveSql(session, item)}><Icon n="term" />{busy === item.id ? '求值中…' : '解析公式 SQL'}</button>}
+            </> : <div className="banner warn"><Icon n="alert" /><div>未在当前项目接口契约中找到 <span className="mono">{item.datasourceName || '该数据集'}</span>，因此只展示网络请求，不读取其他项目。</div></div>}
+            <div className="data-log-pair">
+              <div><CodeBlk title="请求体" body={prettyJson(item.requestBody)} /></div>
+              <div><CodeBlk title="响应体" body={item.networkError || prettyJson(item.responseBody)} /></div>
+            </div>
+          </div>}
+        </div>
+      })}
+    </div>}
+  </div>
 }
 
 // ── 开发检查点 ──────────────────────────────────────────────────
@@ -742,12 +834,13 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
-function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onResourcesChanged }: {
+function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onShowDataLogs, onResourcesChanged }: {
   ctx: { project: string; resource?: string; nonce?: number } | null
   project: Project | null
   data: WBData
   onProjectSettings: () => void
   onShowVersions: () => void
+  onShowDataLogs: () => void
   onResourcesChanged?: () => void
 }): React.ReactElement {
   const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
@@ -803,6 +896,7 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onR
           <button className={mode === 'discussion' ? 'on' : ''} disabled={state.handle.agent.state.isStreaming} onClick={() => { state.handle?.setMode('discussion'); setMode('discussion') }}>讨论需求</button>
         </span>}
         {project && <button className="btn sm" title="查看本项目的开发检查点与源码变更" onClick={onShowVersions}><Icon n="clock" size={13} />版本</button>}
+        {project && <button className="btn sm" title="查看当前预览会话的 Data API 请求、响应与调试 SQL" onClick={onShowDataLogs}><Icon n="term" size={13} />Data 日志</button>}
         {state.handle && <button className="btn sm" title="在当前项目中开始空白会话" onClick={newSession}><Icon n="plus" size={13} />新建会话</button>}
         {project && <button className="iconbtn" title="项目设置" onClick={onProjectSettings}><Icon n="set" /></button>}
       </div>

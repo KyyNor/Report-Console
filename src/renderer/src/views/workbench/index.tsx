@@ -479,6 +479,12 @@ export default function WorkbenchView(): React.ReactElement {
               setAgentMode(false)
               setTab(`project:${cur}`, 'versions')
             }}
+            onShowDataLogs={() => {
+              if (!cur) return
+              setSel(null)
+              setAgentMode(false)
+              setTab(`project:${cur}`, 'dataLogs')
+            }}
             onResourcesChanged={() => { void refresh() }}
           />
         </aside>

@@ -140,6 +140,54 @@ export interface TraditionalCptMeta {
   mtime: number
 }
 
+// ── 预览窗口 Data API 调用日志（进程内、按项目/页面隔离） ────────
+
+export interface PreviewDataParameter {
+  name: string
+  type?: string
+  value?: unknown
+}
+
+export interface PreviewDataCall {
+  id: number
+  at: string
+  completedAt?: string
+  durationMs?: number
+  method: string
+  url: string
+  status?: number
+  requestBody?: string
+  responseBody?: string
+  networkError?: string
+  reportPath?: string
+  datasourceName?: string
+  parameters?: PreviewDataParameter[]
+  sqlTemplate?: string
+  /** 请求参数已代入帆软公式表达式，但尚未由 FR.remoteEvaluate 求值。 */
+  sqlPrepared?: string
+  /** 桌面预览窗口显式执行 FR.remoteEvaluate 后得到的调试 SQL。 */
+  sqlResolved?: string
+  sqlResolutionError?: string
+}
+
+export interface PreviewDataSession {
+  project: string
+  page: string
+  url: string
+  windowId: number
+  openedAt: string
+  lastActivityAt: string
+  closedAt?: string
+  calls: PreviewDataCall[]
+}
+
+export interface PreviewDataReport {
+  project: string
+  page?: string
+  totalCalls: number
+  sessions: PreviewDataSession[]
+}
+
 // ── 文档（项目 meta/ 元数据） ───────────────────────────────────
 
 export interface DocMeta {

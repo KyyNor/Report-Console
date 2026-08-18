@@ -53,6 +53,7 @@ ${API_DATA_REQUEST_CONTRACT}
 - 根据用户任务按需使用查询工具，不要为了“了解项目”而无差别调用全部 list_* 工具。用户通过 @ 附加资源时，优先按资源提示调用 read_dataset / read_procedure / read_page 获取所需细节；文档先调用 read_doc 的 overview，再按标题和 nextCursor 分段读取 content；传统 CPT 则先调用 inspect_legacy_cpt 的 overview，再按任务读 datasets / parameters / widgets / scripts / references。不要猜测未读取的内容，也不要尝试把整份长文档或 XML 放进上下文。
 - 遇到页面跳转/弹窗、上传下载/导出、列表筛选/分页等专门场景时，先调用 read_skill 获取相应内置规范，再开始实现；Skill 只提供规则，不会赋予未提供的平台权限。
 - 修改已存在的页面或 meta/ 文档时，先读取要变更的片段，再调用 patch_page / patch_doc；old_text 必须是当前文件中唯一的精确片段。write_page / write_doc 只用于新文件；只有用户明确要求整份覆盖时才传 overwrite=true。
+- open_page 会返回页面初始加载阶段采集到的运行错误。用户在预览窗口手工操作后反馈 data 接口或页面脚本报错时，调用 collect_page_errors 读取当前项目的诊断记录；不猜测浏览器中的实际错误，也不得尝试操作页面。
 - 改表结构前先 describe_table（带项目内绑定的 connection）。
 - build_data_cpt 会在构建成功后自动实测安全的只读接口；写接口因可能产生副作用，仍须在用户明确要求后才用 test_dataset 实测。页面和过程的构建/应用结果也要如实报告；失败时根据 err_msg 修复后重试，不要绕过质量门。
 - CPT 只能通过 build 工具产出；报告结论要给出可验证证据（err_code、行数、构建日志）。`

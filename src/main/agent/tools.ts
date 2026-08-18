@@ -251,13 +251,31 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     open_page: tool({
-      description: '构建（如有变更）并用帆软 URL 打开页面预览（op=write + 时间戳防缓存）',
-      parameters: z.object({ project: z.string(), page: z.string() }),
-      execute: async ({ project, page }) => {
-        const { openPreviewWindow } = await import('../windows')
+      description: '用帆软 URL 打开页面预览，并等待初始加载后返回本轮捕获的 data 接口 HTTP 4xx/5xx、网络失败、JS error 与页面加载错误。用户可在窗口中手工操作；此工具不代替 build_page。',
+      parameters: z.object({
+        project: z.string(),
+        page: z.string(),
+        settleMs: z.number().int().min(300).max(5000).optional().describe('页面加载完成后继续采集的毫秒数，缺省 1200')
+      }),
+      execute: async ({ project, page, settleMs }) => {
+        const { openPreviewAndCollect } = await import('../windows')
         const url = pages.pagePreviewUrl(project, page)
-        openPreviewWindow(url, `${project}/${page}`)
-        return { ok: true, url }
+        const diagnostics = await openPreviewAndCollect(url, { project, page }, settleMs)
+        return { ok: true, url, diagnostics }
+      }
+    }),
+
+    collect_page_errors: tool({
+      description: `读取当前项目预览窗口持续采集的运行错误，不会操作页面。
+用户在预览窗口手工点击、筛选或提交后反馈“刚才操作报错”时调用。只返回当前 Agent 项目的窗口；page 缺省时列出该项目全部已打开/最近关闭的预览，指定 page 可缩小范围。
+采集范围：/webroot/decision/api/data 的 HTTP 4xx/5xx 或网络失败、error 级 JS 控制台消息、页面主框架加载失败。`,
+      parameters: z.object({
+        project: z.string(),
+        page: z.string().optional().describe('可选页面名；不确定时省略以查看当前项目全部预览')
+      }),
+      execute: async ({ project, page }) => {
+        const { collectPreviewErrors } = await import('../windows')
+        return collectPreviewErrors(project, page)
       }
     }),
 

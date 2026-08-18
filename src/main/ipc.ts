@@ -219,8 +219,10 @@ export function registerIpc(): void {
   handle('pages:build', (a) => pages.buildPage((a as { project: string }).project, (a as { page: string }).page))
   handle('pages:previewUrl', (a) => pages.pagePreviewUrl((a as { project: string }).project, (a as { page: string }).page))
   handle('pages:open', (a) => {
-    const url = pages.pagePreviewUrl((a as { project: string }).project, (a as { page: string }).page)
-    openPreviewWindow(url, `${(a as { project: string }).project}/${(a as { page: string }).page}`)
+    const project = (a as { project: string }).project
+    const page = (a as { page: string }).page
+    const url = pages.pagePreviewUrl(project, page)
+    openPreviewWindow(url, { project, page })
     return url
   })
 

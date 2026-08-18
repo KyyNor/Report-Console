@@ -9,6 +9,7 @@ import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
 import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
+import { buildUnifiedLineDiff } from '@shared/textDiff'
 
 export interface WBData {
   datasets: Dataset[]
@@ -269,6 +270,7 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
   }, [project.name, diff, file])
 
   const selectedCheckpoint = checkpoints.find((x) => x.id === selected)
+  const lineDiff = useMemo(() => fileDiff ? buildUnifiedLineDiff(fileDiff.before, fileDiff.after) : null, [fileDiff])
   const create = async () => {
     const title = prompt('检查点说明（仅在工作区有变更时创建）：', '手工检查点')
     if (title === null) return
@@ -316,9 +318,15 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
         <div className="vp-diff-head"><b>{selected === 'working' ? '最近检查点 → 当前工作区' : compareWorking ? '所选检查点 → 当前工作区' : '与上一个检查点相比'}</b><span className="mono">新增 {diff?.additions ?? 0} · 删除 {diff?.deletions ?? 0} · 共 {diff?.changes.length ?? 0} 处</span></div>
         {!diff?.changes.length ? <div className="nores">没有源文件变更</div> : <>
           <div className="vp-files">{diff.changes.map((change) => <button key={change.path} className={file === change.path ? 'on' : ''} onClick={() => setFile(change.path)}><i className={change.kind} />{change.path}<span>{change.kind === 'added' ? '新增' : change.kind === 'deleted' ? '删除' : '修改'}</span></button>)}</div>
-          {fileDiff && <div className="vp-code-grid">
-            <div><div className="vp-code-title">修改前</div><pre>{fileDiff.before ?? '（文件不存在）'}</pre></div>
-            <div><div className="vp-code-title">修改后</div><pre>{fileDiff.after ?? '（文件已删除）'}</pre></div>
+          {fileDiff && lineDiff && <div className="vp-unified-diff">
+            {lineDiff.truncated
+              ? <div className="vp-diff-limit">文件行数或改动范围过大，未生成完整行级 Diff。请通过页面或文档编辑器查看源码。</div>
+              : lineDiff.hunks.map((hunk, hi) => <React.Fragment key={hi}>
+                {hi > 0 && <div className="vp-hunk-gap">···</div>}
+                {hunk.lines.map((line, li) => <div key={`${hi}-${li}`} className={`vp-diff-line ${line.kind}`}>
+                  <span>{line.oldLine ?? ''}</span><span>{line.newLine ?? ''}</span><i>{line.kind === 'added' ? '+' : line.kind === 'deleted' ? '-' : ' '}</i><code>{line.text || ' '}</code>
+                </div>)}
+              </React.Fragment>)}
           </div>}
         </>}
       </div>

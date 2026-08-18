@@ -12,6 +12,8 @@ import type { AssistantMessage, TextContent, ToolCall, ToolResultMessage, Usage 
 import { Icon } from '../../components/Icon'
 import { Markdown } from './Markdown'
 import type { PiAgentHandle } from '../piAgent'
+import { call } from '../../api'
+import type { DevelopmentCheckpoint } from '@shared/types'
 
 /** 这些工具成功后会改变工作台资源或其构建、实测状态。 */
 const RESOURCE_MUTATING_TOOLS = new Set([
@@ -61,7 +63,7 @@ export interface ChatAttachment {
   label: string
 }
 
-export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach, onToolCompleted }: {
+export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach, onToolCompleted, onCheckpointCreated }: {
   handle: PiAgentHandle
   placeholder?: string
   /** 每次任务发送时附带的轻量资源引用，不含资源正文。 */
@@ -72,6 +74,8 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
   onDetach?: (key: string) => void
   /** 资源写入类工具成功完成后通知宿主刷新自己的资源视图。 */
   onToolCompleted?: (toolName: string) => void
+  /** Agent 回合结束且源码变更时，RC 已自动创建开发检查点。 */
+  onCheckpointCreated?: (checkpoint: DevelopmentCheckpoint) => void
 }): React.ReactElement {
   const agent = handle.agent
   const view = useChatView(agent)
@@ -133,7 +137,28 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
     setDraft('')
     requestAnimationFrame(autoSize)
     stick.current = true
-    void agent.prompt(contextPrefix ? `${contextPrefix}\n\n[任务]\n${text}` : text)
+    const message = contextPrefix ? `${contextPrefix}\n\n[任务]\n${text}` : text
+    void (async () => {
+      // 先固化本回合基线；工具写入后才能准确得到“这轮改了什么”。
+      let turnId: string | null = null
+      try {
+        turnId = await call<string>('versions:startAgentTurn', { project: handle.scope.project, sessionId: handle.sessionId, prompt: text })
+      } catch (e) {
+        // 版本历史失败不能阻断开发；控制台会在下次操作时继续尝试建立基线。
+        console.warn('[checkpoint] 无法开始 Agent 回合：', (e as Error).message)
+      }
+      try {
+        await agent.prompt(message)
+      } finally {
+        if (!turnId) return
+        try {
+          const checkpoint = await call<DevelopmentCheckpoint | null>('versions:finishAgentTurn', { turnId })
+          if (checkpoint) onCheckpointCreated?.(checkpoint)
+        } catch (e) {
+          console.warn('[checkpoint] 无法完成 Agent 回合：', (e as Error).message)
+        }
+      }
+    })()
   }
 
   const mention = /(?:^|\s)@([^\s@]*)$/.exec(draft)

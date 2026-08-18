@@ -145,6 +145,40 @@ CREATE TABLE IF NOT EXISTS agent_messages (
   tool_json  TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
+
+-- ── RC 开发检查点（内容对象在 userData/checkpoints/，不写入项目目录） ──
+CREATE TABLE IF NOT EXISTS dev_checkpoints (
+  id            TEXT PRIMARY KEY,
+  project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  origin        TEXT NOT NULL,
+  title         TEXT NOT NULL DEFAULT '',
+  session_id    TEXT,
+  parent_id     TEXT,
+  restored_from TEXT,
+  file_count    INTEGER NOT NULL DEFAULT 0,
+  additions     INTEGER NOT NULL DEFAULT 0,
+  deletions     INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_dev_checkpoints_project ON dev_checkpoints(project_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS dev_checkpoint_files (
+  checkpoint_id TEXT NOT NULL REFERENCES dev_checkpoints(id) ON DELETE CASCADE,
+  path          TEXT NOT NULL,
+  content_hash  TEXT NOT NULL,
+  bytes         INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(checkpoint_id, path)
+);
+
+CREATE TABLE IF NOT EXISTS dev_checkpoint_turns (
+  id            TEXT PRIMARY KEY,
+  project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  session_id    TEXT NOT NULL,
+  title         TEXT NOT NULL DEFAULT '',
+  baseline_id   TEXT NOT NULL REFERENCES dev_checkpoints(id) ON DELETE RESTRICT,
+  started_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
 `)
 
   // ddl_log 增加连接列（存量库补列）

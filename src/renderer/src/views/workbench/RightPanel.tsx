@@ -8,7 +8,7 @@ import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding } from '@shared/types'
+import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
 
 export interface WBData {
   datasets: Dataset[]
@@ -99,24 +99,24 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onResourcesChanged={onResourcesChanged} />
   const { sel } = ctx
   const r = sel ? sel : null
-  if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} />
+  if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
   if (r.startsWith('if:')) {
     const ds = data.datasets.find((x) => x.name === r.slice(3))
-    return ds ? <DetailShell onClose={onExitAgent}><IfPanel key={r} ctx={ctx} ds={ds} st={data.statuses[ds.name]} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return ds ? <DetailShell onClose={onExitAgent}><IfPanel key={r} ctx={ctx} ds={ds} st={data.statuses[ds.name]} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
   }
   if (r.startsWith('sp:')) {
     const sp = data.procs.find((x) => x.name === r.slice(3))
-    return sp ? <DetailShell onClose={onExitAgent}><SpPanel key={r} ctx={ctx} sp={sp} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return sp ? <DetailShell onClose={onExitAgent}><SpPanel key={r} ctx={ctx} sp={sp} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
   }
   if (r.startsWith('pg:')) {
     const pg = data.pages.find((x) => x.name === r.slice(3))
-    return pg ? <DetailShell onClose={onExitAgent}><PgPanel key={r} ctx={ctx} pg={pg} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return pg ? <DetailShell onClose={onExitAgent}><PgPanel key={r} ctx={ctx} pg={pg} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
   }
   if (r.startsWith('doc:')) {
     const doc = data.docs.find((x) => x.name === r.slice(4))
-    return doc ? <DetailShell onClose={onExitAgent}><DocPanel key={r} ctx={ctx} doc={doc} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} />
+    return doc ? <DetailShell onClose={onExitAgent}><DocPanel key={r} ctx={ctx} doc={doc} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
   }
-  return <ProjectPanel ctx={ctx} data={data} acts={acts} />
+  return <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
 }
 
 function DetailShell({ children, onClose }: { children: React.ReactElement; onClose: () => void }): React.ReactElement {
@@ -125,7 +125,7 @@ function DetailShell({ children, onClose }: { children: React.ReactElement; onCl
 
 // ── 项目面板（未选资源 / 空项目） ───────────────────────────────
 
-function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WBActs }): React.ReactElement {
+function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; data: WBData; acts: WBActs; onResourcesChanged?: () => void }): React.ReactElement {
   const p = ctx.project
   const [dyn, setDyn] = useState<Array<{ i: string; h: React.ReactNode; m: string }>>([])
   useEffect(() => {
@@ -147,6 +147,8 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
   if (!p) return <div className="rp"><div className="rp-body"><div className="nores">未选择项目</div></div></div>
   const c = p.counts
   const empty = c.ifs + c.sps + c.pgs + c.docs === 0
+  const key = `project:${p.name}`
+  const tab = ctx.tab[key] ?? 'ov'
   return (
     <div className="rp">
       <div className="rp-head">
@@ -162,8 +164,10 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
           <button className="iconbtn" title="删除项目（需确认）" onClick={acts.deleteProject}><Icon n="trash" /></button>
         </div>
       </div>
-      <TabsBar tabs={[{ k: 'ov', n: '总览' }]} cur="ov" onSelect={() => {}} />
+      <TabsBar tabs={[{ k: 'ov', n: '总览' }, { k: 'versions', n: '版本' }]} cur={tab} onSelect={(next) => ctx.setTab(key, next)} />
       <div className="rp-body">
+        {tab === 'versions' && <VersionPanel project={p} onRestored={onResourcesChanged} />}
+        {tab === 'ov' && <>
         <div className="blk">
           <div className="blk-t"><Icon n="folder" />项目信息</div>
           <div className="kv">
@@ -193,9 +197,132 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
             </div>
           </div>
         )}
+        </>}
       </div>
     </div>
   )
+}
+
+// ── 开发检查点 ──────────────────────────────────────────────────
+
+const CHECKPOINT_ORIGIN: Record<DevelopmentCheckpoint['origin'], string> = {
+  baseline: '基线', agent: 'Agent', manual: '人工', restore: '恢复', recovery: '恢复草稿'
+}
+
+function VersionPanel({ project, onRestored }: { project: Project; onRestored?: () => void }): React.ReactElement {
+  const [checkpoints, setCheckpoints] = useState<DevelopmentCheckpoint[]>([])
+  const [working, setWorking] = useState<CheckpointDiff | null>(null)
+  const [selected, setSelected] = useState<string>('working')
+  const [compareWorking, setCompareWorking] = useState(false)
+  const [diff, setDiff] = useState<CheckpointDiff | null>(null)
+  const [file, setFile] = useState<string | null>(null)
+  const [fileDiff, setFileDiff] = useState<CheckpointFileDiff | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+
+  const reload = async () => {
+    const [next, wd] = await Promise.all([
+      call<DevelopmentCheckpoint[]>('versions:list', { project: project.name }),
+      call<CheckpointDiff>('versions:workingDiff', { project: project.name })
+    ])
+    setCheckpoints(next)
+    setWorking(wd)
+  }
+
+  useEffect(() => {
+    let alive = true
+    void reload().catch((e) => alive && setNote((e as Error).message))
+    return () => { alive = false }
+    // 项目切换时重新读取；reload 故意不进入依赖，避免函数重建造成循环。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.name])
+
+  useEffect(() => {
+    let alive = true
+    const current = checkpoints.find((x) => x.id === selected)
+    if (selected === 'working') {
+      setDiff(working)
+      return () => { alive = false }
+    }
+    if (!current) return () => { alive = false }
+    const from = compareWorking ? current.id : (current.parentId ?? current.id)
+    const to = compareWorking ? undefined : current.id
+    void call<CheckpointDiff>('versions:diff', { project: project.name, from, to })
+      .then((value) => { if (alive) setDiff(value) })
+      .catch((e) => { if (alive) setNote((e as Error).message) })
+    return () => { alive = false }
+  }, [project.name, checkpoints, selected, compareWorking, working])
+
+  useEffect(() => {
+    const path = file && diff?.changes.some((change) => change.path === file)
+      ? file
+      : diff?.changes[0]?.path
+    if (!diff || !path) { setFileDiff(null); return }
+    if (path !== file) setFile(path)
+    let alive = true
+    void call<CheckpointFileDiff>('versions:diffFile', {
+      project: project.name, from: diff.from, to: diff.to === 'working' ? undefined : diff.to, path
+    }).then((value) => { if (alive) setFileDiff(value) })
+      .catch((e) => { if (alive) setNote((e as Error).message) })
+    return () => { alive = false }
+  }, [project.name, diff, file])
+
+  const selectedCheckpoint = checkpoints.find((x) => x.id === selected)
+  const create = async () => {
+    const title = prompt('检查点说明（仅在工作区有变更时创建）：', '手工检查点')
+    if (title === null) return
+    setBusy(true)
+    try {
+      const made = await call<DevelopmentCheckpoint | null>('versions:create', { project: project.name, title })
+      setNote(made ? `已创建检查点：${made.title}` : '当前受管源码与最近检查点一致，没有创建空版本。')
+      await reload()
+      if (made) setSelected(made.id)
+    } catch (e) { setNote((e as Error).message) } finally { setBusy(false) }
+  }
+  const restore = async () => {
+    if (!selectedCheckpoint) return
+    const ok = confirm(`恢复到「${selectedCheckpoint.title}」？\n\n将覆盖受 RC 管理的源码，并自动留存“恢复前”检查点。\n不会回滚数据库，也不会覆盖传统 CPT；恢复后请重新构建受影响产物。`)
+    if (!ok) return
+    setBusy(true)
+    try {
+      const restored = await call<DevelopmentCheckpoint>('versions:restore', { project: project.name, checkpointId: selectedCheckpoint.id })
+      setNote(`已恢复源码：${restored.title}。请重新构建受影响页面或数据层。`)
+      await reload()
+      setSelected(restored.id)
+      onRestored?.()
+    } catch (e) { setNote((e as Error).message) } finally { setBusy(false) }
+  }
+
+  return <div className="vp">
+    <div className="banner info"><Icon n="info" /><div><b>开发检查点</b>保存在 Report Console 本地，不创建 .git、不会修改 SVN。仅追踪 project.yaml、受管 JSX、过程定义与 meta/ 源文档；CPT 构建产物、传统 CPT 与数据库不会被回滚。</div></div>
+    <div className="vp-actions">
+      <button className="btn" disabled={busy} onClick={() => void create()}><Icon n="plus" />创建检查点</button>
+      {selectedCheckpoint && <button className="btn dgr" disabled={busy} onClick={() => void restore()}><Icon n="back" />恢复此版本</button>}
+      {selectedCheckpoint && <button className="btn sm" onClick={() => setCompareWorking((x) => !x)}>{compareWorking ? '查看本次变更' : '与工作区比较'}</button>}
+    </div>
+    {note && <div className="vp-note">{note}</div>}
+    <div className="vp-grid">
+      <div className="vp-list">
+        <button className={`vp-item${selected === 'working' ? ' on' : ''}`} onClick={() => { setSelected('working'); setCompareWorking(false) }}>
+          <span className="dot" /> <span><b>当前工作区</b><small>{working?.changes.length ?? 0} 个未检查点变更</small></span>
+        </button>
+        {checkpoints.map((checkpoint) => <button key={checkpoint.id} className={`vp-item${selected === checkpoint.id ? ' on' : ''}`} onClick={() => { setSelected(checkpoint.id); setCompareWorking(false) }}>
+          <span className={`vp-origin ${checkpoint.origin}`}>{CHECKPOINT_ORIGIN[checkpoint.origin]}</span>
+          <span><b>{checkpoint.title}</b><small>{fmtTime(checkpoint.createdAt)} · {checkpoint.fileCount} 文件</small></span>
+        </button>)}
+      </div>
+      <div className="vp-detail">
+        <div className="vp-diff-head"><b>{selected === 'working' ? '最近检查点 → 当前工作区' : compareWorking ? '所选检查点 → 当前工作区' : '与上一个检查点相比'}</b><span className="mono">新增 {diff?.additions ?? 0} · 删除 {diff?.deletions ?? 0} · 共 {diff?.changes.length ?? 0} 处</span></div>
+        {!diff?.changes.length ? <div className="nores">没有源文件变更</div> : <>
+          <div className="vp-files">{diff.changes.map((change) => <button key={change.path} className={file === change.path ? 'on' : ''} onClick={() => setFile(change.path)}><i className={change.kind} />{change.path}<span>{change.kind === 'added' ? '新增' : change.kind === 'deleted' ? '删除' : '修改'}</span></button>)}</div>
+          {fileDiff && <div className="vp-code-grid">
+            <div><div className="vp-code-title">修改前</div><pre>{fileDiff.before ?? '（文件不存在）'}</pre></div>
+            <div><div className="vp-code-title">修改后</div><pre>{fileDiff.after ?? '（文件已删除）'}</pre></div>
+          </div>}
+        </>}
+      </div>
+    </div>
+  </div>
 }
 
 // ── 接口面板 ────────────────────────────────────────────────────
@@ -672,6 +799,7 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onResourcesChanged 
           onAttach={(a) => setAttachments((prev) => prev.some((x) => x.key === a.key) ? prev : [...prev, a])}
           onDetach={(key) => setAttachments((prev) => prev.filter((x) => x.key !== key))}
           onToolCompleted={onResourcesChanged}
+          onCheckpointCreated={() => onResourcesChanged?.()}
           placeholder="描述开发任务；输入 @ 附加当前项目资源…"
         />}
       </div>

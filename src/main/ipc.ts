@@ -11,6 +11,7 @@ import * as pages from './pagesService'
 import { piToolDefs, piToolExec } from './agent/piBridge'
 import { pingFrServer, callApiData } from './frClient'
 import { openPreviewWindow } from './windows'
+import * as checkpoints from './checkpointService'
 import type { AppSettings, StatusPayload } from '@shared/types'
 import { existsSync, accessSync, constants } from 'fs'
 
@@ -23,6 +24,14 @@ function handle(channel: string, fn: (args: unknown) => unknown): void {
       return { ok: false, error: (err as Error).message }
     }
   })
+}
+
+/** 受 UI 触发的源码操作：先固定基线，成功后才收集人工检查点。 */
+function checkpointed<T>(project: string, title: string, fn: () => T): T {
+  checkpoints.ensureBaseline(project)
+  const result = fn()
+  checkpoints.captureManualCheckpoint(project, title)
+  return result
 }
 
 export function registerIpc(): void {
@@ -100,14 +109,23 @@ export function registerIpc(): void {
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
   })
   handle('projects:list', () => projects.listProjects())
-  handle('projects:create', (a) => projects.createProject(
-    (a as { name: string }).name,
-    (a as { connections: string[] }).connections,
-    (a as { comment?: string }).comment,
-    (a as { dir?: string }).dir
-  ))
+  handle('projects:create', (a) => {
+    const project = projects.createProject(
+      (a as { name: string }).name,
+      (a as { connections: string[] }).connections,
+      (a as { comment?: string }).comment,
+      (a as { dir?: string }).dir
+    )
+    checkpoints.ensureBaseline(project.name)
+    return project
+  })
   handle('projects:open', (a) => projects.openProject((a as { dir: string }).dir))
-  handle('projects:update', (a) => { projects.updateProject((a as { id: number }).id, a as never); return true })
+  handle('projects:update', (a) => {
+    const id = (a as { id: number }).id
+    const project = projects.listProjects().find((item) => item.id === id)
+    if (!project) throw new Error('项目不存在')
+    return checkpointed(project.name, '人工更新项目配置', () => { projects.updateProject(id, a as never); return true })
+  })
   handle('projects:delete', (a) => { projects.deleteProject((a as { id: number }).id); return true })
   handle('projects:scan', () => projects.scanDeployedProjects())
   handle('projects:export', (a) => projects.exportProject((a as { project: string }).project))
@@ -118,8 +136,14 @@ export function registerIpc(): void {
   handle('datasets:list', (a) => projects.listDatasets((a as { project: string }).project))
   handle('datasets:read', (a) => projects.readDataset((a as { project: string }).project, (a as { name: string }).name))
   handle('datasets:statuses', (a) => projects.datasetStatuses((a as { project: string }).project))
-  handle('datasets:save', (a) => projects.saveDataset((a as { project: string }).project, a as never, (a as { expectId?: number }).expectId))
-  handle('datasets:delete', (a) => { projects.deleteDataset((a as { project: string }).project, (a as { name: string }).name); return true })
+  handle('datasets:save', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工保存接口 ${(a as { name: string }).name}`, () => projects.saveDataset(project, a as never, (a as { expectId?: number }).expectId))
+  })
+  handle('datasets:delete', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工删除接口 ${(a as { name: string }).name}`, () => { projects.deleteDataset(project, (a as { name: string }).name); return true })
+  })
   handle('build:dataCpt', (a) => projects.buildDataCpt((a as { project: string }).project))
   handle('test:dataset', (a) => projects.testDataset((a as { project: string }).project, (a as { dataset: string }).dataset, (a as { overrides?: Record<string, unknown> }).overrides ?? {}))
   handle('test:all', (a) => projects.testAllDatasets((a as { project: string }).project))
@@ -135,32 +159,62 @@ export function registerIpc(): void {
 
   // ── 存储过程（归属/关联） ──────────────────────────────
   handle('procs:list', (a) => projects.listProcedures((a as { project: string }).project))
-  handle('procs:save', (a) => projects.saveProcedure((a as { project: string }).project, a as never))
+  handle('procs:save', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工保存过程 ${(a as { name: string }).name}`, () => projects.saveProcedure(project, a as never))
+  })
   handle('procs:def', (a) => projects.procedureDefinition((a as { project: string }).project, (a as { name: string }).name))
   handle('procs:apply', (a) => projects.applyProjectProcedure((a as { project: string }).project, (a as { name: string }).name))
   handle('procs:call', (a) => projects.callProcedureSql((a as { sql: string }).sql, (a as { connection: string }).connection))
   handle('procs:link', (a) => { projects.linkProcedure((a as { project: string }).project, (a as { procedureId: number }).procedureId); return true })
   handle('procs:unlink', (a) => { projects.unlinkProcedure((a as { project: string }).project, (a as { procedureId: number }).procedureId); return true })
-  handle('procs:delete', (a) => { projects.deleteProcedure((a as { project: string }).project, (a as { name: string }).name); return true })
+  handle('procs:delete', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工删除过程 ${(a as { name: string }).name}`, () => { projects.deleteProcedure(project, (a as { name: string }).name); return true })
+  })
   handle('procs:linkable', (a) => projects.linkableProcedures((a as { project: string }).project))
 
   // ── 项目文档（meta/） ─────────────────────────────────
   handle('docs:list', (a) => projects.listDocs((a as { project: string }).project))
   handle('docs:read', (a) => projects.readDoc((a as { project: string }).project, (a as { name: string }).name))
-  handle('docs:save', (a) => { projects.saveDoc((a as { project: string }).project, (a as { name: string }).name, (a as { content: string }).content, { overwrite: (a as { overwrite?: boolean }).overwrite }); return true })
-  handle('docs:import', (a) => projects.importDoc((a as { project: string }).project, (a as { source: string }).source))
-  handle('docs:delete', (a) => { projects.deleteDoc((a as { project: string }).project, (a as { name: string }).name); return true })
-  handle('docs:rename', (a) => { projects.renameDoc((a as { project: string }).project, (a as { name: string }).name, (a as { newName: string }).newName); return true })
+  handle('docs:save', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工保存文档 ${(a as { name: string }).name}`, () => { projects.saveDoc(project, (a as { name: string }).name, (a as { content: string }).content, { overwrite: (a as { overwrite?: boolean }).overwrite }); return true })
+  })
+  handle('docs:import', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, '人工导入文档', () => projects.importDoc(project, (a as { source: string }).source))
+  })
+  handle('docs:delete', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工删除文档 ${(a as { name: string }).name}`, () => { projects.deleteDoc(project, (a as { name: string }).name); return true })
+  })
+  handle('docs:rename', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工重命名文档 ${(a as { name: string }).name}`, () => { projects.renameDoc(project, (a as { name: string }).name, (a as { newName: string }).newName); return true })
+  })
 
   // ── 页面 ──────────────────────────────────────────────
   handle('pages:list', (a) => pages.listPages((a as { project?: string }).project))
   handle('pages:read', (a) => pages.readPage((a as { project: string }).project, (a as { page: string }).page))
-  handle('pages:save', (a) => { pages.savePage((a as { project: string }).project, (a as { page: string }).page, (a as { content: string }).content, { overwrite: (a as { overwrite?: boolean }).overwrite }); return true })
-  handle('pages:create', (a) => { pages.createPage((a as { project: string }).project, (a as { page: string }).page, (a as { starter: 'blank' | 'list' | 'form' }).starter ?? 'blank'); return true })
-  handle('pages:delete', (a) => { pages.deletePage((a as { project: string }).project, (a as { page: string }).page); return true })
+  handle('pages:save', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工保存页面 ${(a as { page: string }).page}`, () => { pages.savePage(project, (a as { page: string }).page, (a as { content: string }).content, { overwrite: (a as { overwrite?: boolean }).overwrite }); return true })
+  })
+  handle('pages:create', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工新建页面 ${(a as { page: string }).page}`, () => { pages.createPage(project, (a as { page: string }).page, (a as { starter: 'blank' | 'list' | 'form' }).starter ?? 'blank'); return true })
+  })
+  handle('pages:delete', (a) => {
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工删除页面 ${(a as { page: string }).page}`, () => { pages.deletePage(project, (a as { page: string }).page); return true })
+  })
   handle('pages:updatePaths', (a) => {
-    pages.updatePagePaths((a as { project: string }).project, (a as { page: string }).page, (a as { paths: { jsx: string; mjs: string; cpt: string } }).paths)
-    return true
+    const project = (a as { project: string }).project
+    return checkpointed(project, `人工调整页面路径 ${(a as { page: string }).page}`, () => {
+      pages.updatePagePaths(project, (a as { page: string }).page, (a as { paths: { jsx: string; mjs: string; cpt: string } }).paths)
+      return true
+    })
   })
   handle('pages:build', (a) => pages.buildPage((a as { project: string }).project, (a as { page: string }).page))
   handle('pages:previewUrl', (a) => pages.pagePreviewUrl((a as { project: string }).project, (a as { page: string }).page))
@@ -169,6 +223,16 @@ export function registerIpc(): void {
     openPreviewWindow(url, `${(a as { project: string }).project}/${(a as { page: string }).page}`)
     return url
   })
+
+  // ── 开发检查点（RC 本地版本历史）──────────────────────
+  handle('versions:list', (a) => checkpoints.listCheckpoints((a as { project: string }).project))
+  handle('versions:workingDiff', (a) => checkpoints.workingDiff((a as { project: string }).project))
+  handle('versions:diff', (a) => checkpoints.diffCheckpoints((a as { project: string }).project, (a as { from: string }).from, (a as { to?: string }).to))
+  handle('versions:diffFile', (a) => checkpoints.diffFile((a as { project: string }).project, (a as { from: string }).from, (a as { path: string }).path, (a as { to?: string }).to))
+  handle('versions:create', (a) => checkpoints.createNamedCheckpoint((a as { project: string }).project, (a as { title: string }).title))
+  handle('versions:restore', (a) => checkpoints.restoreCheckpoint((a as { project: string }).project, (a as { checkpointId: string }).checkpointId))
+  handle('versions:startAgentTurn', (a) => checkpoints.startAgentTurn((a as { project: string }).project, (a as { sessionId: string }).sessionId, (a as { prompt: string }).prompt))
+  handle('versions:finishAgentTurn', (a) => checkpoints.finishAgentTurn((a as { turnId: string }).turnId))
 
   // ── pi Agent 桥（渲染层 Agent 的平台工具通道）──────────
   handle('pi:toolDefs', () => piToolDefs())

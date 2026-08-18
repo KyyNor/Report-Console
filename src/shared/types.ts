@@ -143,6 +143,52 @@ export interface DocMeta {
   mtime: number
 }
 
+// ── 开发检查点（RC 本地历史，不替代 SVN） ────────────────────────
+
+export type CheckpointOrigin = 'baseline' | 'agent' | 'manual' | 'restore' | 'recovery'
+
+export interface DevelopmentCheckpoint {
+  id: string
+  project: string
+  origin: CheckpointOrigin
+  /** 对 Agent 回合为用户任务摘要；人工与恢复操作为动作描述。 */
+  title: string
+  sessionId?: string
+  parentId?: string
+  restoredFrom?: string
+  fileCount: number
+  additions: number
+  deletions: number
+  createdAt: string
+}
+
+export interface CheckpointFileMeta {
+  path: string
+  hash: string
+  bytes: number
+}
+
+export interface CheckpointFileChange {
+  path: string
+  kind: 'added' | 'modified' | 'deleted'
+  before?: CheckpointFileMeta
+  after?: CheckpointFileMeta
+}
+
+export interface CheckpointDiff {
+  from: string
+  to: string
+  additions: number
+  deletions: number
+  changes: CheckpointFileChange[]
+}
+
+export interface CheckpointFileDiff {
+  path: string
+  before?: string
+  after?: string
+}
+
 // ── 设置 ────────────────────────────────────────────────────────
 
 export interface AppSettings {

@@ -360,13 +360,7 @@ export default function WorkbenchView(): React.ReactElement {
                     <span className="gact" onClick={() => void importDoc()}><Icon n="folderOpen" size={12} />导入文档</span>
                     <span className="gact" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
                   </>}
-                  empty={{
-                    t: '还没有文档',
-                    actions: <>
-                      <span className="mini" onClick={() => void importDoc()}><Icon n="folderOpen" size={12} />导入文档</span>
-                      <span className="mini" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
-                    </>
-                  }}
+                  empty={{ t: '还没有文档' }}
                 >
                   {docs.filter((x) => match(x.name)).map((x) => (
                     <div key={x.name} className={`row${sel === `doc:${x.name}` ? ' on' : ''}`} onClick={() => { setSel(`doc:${x.name}`); setAgentMode(false) }}>
@@ -388,13 +382,7 @@ export default function WorkbenchView(): React.ReactElement {
                     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                     pageMenuAt(r.left, r.bottom + 6)
                   }}><Icon n="plus" size={12} />新建页面</span>}
-                  empty={{
-                    t: '还没有页面',
-                    actions: <span className="mini" onClick={(e) => {
-                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                      pageMenuAt(r.left, r.bottom + 6)
-                    }}><Icon n="plus" size={12} />新建页面</span>
-                  }}
+                  empty={{ t: '还没有页面' }}
                 >
                   {pages.filter((x) => match(x.name)).map((x) => {
                     const stl = x.stale ? ['old', 'cpt 落后 jsx，待重建'] : x.cptExists ? ['new', '最新'] : ['none', '从未构建']
@@ -415,14 +403,11 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 数据接口 */}
                 <Group
                   gk="ifs" title="数据接口" one="接口" count={datasets.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<span className="gact" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" size={12} />新建接口</span>}
-                  empty={{
-                    t: '还没有数据接口',
-                    actions: <>
-                      <button className="btn sm" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" />新建接口</button>
-                      <span className="mini" onClick={() => acts.useAgent()}><Icon n="ai" size={12} />用 Agent 做</span>
-                    </>
-                  }}
+                  extra={<>
+                    <span className="gact" onClick={() => acts.useAgent()}><Icon n="ai" size={12} />用 Agent 做</span>
+                    <span className="gact" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" size={12} />新建接口</span>
+                  </>}
+                  empty={{ t: '还没有数据接口' }}
                 >
                   {datasets.filter((x) => match(x.name)).map((x) => {
                     const st = statuses[x.name]?.test
@@ -450,24 +435,16 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 存储过程 */}
                 <Group
                   gk="sps" title="存储过程" one="过程" count={procs.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<span className="gact" onClick={async () => {
-                    try {
-                      const linkable = await call<LinkableProc[]>('procs:linkable', { project: cur })
-                      setModal({ k: 'linkproc', linkable })
-                    } catch (e) { toast((e as Error).message, 'err') }
-                  }}><Icon n="link" size={12} />关联</span>}
-                  empty={{
-                    t: '还没有存储过程',
-                    actions: <>
-                      <span className="mini" onClick={async () => {
-                        try {
-                          const linkable = await call<LinkableProc[]>('procs:linkable', { project: cur })
-                          setModal({ k: 'linkproc', linkable })
-                        } catch (e) { toast((e as Error).message, 'err') }
-                      }}><Icon n="link" size={12} />关联现有过程</span>
-                      <span className="mini" onClick={() => setModal({ k: 'newproc' })}><Icon n="plus" size={12} />从模板新建</span>
-                    </>
-                  }}
+                  extra={<>
+                    <span className="gact" onClick={async () => {
+                      try {
+                        const linkable = await call<LinkableProc[]>('procs:linkable', { project: cur })
+                        setModal({ k: 'linkproc', linkable })
+                      } catch (e) { toast((e as Error).message, 'err') }
+                    }}><Icon n="link" size={12} />关联</span>
+                    <span className="gact" onClick={() => setModal({ k: 'newproc' })}><Icon n="plus" size={12} />从模板新建</span>
+                  </>}
+                  empty={{ t: '还没有存储过程' }}
                 >
                   {procs.filter((x) => match(x.name)).map((x) => (
                     <div key={`${x.own ? 'o' : 'l'}:${x.name}`} className={`row${sel === `sp:${x.name}` ? ' on' : ''}`} onClick={() => { setSel(`sp:${x.name}`); setAgentMode(false) }}>
@@ -677,7 +654,7 @@ function Group({ gk, title, one, count, collapsed, onToggle, extra, empty, child
   collapsed: Record<string, boolean>
   onToggle: (g: string) => void
   extra?: React.ReactNode
-  empty?: { t: string; d?: string; actions?: React.ReactNode }
+  empty?: { t: string; d?: string }
   children: React.ReactNode
 }): React.ReactElement {
   const col = collapsed[gk]
@@ -695,7 +672,6 @@ function Group({ gk, title, one, count, collapsed, onToggle, extra, empty, child
         : <div className="rows"><div className="grp-empty">
             <div className="e1">{empty?.t ?? `还没有${one}`}</div>
             {empty?.d && <div className="e2">{empty.d}</div>}
-            {empty?.actions && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>{empty.actions}</div>}
           </div></div>)}
     </div>
   )

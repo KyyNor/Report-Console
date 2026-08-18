@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { basename, extname, join, relative, resolve, sep } from 'path'
 import { parse, stringify } from 'yaml'
 import { getDb, getSettings } from './db'
-import type { TraditionalCptMeta } from '@shared/types'
+import type { DatasetKind, DatasetParam, TraditionalCptMeta } from '@shared/types'
 
 export const PROJECT_MANIFEST = 'project.yaml'
 const LEGACY_CONFIG = 'project.json'
@@ -25,6 +25,22 @@ export interface ManagedDataCpt {
   cpt: string
 }
 
+export interface PortableDataset {
+  name: string
+  kind: DatasetKind
+  comment: string
+  connection: string
+  params: DatasetParam[]
+  sql: string
+}
+
+export interface PortableProcedure {
+  name: string
+  connection: string
+  comment: string
+  definition: string
+}
+
 export interface ProjectManifest {
   version: 1
   name: string
@@ -33,6 +49,10 @@ export interface ProjectManifest {
   managed: {
     pages: ManagedPage[]
     data: ManagedDataCpt[]
+  }
+  contracts: {
+    datasets: PortableDataset[]
+    procedures: PortableProcedure[]
   }
 }
 
@@ -78,13 +98,43 @@ function normalize(raw: unknown): ProjectManifest {
     dataIds.add(id)
     return { id, cpt: assertRelativePath(item.cpt, `managed.data[${i}].cpt`, '.cpt') }
   })
+  const contracts = (x.contracts && typeof x.contracts === 'object' && !Array.isArray(x.contracts) ? x.contracts : {}) as Record<string, unknown>
+  const kinds = new Set<DatasetKind>(['list', 'stat', 'detail', 'dict', 'insert', 'update', 'delete', 'other'])
+  const names = new Set<string>()
+  const datasets = (Array.isArray(contracts.datasets) ? contracts.datasets : []).map((v, i) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(`contracts.datasets[${i}] 必须是对象`)
+    const item = v as Record<string, unknown>
+    if (typeof item.name !== 'string' || !NAME_RE.test(item.name) || names.has(item.name)) throw new Error(`contracts.datasets[${i}].name 不合法或重复`)
+    names.add(item.name)
+    if (typeof item.kind !== 'string' || !kinds.has(item.kind as DatasetKind)) throw new Error(`contracts.datasets[${i}].kind 不合法`)
+    if (typeof item.connection !== 'string' || !item.connection.trim()) throw new Error(`contracts.datasets[${i}].connection 缺失`)
+    if (typeof item.sql !== 'string') throw new Error(`contracts.datasets[${i}].sql 缺失`)
+    const params = Array.isArray(item.params) ? item.params.map((p, pi) => {
+      if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error(`contracts.datasets[${i}].params[${pi}] 必须是对象`)
+      const param = p as Record<string, unknown>
+      if (typeof param.name !== 'string' || !param.name) throw new Error(`contracts.datasets[${i}].params[${pi}].name 缺失`)
+      if (!['string', 'integer', 'double', 'formula'].includes(String(param.type))) throw new Error(`contracts.datasets[${i}].params[${pi}].type 不合法`)
+      return { name: param.name, type: param.type as DatasetParam['type'], ...(typeof param.default === 'string' ? { default: param.default } : {}) }
+    }) : []
+    return { name: item.name, kind: item.kind as DatasetKind, comment: typeof item.comment === 'string' ? item.comment : '', connection: item.connection, params, sql: item.sql }
+  })
+  const procNames = new Set<string>()
+  const procedures = (Array.isArray(contracts.procedures) ? contracts.procedures : []).map((v, i) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(`contracts.procedures[${i}] 必须是对象`)
+    const item = v as Record<string, unknown>
+    if (typeof item.name !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(item.name) || procNames.has(item.name)) throw new Error(`contracts.procedures[${i}].name 不合法或重复`)
+    procNames.add(item.name)
+    if (typeof item.connection !== 'string' || !item.connection.trim()) throw new Error(`contracts.procedures[${i}].connection 缺失`)
+    return { name: item.name, connection: item.connection, comment: typeof item.comment === 'string' ? item.comment : '', definition: assertRelativePath(item.definition ?? `meta/${item.name}.sql`, `contracts.procedures[${i}].definition`, '.sql') }
+  })
   const connections = Array.isArray(x.connections) ? x.connections.filter((v): v is string => typeof v === 'string' && !!v.trim()) : []
   return {
     version: 1,
     name: x.name,
     comment: typeof x.comment === 'string' ? x.comment : '',
     connections: [...new Set(connections)],
-    managed: { pages, data }
+    managed: { pages, data },
+    contracts: { datasets, procedures }
   }
 }
 
@@ -97,7 +147,8 @@ export function createManifest(name: string, comment: string, connections: strin
     managed: {
       pages: [],
       data: [{ id: 'data', cpt: `data/${name}_data.cpt` }]
-    }
+    },
+    contracts: { datasets: [], procedures: [] }
   }
 }
 

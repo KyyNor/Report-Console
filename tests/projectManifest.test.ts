@@ -35,4 +35,24 @@ describe('project.yaml', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it('随项目携带接口契约和过程定义路径', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rc-manifest-'))
+    try {
+      const manifest = createManifest('demo', '', ['warehouse'])
+      manifest.contracts.datasets.push({
+        name: 'orders_qry', kind: 'list', comment: '订单列表', connection: 'warehouse',
+        params: [{ name: 'p_page', type: 'integer', default: '1' }], sql: 'SELECT * FROM orders'
+      })
+      manifest.contracts.procedures.push({
+        name: 'sp_orders_insert', connection: 'warehouse', comment: '新增订单', definition: 'sql/procedures/sp_orders_insert.sql'
+      })
+      writeManifest(root, manifest)
+      const restored = readManifest(root)
+      expect(restored.contracts.datasets[0].sql).toBe('SELECT * FROM orders')
+      expect(restored.contracts.procedures[0].definition).toBe('sql/procedures/sp_orders_insert.sql')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })

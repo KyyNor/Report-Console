@@ -4,14 +4,14 @@
  */
 
 import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { getDb, getSettings } from './db'
 import { generateDataCpt } from './cpt/dataWriter'
 import { checkDataCpt, hasError } from './cpt/checker'
 import { callApiData, type ApiDataRequest } from './frClient'
 import { getConnection, requireConnection } from './connectionsService'
 import { applyProcedureMysql, guardedExec, pingConnection } from './mysqlService'
-import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, writeManifest } from './projectManifest'
+import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, resolveProjectFile, writeManifest, type ProjectManifest } from './projectManifest'
 import type {
   Project, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
   BuildResult, CheckerFinding, ConnectionHealth
@@ -97,6 +97,14 @@ function syncProjectManifest(name: string): void {
     manifest.name = p.name
     manifest.comment = p.comment
     manifest.connections = projectConnections(p.id)
+    manifest.contracts.datasets = listDatasets(name).map((x) => ({
+      name: x.name, kind: x.kind, comment: x.comment, connection: x.connection, params: x.params, sql: x.sql
+    }))
+    // 跨项目关联是本机人工行为，不属于可移植项目定义。
+    const definitions = new Map(manifest.contracts.procedures.map((x) => [x.name, x.definition]))
+    manifest.contracts.procedures = listProcedures(name).filter((x) => x.own).map((x) => ({
+      name: x.name, connection: x.connection, comment: x.comment, definition: definitions.get(x.name) ?? `meta/${x.name}.sql`
+    }))
     writeManifest(root, manifest)
   } catch { /* 目录缺失/只读时不阻断主流程 */ }
 }
@@ -128,7 +136,11 @@ export function openProject(dir: string): Project {
   const cfg = readManifest(dir)
   const existing = getProjectByName(cfg.name)
   if (existing) {
-    if (projectDir(cfg.name) === dir) return listProjects().find((p) => p.id === existing.id)! // 已打开，直接聚焦
+    if (projectDir(cfg.name) === dir) {
+      // 已注册的旧项目也借此机会把本机缓存回写为可移植项目定义。
+      syncProjectManifest(cfg.name)
+      return listProjects().find((p) => p.id === existing.id)!
+    }
     throw new Error(`同名项目已注册（当前指向 ${projectDir(cfg.name)}）；如需改指向本目录，请在项目设置中重绑目录`)
   }
   const conns = cfg.connections ?? []
@@ -142,6 +154,7 @@ export function openProject(dir: string): Project {
   for (const cn of conns) {
     bind.run(pid, (getConnection({ name: cn }) as { id: number }).id)
   }
+  hydrateManifestContracts(cfg, pid)
   // 兼容旧 project.json 时，首次打开即写出 project.yaml；不创建/调整任何业务目录。
   writeManifest(dir, cfg)
   return listProjects().find((p) => p.id === pid)!
@@ -192,6 +205,28 @@ export function scanDeployedProjects(): string[] {
 /** 传统 CPT 不进入 project.yaml；仅用于工作台浏览/Agent 的轻量引用。 */
 export function listTraditionalCpts(project: string) {
   return scanTraditionalCpts(project)
+}
+
+/** 新机器添加项目时，用 project.yaml 的可移植定义重建本机 SQLite 缓存。 */
+function hydrateManifestContracts(manifest: ProjectManifest, projectId: number): void {
+  const d = getDb()
+  const connectionId = (name: string): number => {
+    const c = getConnection({ name })
+    if (!c) throw new Error(`项目定义引用的连接未注册：${name}`)
+    return c.id
+  }
+  const tx = d.transaction(() => {
+    const insertDataset = d.prepare(`INSERT OR IGNORE INTO datasets(project_id, connection_id, name, kind, comment, params, sql)
+      VALUES(?,?,?,?,?,?,?)`)
+    for (const ds of manifest.contracts.datasets) {
+      insertDataset.run(projectId, connectionId(ds.connection), ds.name, ds.kind, ds.comment, JSON.stringify(ds.params), ds.sql)
+    }
+    const insertProcedure = d.prepare('INSERT OR IGNORE INTO procedures(project_id, connection_id, name, comment) VALUES(?,?,?,?)')
+    for (const procedure of manifest.contracts.procedures) {
+      insertProcedure.run(projectId, connectionId(procedure.connection), procedure.name, procedure.comment)
+    }
+  })
+  tx()
 }
 
 // ── 接口契约 ────────────────────────────────────────────────────
@@ -269,7 +304,7 @@ export function datasetStatuses(project: string): Record<string, DatasetStatus> 
 function lastDataBuild(project: string): string | undefined {
   const r = getDb().prepare(
     "SELECT created_at FROM builds WHERE kind='data' AND target=? ORDER BY id DESC LIMIT 1"
-  ).get(`${project}/data/${project}_data.cpt`) as { created_at: string } | undefined
+  ).get(`${project}/${dataCptForProject(project)}`) as { created_at: string } | undefined
   return r?.created_at
 }
 
@@ -307,6 +342,7 @@ export function saveDataset(project: string, input: {
       .run(p.id, connId, input.name, input.kind ?? 'other', input.comment ?? '', params, input.sql ?? '')
   }
   const saved = d.prepare('SELECT * FROM datasets WHERE project_id=? AND name=?').get(p.id, input.name) as Record<string, unknown>
+  syncProjectManifest(project)
   return rowToDataset(saved)
 }
 
@@ -314,6 +350,7 @@ export function deleteDataset(project: string, name: string): void {
   const p = getProjectByName(project)
   if (!p) throw new Error(`项目不存在：${project}`)
   getDb().prepare('DELETE FROM datasets WHERE project_id=? AND name=?').run(p.id, name)
+  syncProjectManifest(project)
 }
 
 // ── 数据层构建（一项目一页 _data.cpt，页内每数据集各带连接名） ──
@@ -448,6 +485,10 @@ function metaRoot(project: string): string {
 }
 
 function procMetaPath(project: string, procName: string): string {
+  try {
+    const path = manifestForProject(project).contracts.procedures.find((x) => x.name === procName)?.definition
+    if (path) return resolveProjectFile(projectDir(project), path)
+  } catch { /* 项目清单尚未创建时，使用新建项目默认位置 */ }
   return join(metaRoot(project), `${procName}.sql`)
 }
 
@@ -531,10 +572,12 @@ export function saveProcedure(project: string, input: { name: string; connection
       .run(p.id, c.id, input.name, input.comment ?? '')
   }
   if (input.definition?.trim()) {
-    mkdirSync(metaRoot(project), { recursive: true })
+    mkdirSync(dirname(procMetaPath(project, input.name)), { recursive: true })
     writeFileSync(procMetaPath(project, input.name), input.definition, 'utf-8')
   }
-  return listProcedures(project).find((x) => x.name === input.name && x.own)!
+  const saved = listProcedures(project).find((x) => x.name === input.name && x.own)!
+  syncProjectManifest(project)
+  return saved
 }
 
 /** 应用过程（DROP IF EXISTS + CREATE）：定义取 meta 文件，应用后审计；own 与关联项目均可应用 */
@@ -579,6 +622,7 @@ export function deleteProcedure(project: string, name: string): void {
   d.prepare('DELETE FROM procedures WHERE id=?').run(rec.id)
   const meta = procMetaPath(project, name)
   if (existsSync(meta)) unlinkSync(meta)
+  syncProjectManifest(project)
 }
 
 /** 可供本项目关联的其他项目过程清单 */

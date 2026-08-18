@@ -41,7 +41,7 @@ export function buildTools() {
     }),
 
     save_dataset: tool({
-      description: `创建或更新接口（数据集契约，存 SQLite，构建后进入项目 _data.cpt）。
+      description: `创建或更新接口（数据集契约写入项目 project.yaml，本机 SQLite 仅作运行缓存；构建后进入项目数据 CPT）。
 命名规范：列表 {m}_qry（含 p_page/p_pagesize/p_keyword 参数 + LIMIT 分页）、统计 {m}_total、单条 {m}_by_id、字典 dict_{x}、写入 {m}_insert/update/delete（CALL 存储过程）。
 参数 type: string|integer|double|formula（当前用户类变量用 formula，如 =$fine_username）。
 SQL 用帆软公式：可选条件 \${if(len(p_x)==0,""," AND col='"+p_x+"')}，分页 LIMIT \${(p_page-1)*p_pagesize}, \${p_pagesize}。
@@ -164,7 +164,7 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     write_page: tool({
-      description: `写入/更新页面 JSX 源码（reportlets/{project}/pages/{page}.jsx，仅此目录可写）。
+      description: `写入/更新 project.yaml 已声明的页面 JSX 源码（具体项目内路径由清单决定）。
 页面运行约定：直接使用全局 React/ReactDOM/antd/dayjs/$/PATH（禁止 import、禁止重新声明 PATH、不要自行创建 app-root）。
 调接口统一走 PATH.apiBase + '/api/data'，body: {report_path: PATH.getDataTemplate('xx_data.cpt'), datasource_name, page_number:-1, page_size:-1, parameters}。`,
       parameters: z.object({
@@ -174,7 +174,7 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
       }),
       execute: async ({ project, page, content }) => {
         pages.savePage(project, page, content)
-        return { ok: true, path: `${project}/pages/${page}.jsx` }
+        return { ok: true }
       }
     }),
 

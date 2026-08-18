@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, unlinkSyn
 import { dirname } from 'path'
 import { getDb } from './db'
 import { compileJsx, generatePageCpt } from './cpt/displayWriter'
-import { checkApiDataParameters, checkPageCpt, hasError } from './cpt/checker'
+import { checkApiDataParameters, checkFineReportAjaxCompatibility, checkPageCpt, hasError } from './cpt/checker'
 import { previewPageUrl } from './frClient'
 import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPagePaths, type ManagedPage } from './projectManifest'
 import type { PageMeta, BuildResult } from '@shared/types'
@@ -138,7 +138,7 @@ export async function buildPage(projectName: string, pageName: string): Promise<
   log.push(`.mjs 已落盘：${page.mjs}`)
 
   const cpt = generatePageCpt(pageTemplateRaw, clean)
-  const findings = [...checkPageCpt(cpt, pageTemplateRaw), ...checkApiDataParameters(jsx)]
+  const findings = [...checkPageCpt(cpt, pageTemplateRaw), ...checkApiDataParameters(jsx), ...checkFineReportAjaxCompatibility(jsx)]
   const errCount = findings.filter((f) => f.severity === 'error').length
   const warnCount = findings.filter((f) => f.severity === 'warning').length
   log.push(`质量门：${errCount} error / ${warnCount} warning`)

@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { generateDataCpt, buildTableDataXml } from '@main/cpt/dataWriter'
 import { removeComments, transformHooksDestructuring } from '@main/cpt/jsTransform'
 import { compileJsx, generatePageCpt } from '@main/cpt/displayWriter'
-import { checkApiDataParameters, checkDataCpt, checkPageCpt, extractJsFromCpt } from '@main/cpt/checker'
+import { checkApiDataParameters, checkDataCpt, checkFineReportAjaxCompatibility, checkPageCpt, extractJsFromCpt } from '@main/cpt/checker'
 import { XMLParser } from 'fast-xml-parser'
 
 const TPL_DIR = resolve(__dirname, '../src/main/templates')
@@ -190,6 +190,28 @@ describe('displayWriter + checker', () => {
       callApi('book_qry', mkParams(1));
     `
     expect(checkApiDataParameters(forwardedObject).some((f) => f.rule === 'api_data_parameters_shape')).toBe(true)
+  })
+
+  it('帆软 /api/data 的 jQuery 调用必须显式兼容 Deferred 和 JSON 响应头', () => {
+    const broken = `
+      function callApi(parameters) {
+        return $.ajax({ url: PATH.apiBase + '/api/data', contentType: 'application/json', data: JSON.stringify({ parameters }) })
+          .then((r) => r);
+      }
+    `
+    const rules = checkFineReportAjaxCompatibility(broken).map((f) => f.rule)
+    expect(rules).toContain('finereport_ajax_deferred')
+    expect(rules).toContain('finereport_ajax_json_type')
+
+    const valid = `
+      function callApi(parameters) {
+        return new Promise((resolve, reject) => {
+          $.ajax({ url: PATH.apiBase + '/api/data', contentType: 'application/json', dataType: 'json', data: JSON.stringify({ parameters }) })
+            .done(resolve).fail(reject);
+        });
+      }
+    `
+    expect(checkFineReportAjaxCompatibility(valid)).toEqual([])
   })
 })
 

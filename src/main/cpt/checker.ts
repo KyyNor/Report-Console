@@ -292,6 +292,38 @@ export function checkApiDataParameters(js: string): CheckerFinding[] {
   return findings
 }
 
+/** 帆软内置 jQuery 的 Deferred 与原生 Promise 不完全兼容，页面调用 /api/data 时必须显式规避。 */
+export function checkFineReportAjaxCompatibility(js: string): CheckerFinding[] {
+  const findings: CheckerFinding[] = []
+  const ajax = /\$\.ajax\s*\(/g
+  let match: RegExpExecArray | null
+  while ((match = ajax.exec(js)) !== null) {
+    const open = ajax.lastIndex - 1
+    const close = matchingIndex(js, open, '(', ')')
+    if (close < 0) continue
+    const request = js.slice(open + 1, close)
+    if (!request.includes('/api/data')) continue
+    const after = js.slice(close + 1, close + 80)
+    if (/^\s*\.then\s*\(/.test(after)) {
+      findings.push({
+        rule: 'finereport_ajax_deferred',
+        severity: 'error',
+        line: lineAt(js, match.index),
+        message: '帆软内置 jQuery Deferred 不兼容 $.ajax(...).then(...).catch(...)；请用 .done/.fail 封装为原生 Promise。'
+      })
+    }
+    if (/contentType\s*:\s*['"]application\/json['"]/.test(request) && !/dataType\s*:\s*['"]json['"]/.test(request)) {
+      findings.push({
+        rule: 'finereport_ajax_json_type',
+        severity: 'error',
+        line: lineAt(js, match.index),
+        message: '帆软 /api/data 虽返回 JSON 正文但可能声明 text/html；$.ajax 请求必须设置 dataType: \'json\'。'
+      })
+    }
+  }
+  return findings
+}
+
 /** js_path_resolution：PATH 基础设施完整 + 未被业务区遮盖 */
 export function checkPathResolution(cptXml: string, baseTemplateXml: string): CheckerFinding[] {
   const findings: CheckerFinding[] = []

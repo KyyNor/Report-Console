@@ -19,7 +19,11 @@ parameters: [
   { name: 'p_pagesize', type: 'Integer', value: pageSize },
   { name: 'p_keyword', type: 'String', value: keyword || '' }
 ]
-\`\`\``
+\`\`\`
+
+### 帆软 jQuery 兼容（严格）
+- 帆软内置 jQuery 的 Deferred 不保证支持原生 Promise 的 \`.catch()\`。调用 \`/api/data\` 时，\`$.ajax(...)\` 必须使用 \`.done(...).fail(...)\` 并封装成 \`new Promise((resolve, reject) => ...)\`；禁止 \`$.ajax(...).then(...).catch(...)\`。
+- 虽然接口正文是 JSON，帆软响应头可能是 \`text/html\`；请求必须设置 \`dataType: 'json'\`，再检查 \`res.err_code === 0\`。`
 
 export const SYSTEM_PROMPT = `你是「Report Console」的开发 Agent，工作在帆软加壳架构上：帆软做数据连接/鉴权/数据集宿主，前端用 React(antd) 页面，产物是部署到 reportlets 的 CPT。
 

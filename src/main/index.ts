@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import { registerIpc } from './ipc'
 import { createMainWindow } from './windows'
 import { runSelftest } from './selftest'
@@ -9,6 +9,22 @@ app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkReq
 function bootstrap(): void {
   registerIpc()
   const win = createMainWindow()
+
+  // 无系统菜单栏的桌面壳默认不会为网页输入控件提供编辑右键菜单。
+  // 只对可编辑控件弹出，避免覆盖工作台其他区域的原生交互。
+  win.webContents.on('context-menu', (_event, params) => {
+    if (!params.isEditable) return
+    Menu.buildFromTemplate([
+      { role: 'undo' },
+      { role: 'redo' },
+      { type: 'separator' },
+      { role: 'cut' },
+      { role: 'copy' },
+      { role: 'paste' },
+      { type: 'separator' },
+      { role: 'selectAll' }
+    ]).popup({ window: win })
+  })
 
   // 冒烟模式：--smoke <截图路径> —— 等待渲染后截图并退出（供自动化验收）
   const smokeIdx = process.argv.indexOf('--smoke')

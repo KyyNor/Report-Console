@@ -190,7 +190,7 @@ export default function WorkbenchView(): React.ReactElement {
       } catch (e) { toast((e as Error).message, 'err'); return null }
     },
     savePage: async (page, content) => {
-      try { await call('pages:save', { project: cur, page, content }); toast(`已保存 ${page}.jsx`, 'ok'); await refresh() } catch (e) { toast((e as Error).message, 'err') }
+      try { await call('pages:save', { project: cur, page, content, overwrite: true }); toast(`已保存 ${page}.jsx`, 'ok'); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
     buildPage: async (page) => {
       try {
@@ -230,7 +230,7 @@ export default function WorkbenchView(): React.ReactElement {
       try { await call('procs:delete', { project: cur, name }); toast(`已删除过程 ${name}`, 'ok'); setSel(null); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
     saveDoc: async (name, content) => {
-      try { await call('docs:save', { project: cur, name, content }); toast(`已保存 ${name}`, 'ok'); await refresh() } catch (e) { toast((e as Error).message, 'err') }
+      try { await call('docs:save', { project: cur, name, content, overwrite: true }); toast(`已保存 ${name}`, 'ok'); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
     deleteDoc: async (name) => {
       try { await call('docs:delete', { project: cur, name }); toast(`已删除 ${name}`, 'ok'); setSel(null); await refresh() } catch (e) { toast((e as Error).message, 'err') }

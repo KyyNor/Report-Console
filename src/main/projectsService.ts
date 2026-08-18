@@ -13,6 +13,7 @@ import { getConnection, requireConnection } from './connectionsService'
 import { applyProcedureMysql, guardedExec, pingConnection } from './mysqlService'
 import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, resolveProjectFile, writeManifest, type ProjectManifest } from './projectManifest'
 import { inspectDocumentContent, type DocInspectOptions } from './docInspector'
+import { replaceUniqueText } from './textPatch'
 import type {
   Project, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
   BuildResult, CheckerFinding, ConnectionHealth
@@ -696,10 +697,24 @@ export function inspectDoc(project: string, name: string, options: DocInspectOpt
   return inspectDocumentContent(content, { name, type, size: stat.size, mtime: stat.mtimeMs }, options)
 }
 
-export function saveDoc(project: string, name: string, content: string): void {
+export function saveDoc(project: string, name: string, content: string, options: { overwrite?: boolean } = {}): void {
   if (!DOC_NAME_RE.test(name)) throw new Error('文档名仅支持 .md / .txt / .html / .sql / .js / .jsx / .mjs / .css 结尾')
-  mkdirSync(metaRoot(project), { recursive: true })
-  writeFileSync(join(metaRoot(project), name), content, 'utf-8')
+  const dir = metaRoot(project)
+  const path = join(dir, name)
+  if (existsSync(path) && !options.overwrite) {
+    throw new Error(`文档已存在：${name}。请先用 patch_doc 修改片段；只有明确需要整份覆盖时才传 overwrite=true`)
+  }
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(path, content, 'utf-8')
+}
+
+/** 对项目 meta/ 文档的精确唯一片段替换。 */
+export function patchDoc(project: string, name: string, oldText: string, newText: string): void {
+  if (!DOC_NAME_RE.test(name)) throw new Error('文档名不合法')
+  const path = join(metaRoot(project), name)
+  if (!existsSync(path)) throw new Error(`文档不存在：${name}`)
+  const content = readFileSync(path, 'utf-8')
+  writeFileSync(path, replaceUniqueText(content, oldText, newText, `文档 ${name}`), 'utf-8')
 }
 
 /** 从用户明确选择的文本文件复制到项目 meta/；不允许路径或格式绕过。 */

@@ -219,7 +219,7 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
       .replace(/CHANGE_ME_data\.cpt/g, 'frdemo_data.cpt')
       .replace(/CHANGE_ME_qry/g, 'book_qry')
       .replace(/CHANGE_ME_total/g, 'book_total')
-    pages.savePage('frdemo', 'book_list', customized)
+    pages.savePage('frdemo', 'book_list', customized, { overwrite: true })
     return 'frdemo/pages/book_list.jsx'
   })
   await step('页面：构建 book_list.mjs + .cpt', () => pages.buildPage('frdemo', 'book_list'))
@@ -232,7 +232,7 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
 
   // 文档（meta/）
   await step('文档：meta/需求与过程语句', () => {
-    projects.saveDoc('frdemo', '01-需求-图书演示.md', '# 图书演示 · 需求\n\nselftest 自动生成的演示项目：列表 / 字典 / 增删改存储过程闭环。\n')
+    projects.saveDoc('frdemo', '01-需求-图书演示.md', '# 图书演示 · 需求\n\nselftest 自动生成的演示项目：列表 / 字典 / 增删改存储过程闭环。\n', { overwrite: true })
     return 'frdemo/meta/01-需求-图书演示.md'
   })
 

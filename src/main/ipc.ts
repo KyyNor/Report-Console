@@ -147,7 +147,7 @@ export function registerIpc(): void {
   // ── 项目文档（meta/） ─────────────────────────────────
   handle('docs:list', (a) => projects.listDocs((a as { project: string }).project))
   handle('docs:read', (a) => projects.readDoc((a as { project: string }).project, (a as { name: string }).name))
-  handle('docs:save', (a) => { projects.saveDoc((a as { project: string }).project, (a as { name: string }).name, (a as { content: string }).content); return true })
+  handle('docs:save', (a) => { projects.saveDoc((a as { project: string }).project, (a as { name: string }).name, (a as { content: string }).content, { overwrite: (a as { overwrite?: boolean }).overwrite }); return true })
   handle('docs:import', (a) => projects.importDoc((a as { project: string }).project, (a as { source: string }).source))
   handle('docs:delete', (a) => { projects.deleteDoc((a as { project: string }).project, (a as { name: string }).name); return true })
   handle('docs:rename', (a) => { projects.renameDoc((a as { project: string }).project, (a as { name: string }).name, (a as { newName: string }).newName); return true })
@@ -155,7 +155,7 @@ export function registerIpc(): void {
   // ── 页面 ──────────────────────────────────────────────
   handle('pages:list', (a) => pages.listPages((a as { project?: string }).project))
   handle('pages:read', (a) => pages.readPage((a as { project: string }).project, (a as { page: string }).page))
-  handle('pages:save', (a) => { pages.savePage((a as { project: string }).project, (a as { page: string }).page, (a as { content: string }).content); return true })
+  handle('pages:save', (a) => { pages.savePage((a as { project: string }).project, (a as { page: string }).page, (a as { content: string }).content, { overwrite: (a as { overwrite?: boolean }).overwrite }); return true })
   handle('pages:create', (a) => { pages.createPage((a as { project: string }).project, (a as { page: string }).page, (a as { starter: 'blank' | 'list' | 'form' }).starter ?? 'blank'); return true })
   handle('pages:delete', (a) => { pages.deletePage((a as { project: string }).project, (a as { page: string }).page); return true })
   handle('pages:updatePaths', (a) => {

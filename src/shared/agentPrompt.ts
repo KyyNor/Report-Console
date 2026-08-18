@@ -51,6 +51,7 @@ ${API_DATA_REQUEST_CONTRACT}
 
 ## 工作方式
 - 根据用户任务按需使用查询工具，不要为了“了解项目”而无差别调用全部 list_* 工具。用户通过 @ 附加资源时，优先按资源提示调用 read_dataset / read_procedure / read_page 获取所需细节；文档先调用 read_doc 的 overview，再按标题和 nextCursor 分段读取 content；传统 CPT 则先调用 inspect_legacy_cpt 的 overview，再按任务读 datasets / parameters / widgets / scripts / references。不要猜测未读取的内容，也不要尝试把整份长文档或 XML 放进上下文。
+- 修改已存在的页面或 meta/ 文档时，先读取要变更的片段，再调用 patch_page / patch_doc；old_text 必须是当前文件中唯一的精确片段。write_page / write_doc 只用于新文件；只有用户明确要求整份覆盖时才传 overwrite=true。
 - 改表结构前先 describe_table（带项目内绑定的 connection）。
 - build_data_cpt 会在构建成功后自动实测安全的只读接口；写接口因可能产生副作用，仍须在用户明确要求后才用 test_dataset 实测。页面和过程的构建/应用结果也要如实报告；失败时根据 err_msg 修复后重试，不要绕过质量门。
 - CPT 只能通过 build 工具产出；报告结论要给出可验证证据（err_code、行数、构建日志）。`

@@ -10,6 +10,7 @@ import { compileJsx, generatePageCpt } from './cpt/displayWriter'
 import { checkApiDataParameters, checkFineReportAjaxCompatibility, checkPageCpt, hasError } from './cpt/checker'
 import { previewPageUrl } from './frClient'
 import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPagePaths, type ManagedPage } from './projectManifest'
+import { replaceUniqueText } from './textPatch'
 import type { PageMeta, BuildResult } from '@shared/types'
 import pageTemplateRaw from './templates/base_cpt_page.cpt?raw'
 import starterBlank from './templates/starters/blank.jsx?raw'
@@ -82,12 +83,24 @@ export function readPage(projectName: string, pageName: string): string {
   return readFileSync(paths.jsx, 'utf-8')
 }
 
-export function savePage(projectName: string, pageName: string, content: string): void {
+export function savePage(projectName: string, pageName: string, content: string, options: { overwrite?: boolean } = {}): void {
   assertName(projectName); assertName(pageName)
   if (!content.trim()) throw new Error('页面内容为空')
   const paths = pagePaths(projectName, pageForProject(projectName, pageName))
+  if (existsSync(paths.jsx) && !options.overwrite) {
+    throw new Error(`页面源文件已存在：${pageName}。请先用 patch_page 修改片段；只有明确需要整份覆盖时才传 overwrite=true`)
+  }
   mkdirSync(dirname(paths.jsx), { recursive: true })
   writeFileSync(paths.jsx, content, 'utf-8')
+}
+
+/** 对已受管页面 JSX 的精确唯一片段替换。 */
+export function patchPage(projectName: string, pageName: string, oldText: string, newText: string): void {
+  assertName(projectName); assertName(pageName)
+  const paths = pagePaths(projectName, pageForProject(projectName, pageName))
+  if (!existsSync(paths.jsx)) throw new Error(`受管页面源文件不存在：${projectName}/${pageName}`)
+  const content = readFileSync(paths.jsx, 'utf-8')
+  writeFileSync(paths.jsx, replaceUniqueText(content, oldText, newText, `页面 ${pageName}`), 'utf-8')
 }
 
 export function createPage(projectName: string, pageName: string, starter: keyof typeof STARTERS = 'blank'): void {

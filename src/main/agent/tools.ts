@@ -156,9 +156,15 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     write_doc: tool({
-      description: '写入/更新项目元数据文件（meta/ 目录，.md / .txt / .html / .sql / .js / .jsx / .mjs / .css）。需求确认、设计沉淀、过程语句备份与前端参考源码都可放这里',
-      parameters: z.object({ project: z.string(), name: z.string(), content: z.string().min(1) }),
-      execute: async ({ project, name, content }) => { projects.saveDoc(project, name, content); return { ok: true } }
+      description: '新建项目元数据文件（meta/ 目录，.md / .txt / .html / .sql / .js / .jsx / .mjs / .css）。同名文件已存在时默认拒绝，先 read_doc 后用 patch_doc 修改；仅用户明确要求整份替换时才传 overwrite=true。',
+      parameters: z.object({ project: z.string(), name: z.string(), content: z.string().min(1), overwrite: z.boolean().default(false).describe('仅在用户明确要求整份覆盖时设为 true') }),
+      execute: async ({ project, name, content, overwrite }) => { projects.saveDoc(project, name, content, { overwrite }); return { ok: true } }
+    }),
+
+    patch_doc: tool({
+      description: '精确修改已有项目 meta/ 文件的一个片段。old_text 必须与当前文件内容完全一致且只出现一次；找不到或命中多处会拒绝写入，需先 read_doc 获取更准确上下文。new_text 可为空以删除该片段。',
+      parameters: z.object({ project: z.string(), name: z.string(), old_text: z.string().min(1), new_text: z.string() }),
+      execute: async ({ project, name, old_text, new_text }) => { projects.patchDoc(project, name, old_text, new_text); return { ok: true } }
     }),
 
     // ── 页面 ──────────────────────────────────────────────
@@ -175,16 +181,27 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     write_page: tool({
-      description: `写入/更新 project.yaml 已声明的页面 JSX 源码（具体项目内路径由清单决定）。
+      description: `写入 project.yaml 已声明的新页面 JSX 源码（具体项目内路径由清单决定）。同名页面源码已存在时默认拒绝，先 read_page 后用 patch_page 修改；仅用户明确要求整份替换时才传 overwrite=true。
 页面运行约定：直接使用全局 React/ReactDOM/antd/dayjs/$/PATH（禁止 import、禁止重新声明 PATH、不要自行创建 app-root）。
 调接口统一走 PATH.apiBase + '/api/data'，report_path 用 PATH.getDataTemplate('xx_data.cpt')。${API_DATA_REQUEST_CONTRACT}`,
       parameters: z.object({
         project: z.string(),
         page: z.string(),
-        content: z.string().min(1)
+        content: z.string().min(1),
+        overwrite: z.boolean().default(false).describe('仅在用户明确要求整份覆盖时设为 true')
       }),
-      execute: async ({ project, page, content }) => {
-        pages.savePage(project, page, content)
+      execute: async ({ project, page, content, overwrite }) => {
+        pages.savePage(project, page, content, { overwrite })
+        return { ok: true }
+      }
+    }),
+
+    patch_page: tool({
+      description: `精确修改已有受管页面 JSX 的一个片段。old_text 必须与当前页面内容完全一致且只出现一次；找不到或命中多处会拒绝写入，需先 read_page 获取更准确上下文。new_text 可为空以删除该片段。
+页面运行约定：直接使用全局 React/ReactDOM/antd/dayjs/$/PATH（禁止 import、禁止重新声明 PATH、不要自行创建 app-root）。${API_DATA_REQUEST_CONTRACT}`,
+      parameters: z.object({ project: z.string(), page: z.string(), old_text: z.string().min(1), new_text: z.string() }),
+      execute: async ({ project, page, old_text, new_text }) => {
+        pages.patchPage(project, page, old_text, new_text)
         return { ok: true }
       }
     }),

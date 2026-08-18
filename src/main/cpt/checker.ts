@@ -433,6 +433,14 @@ export function checkMobilePageCpt(cptXml: string, baseTemplateXml: string): Che
   while ((match = windowCustom.exec(businessJs)) !== null) {
     report('js_mobile_window_custom_state', 'error', match, '移动 SPA 禁止给 window.__* 写自定义状态，可能阻塞同一 window 内的后续路由页面；改用闭包、React state 或 DOM data 属性。')
   }
+  const fixedViewport = /\b100vh\b/gi
+  while ((match = fixedViewport.exec(businessJs)) !== null) {
+    report('js_mobile_no_100vh', 'error', match, '移动端禁止固定 100vh；浏览器地址栏与企微安全区会造成内容遮挡，请使用自然高度、弹性布局或 100dvh。')
+  }
+  const highZIndex = /(?:\bzIndex\s*:\s*|\bz-index\s*:\s*)(\d+)/gi
+  while ((match = highZIndex.exec(businessJs)) !== null) {
+    if (Number(match[1]) > 1_000) report('js_mobile_z_index', 'error', match, '移动端业务 z-index 不得超过 1000，避免覆盖帆软移动 SPA 与 antd-mobile Portal。')
+  }
   return findings
 }
 

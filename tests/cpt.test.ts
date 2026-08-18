@@ -190,6 +190,12 @@ describe('displayWriter + checker', () => {
     const desktop = await compileJsx('var Button = antd.Button; function Root(){ return <Button>bad</Button>; } ReactDOM.createRoot(document.getElementById("app-root")).render(<Root/>);')
     const bad = generateMobilePageCpt(mobilePageTemplate, desktop.clean)
     expect(checkMobilePageCpt(bad, mobilePageTemplate).some((f) => f.rule === 'js_uses_antd_mobile' && f.severity === 'error')).toBe(true)
+
+    const unsafeLayout = await compileJsx('function Root(){ return <div style={{height:"100vh",zIndex:1200}}>bad</div>; } ReactDOM.createRoot(document.getElementById("app-root")).render(<Root/>);')
+    const unsafeCpt = generateMobilePageCpt(mobilePageTemplate, unsafeLayout.clean)
+    const layoutFindings = checkMobilePageCpt(unsafeCpt, mobilePageTemplate)
+    expect(layoutFindings.some((f) => f.rule === 'js_mobile_no_100vh' && f.severity === 'error')).toBe(true)
+    expect(layoutFindings.some((f) => f.rule === 'js_mobile_z_index' && f.severity === 'error')).toBe(true)
   })
 
   it('/api/data parameters 必须是数组，识别对象字面量和对象工厂透传', () => {

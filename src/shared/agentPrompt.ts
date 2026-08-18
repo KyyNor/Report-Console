@@ -69,6 +69,7 @@ const DESKTOP_RULES = `### 桌面端页面规范
 const MOBILE_RULES = `### 移动端页面规范
 - 页面 JSX 直接使用全局 React / antdMobile / dayjs / $ / PATH；禁止使用 PC 全局 antd，禁止 import、重建 PATH、自建 app-root。
 - antd-mobile 没有 PC Table/Modal：数据展示用 List/Grid/IndexBar，容器交互用 Popup，确认用 Dialog，动作菜单用 ActionSheet；触控目标至少 44px，并处理 safe-area。
+- 页面必须有 NavBar；正文以 14–16px 为主。禁止 100vh（使用动态视口/弹性布局）和 z-index > 1000，避免遮挡帆软移动 SPA 与 antd-mobile Portal。
 - 禁止 iframe；复杂场景使用同页 Popup 或移动 SPA 路由。禁止向 window.__* 写自定义状态，避免同一移动 SPA window 后续页面卡死。
 - 移动 SPA 不读取桌面 jsImportList，依赖由移动骨架加载；预览走 /decision/url/mobile#/report。
 - 涉及移动组件、导航或验收时先读取 mobile_display / mobile_qa Skill。`

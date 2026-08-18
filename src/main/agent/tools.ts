@@ -11,6 +11,7 @@ import * as projects from '../projectsService'
 import * as pages from '../pagesService'
 import * as sql from '../mysqlService'
 import * as legacyCpt from '../legacyCptService'
+import { readBuiltinSkill } from './skills'
 import { API_DATA_REQUEST_CONTRACT } from '@shared/agentPrompt'
 
 export { SYSTEM_PROMPT } from '@shared/agentPrompt'
@@ -30,6 +31,15 @@ const connRef = z.object({ id: z.number().optional(), name: z.string().optional(
 
 export function buildTools() {
   return {
+    // ── 内置开发 Skill（只读、按需注入）────────────────────
+    read_skill: tool({
+      description: '按需读取内置开发 Skill，不会访问本机任意文件。可用：page_interaction（跳转/Modal/iframe 通信）、file_transfer（上传/下载/导出边界）、table_patterns（列表/筛选/分页）。任务命中对应场景时先读 Skill，再实现。',
+      parameters: z.object({
+        name: z.enum(['page_interaction', 'file_transfer', 'table_patterns'])
+      }),
+      execute: async ({ name }) => readBuiltinSkill(name)
+    }),
+
     // ── 接口契约 ──────────────────────────────────────────
     list_datasets: tool({
       description: '列出项目内全部接口（数据集）的完整契约：参数、SQL、类型、所属连接',

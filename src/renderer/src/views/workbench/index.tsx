@@ -105,6 +105,20 @@ export default function WorkbenchView(): React.ReactElement {
     if (cur) await loadResources(cur)
   }, [loadProjects, loadResources, cur])
 
+  const importDoc = useCallback(async () => {
+    if (!cur) return
+    try {
+      const source = await call<string | null>('dialog:pickDoc', { title: '选择要导入到项目 meta/ 的文档' })
+      if (!source) return
+      const doc = await call<DocMeta>('docs:import', { project: cur, source })
+      toast(`已导入 meta/${doc.name}`, 'ok')
+      await refresh()
+      setSel(`doc:${doc.name}`)
+    } catch (e) {
+      toast((e as Error).message, 'err')
+    }
+  }, [cur, refresh, toast])
+
   useEffect(() => {
     if (sel === 'if:__pending__' && datasets.length) setSel(`if:${datasets[0].name}`)
   }, [datasets, sel])
@@ -342,10 +356,16 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 文档（需求先行，放最前） */}
                 <Group
                   gk="docs" title="文档（元数据）" one="文档" count={docs.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<span className="gact" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>}
+                  extra={<>
+                    <span className="gact" onClick={() => void importDoc()}><Icon n="folderOpen" size={12} />导入文档</span>
+                    <span className="gact" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
+                  </>}
                   empty={{
                     t: '还没有文档',
-                    actions: <span className="mini" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
+                    actions: <>
+                      <span className="mini" onClick={() => void importDoc()}><Icon n="folderOpen" size={12} />导入文档</span>
+                      <span className="mini" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
+                    </>
                   }}
                 >
                   {docs.filter((x) => match(x.name)).map((x) => (
@@ -353,7 +373,7 @@ export default function WorkbenchView(): React.ReactElement {
                       <Icon n="file" />
                       <div className="main">
                         <div className="nm"><b>{x.name}</b></div>
-                        <div className="sub">{x.type === 'markdown' ? 'Markdown' : x.type === 'sql' ? 'SQL' : '文件'} · meta/ 目录</div>
+                        <div className="sub">{x.type === 'markdown' ? 'Markdown' : x.type === 'sql' ? 'SQL' : '文本'} · meta/ 目录</div>
                       </div>
                       <div className="meta">{fmtShort(new Date(x.mtime).toISOString())}</div>
                       <button className="row-attach" title="附加到 Agent" onClick={(e) => { e.stopPropagation(); acts.useAgent(`doc:${x.name}`) }}><Icon n="ai" size={13} /></button>
@@ -570,7 +590,7 @@ export default function WorkbenchView(): React.ReactElement {
           title="新建文档" initName=""
           onClose={() => setModal(null)}
           onSave={async (name) => {
-            await call('docs:save', { project: cur, name, content: `# ${name.replace(/\.(md|sql)$/i, '').replace(/^\d+-/, '')}\n\n` })
+            await call('docs:save', { project: cur, name, content: `# ${name.replace(/\.(md|txt|html|sql)$/i, '').replace(/^\d+-/, '')}\n\n` })
             toast(`已创建 meta/${name}`, 'ok')
             setModal(null)
             await refresh()

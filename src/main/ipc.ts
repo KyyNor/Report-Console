@@ -90,6 +90,15 @@ export function registerIpc(): void {
     })
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
   })
+  handle('dialog:pickDoc', async (a) => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const r = await dialog.showOpenDialog(win, {
+      title: (a as { title?: string }).title ?? '选择要导入的文档',
+      properties: ['openFile'],
+      filters: [{ name: '文本型文档', extensions: ['md', 'txt', 'html', 'sql'] }]
+    })
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
+  })
   handle('projects:list', () => projects.listProjects())
   handle('projects:create', (a) => projects.createProject(
     (a as { name: string }).name,
@@ -139,6 +148,7 @@ export function registerIpc(): void {
   handle('docs:list', (a) => projects.listDocs((a as { project: string }).project))
   handle('docs:read', (a) => projects.readDoc((a as { project: string }).project, (a as { name: string }).name))
   handle('docs:save', (a) => { projects.saveDoc((a as { project: string }).project, (a as { name: string }).name, (a as { content: string }).content); return true })
+  handle('docs:import', (a) => projects.importDoc((a as { project: string }).project, (a as { source: string }).source))
   handle('docs:delete', (a) => { projects.deleteDoc((a as { project: string }).project, (a as { name: string }).name); return true })
   handle('docs:rename', (a) => { projects.renameDoc((a as { project: string }).project, (a as { name: string }).name, (a as { newName: string }).newName); return true })
 

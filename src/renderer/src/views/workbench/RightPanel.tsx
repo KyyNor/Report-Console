@@ -556,6 +556,8 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
 function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs }): React.ReactElement {
   const key = `doc:${doc.name}`
   const isMd = doc.type === 'markdown'
+  const isSql = doc.type === 'sql'
+  const isText = doc.type === 'other'
   const tab = ctx.tab[key] ?? (isMd ? 'view' : 'src')
   const [content, setContent] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -570,7 +572,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
       <div className="rp-head">
         <div className="rp-r1"><span className="ttl reg">{doc.name}</span></div>
         <div className="rp-r2">
-          <span className="tag src">{isMd ? 'Markdown' : 'SQL 源码'}</span>
+          <span className="tag src">{isMd ? 'Markdown' : isSql ? 'SQL 源码' : '文本'}</span>
           <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>meta/ · {fmtBytes(doc.size)} · {fmtTime(new Date(doc.mtime).toISOString())}</span>
         </div>
         <div className="rp-acts">
@@ -587,14 +589,14 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
       <div className="rp-body">
         {content === null ? <div className="nores">读取中…</div> : tab === 'view'
           ? <div className="md" dangerouslySetInnerHTML={{ __html: mdToHtml(content) }} />
-          : isMd
+            : (isMd || isText)
             ? <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <MdEditor value={content} height="460px" onChange={(v) => { setContent(v); setDirty(true) }} />
               </div>
             : <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <SqlEditor value={content} height="460px" onChange={(v) => { setContent(v); setDirty(true) }} />
               </div>}
-        {!isMd && <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div>过程创建语句存于项目 meta/，与库内实际定义互为备份（「存储过程」面板的保存也写这里）</div></div>}
+        {isSql && <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div>过程创建语句存于项目 meta/，与库内实际定义互为备份（「存储过程」面板的保存也写这里）</div></div>}
       </div>
     </div>
   )

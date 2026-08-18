@@ -3,8 +3,8 @@
  * 存储过程归属/关联（定义存 meta/）、项目文档（meta/）
  */
 
-import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs'
-import { dirname, join } from 'path'
+import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync, copyFileSync } from 'fs'
+import { basename, dirname, extname, join } from 'path'
 import { getDb, getSettings } from './db'
 import { generateDataCpt } from './cpt/dataWriter'
 import { checkDataCpt, hasError } from './cpt/checker'
@@ -12,6 +12,7 @@ import { callApiData, type ApiDataRequest } from './frClient'
 import { getConnection, requireConnection } from './connectionsService'
 import { applyProcedureMysql, guardedExec, pingConnection } from './mysqlService'
 import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, resolveProjectFile, writeManifest, type ProjectManifest } from './projectManifest'
+import { inspectDocumentContent, type DocInspectOptions } from './docInspector'
 import type {
   Project, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
   BuildResult, CheckerFinding, ConnectionHealth
@@ -19,6 +20,8 @@ import type {
 import dataTemplateRaw from './templates/base_cpt_data.cpt?raw'
 
 const NAME_RE = /^[a-z][a-z0-9_]*$/
+const DOC_NAME_RE = /^[\w.\-\u4e00-\u9fa5 ]+\.(md|txt|html|sql)$/i
+const MAX_IMPORTED_DOC_BYTES = 2 * 1024 * 1024
 
 export function assertProjectName(name: string): void {
   if (!NAME_RE.test(name)) throw new Error('名称仅允许小写字母/数字/下划线（= reportlets 子目录名）')
@@ -82,7 +85,7 @@ function countPages(project: string): number {
 function countDocs(project: string): number {
   const dir = join(projectDir(project), 'meta')
   if (!existsSync(dir)) return 0
-  try { return readdirSync(dir).filter((f) => /\.(md|sql)$/i.test(f)).length } catch { return 0 }
+  try { return readdirSync(dir).filter((f) => /\.(md|txt|html|sql)$/i.test(f)).length } catch { return 0 }
 }
 
 /** 把项目身份与受管资源写回 {root}/project.yaml；SQLite 不保存资源布局。 */
@@ -660,7 +663,7 @@ export function listDocs(project: string): DocMeta[] {
   const dir = metaRoot(project)
   if (!existsSync(dir)) return []
   return readdirSync(dir)
-    .filter((f) => /\.(md|sql)$/i.test(f))
+    .filter((f) => /\.(md|txt|html|sql)$/i.test(f))
     .map((f) => {
       const st = statSync(join(dir, f))
       return {
@@ -674,16 +677,44 @@ export function listDocs(project: string): DocMeta[] {
 }
 
 export function readDoc(project: string, name: string): string {
-  if (!/^[\w.\-\u4e00-\u9fa5 ]+$/.test(name)) throw new Error('文档名不合法')
+  if (!DOC_NAME_RE.test(name)) throw new Error('文档名不合法')
   const p = join(metaRoot(project), name)
   if (!existsSync(p)) throw new Error(`文档不存在：${name}`)
   return readFileSync(p, 'utf-8')
 }
 
+/** Agent 专用：概览或分页正文；UI 编辑器仍通过 readDoc 读取完整文件。 */
+export function inspectDoc(project: string, name: string, options: DocInspectOptions = {}): Record<string, unknown> {
+  const content = readDoc(project, name)
+  const stat = statSync(join(metaRoot(project), name))
+  const type = /\.md$/i.test(name) ? 'markdown' : /\.sql$/i.test(name) ? 'sql' : 'other'
+  return inspectDocumentContent(content, { name, type, size: stat.size, mtime: stat.mtimeMs }, options)
+}
+
 export function saveDoc(project: string, name: string, content: string): void {
-  if (!/^[\w.\-\u4e00-\u9fa5 ]+\.(md|sql)$/i.test(name)) throw new Error('文档名仅支持 .md / .sql 结尾')
+  if (!DOC_NAME_RE.test(name)) throw new Error('文档名仅支持 .md / .txt / .html / .sql 结尾')
   mkdirSync(metaRoot(project), { recursive: true })
   writeFileSync(join(metaRoot(project), name), content, 'utf-8')
+}
+
+/** 从用户明确选择的文本文件复制到项目 meta/；不允许路径或格式绕过。 */
+export function importDoc(project: string, source: string): DocMeta {
+  if (!existsSync(source)) throw new Error('待导入文件不存在')
+  const stat = statSync(source)
+  if (!stat.isFile()) throw new Error('只能导入文件')
+  if (stat.size > MAX_IMPORTED_DOC_BYTES) throw new Error('文档超过 2MB，暂不支持导入')
+  const original = basename(source)
+  if (!DOC_NAME_RE.test(original)) throw new Error('仅支持导入 .md / .txt / .html / .sql 文本文件')
+
+  const dir = metaRoot(project)
+  mkdirSync(dir, { recursive: true })
+  const ext = extname(original)
+  const stem = original.slice(0, -ext.length)
+  let name = original
+  let index = 1
+  while (existsSync(join(dir, name))) name = `${stem}-${index++}${ext}`
+  copyFileSync(source, join(dir, name))
+  return { name, type: /\.md$/i.test(name) ? 'markdown' : /\.sql$/i.test(name) ? 'sql' : 'other', size: stat.size, mtime: statSync(join(dir, name)).mtimeMs }
 }
 
 export function deleteDoc(project: string, name: string): void {
@@ -692,7 +723,7 @@ export function deleteDoc(project: string, name: string): void {
 }
 
 export function renameDoc(project: string, name: string, newName: string): void {
-  if (!/^[\w.\-\u4e00-\u9fa5 ]+\.(md|sql)$/i.test(newName)) throw new Error('文档名仅支持 .md / .sql 结尾')
+  if (!DOC_NAME_RE.test(newName)) throw new Error('文档名仅支持 .md / .txt / .html / .sql 结尾')
   const dir = metaRoot(project)
   renameSync(join(dir, name), join(dir, newName))
 }

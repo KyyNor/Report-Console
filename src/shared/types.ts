@@ -137,7 +137,7 @@ export interface TraditionalCptMeta {
 // ── 文档（项目 meta/ 元数据） ───────────────────────────────────
 
 export interface DocMeta {
-  name: string       // 含扩展名（.md / .sql）
+  name: string       // 含扩展名（.md / .txt / .html / .sql）
   type: 'markdown' | 'sql' | 'other'
   size: number
   mtime: number

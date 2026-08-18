@@ -95,7 +95,7 @@ export function registerIpc(): void {
     const r = await dialog.showOpenDialog(win, {
       title: (a as { title?: string }).title ?? '选择要导入的文档',
       properties: ['openFile'],
-      filters: [{ name: '文本型文档', extensions: ['md', 'txt', 'html', 'sql'] }]
+      filters: [{ name: '元数据文本与前端源码', extensions: ['md', 'markdown', 'txt', 'html', 'htm', 'sql', 'js', 'jsx', 'mjs', 'css'] }]
     })
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]
   })

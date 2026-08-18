@@ -407,7 +407,7 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
       </>}
     >
       <div className="fld">
-        <label>文档名（.md / .txt / .html 需求设计，或 .sql 过程语句）</label>
+        <label>文档名（.md / .txt / .html 需求设计、.sql 过程语句，或 .js / .jsx / .mjs / .css 前端参考）</label>
         <input type="text" value={name} spellCheck={false} placeholder="01-需求-订单管理.md" onChange={(e) => setName(e.target.value)} />
       </div>
       {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}

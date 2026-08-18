@@ -573,7 +573,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
       <div className="rp-head">
         <div className="rp-r1"><span className="ttl reg">{doc.name}</span></div>
         <div className="rp-r2">
-          <span className="tag src">{isMd ? 'Markdown' : isSql ? 'SQL 源码' : '文本'}</span>
+          <span className="tag src">{isMd ? 'Markdown' : isSql ? 'SQL 源码' : /\.(js|jsx|mjs)$/i.test(doc.name) ? 'JavaScript' : /\.css$/i.test(doc.name) ? 'CSS' : '文本'}</span>
           <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>meta/ · {fmtBytes(doc.size)} · {fmtTime(new Date(doc.mtime).toISOString())}</span>
         </div>
         <div className="rp-acts">

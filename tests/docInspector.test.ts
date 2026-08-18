@@ -23,4 +23,11 @@ describe('项目文档按需读取器', () => {
     const found = inspectDocumentContent(source, meta, { view: 'content', query: '查询订单', limit: 20 })
     expect(found).toMatchObject({ matchFound: true, query: '查询订单', content: '查询订单\n\n这里是查询流程。' })
   })
+
+  it('前端参考源码也按文本安全地分页读取', () => {
+    const css = '.ledger { color: #123456; }\n.toolbar { display: flex; }'
+    const result = inspectDocumentContent(css, { name: 'lineage.css', type: 'other', size: css.length, mtime: 1 }, { view: 'content', limit: 30 })
+    expect(result).toMatchObject({ name: 'lineage.css', type: 'other', view: 'content', content: css.slice(0, 30) })
+    expect(result).toHaveProperty('nextCursor', 30)
+  })
 })

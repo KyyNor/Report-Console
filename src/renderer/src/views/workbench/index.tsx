@@ -108,7 +108,7 @@ export default function WorkbenchView(): React.ReactElement {
   const importDoc = useCallback(async () => {
     if (!cur) return
     try {
-      const source = await call<string | null>('dialog:pickDoc', { title: '选择要导入到项目 meta/ 的文档' })
+      const source = await call<string | null>('dialog:pickDoc', { title: '选择要导入到项目 meta/ 的文档或前端源码' })
       if (!source) return
       const doc = await call<DocMeta>('docs:import', { project: cur, source })
       toast(`已导入 meta/${doc.name}`, 'ok')
@@ -367,7 +367,7 @@ export default function WorkbenchView(): React.ReactElement {
                       <Icon n="file" />
                       <div className="main">
                         <div className="nm"><b>{x.name}</b></div>
-                        <div className="sub">{x.type === 'markdown' ? 'Markdown' : x.type === 'sql' ? 'SQL' : '文本'} · meta/ 目录</div>
+                        <div className="sub">{x.type === 'markdown' ? 'Markdown' : x.type === 'sql' ? 'SQL' : /\.(js|jsx|mjs)$/i.test(x.name) ? 'JavaScript' : /\.css$/i.test(x.name) ? 'CSS' : '文本'} · meta/ 目录</div>
                       </div>
                       <div className="meta">{fmtShort(new Date(x.mtime).toISOString())}</div>
                       <button className="row-attach" title="附加到 Agent" onClick={(e) => { e.stopPropagation(); acts.useAgent(`doc:${x.name}`) }}><Icon n="ai" size={13} /></button>

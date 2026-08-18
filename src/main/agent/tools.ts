@@ -136,13 +136,13 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
 
     // ── 项目文档（meta/） ────────────────────────────────
     list_docs: tool({
-      description: '列出项目 meta/ 下的需求/设计文档（.md/.txt/.html）与过程语句（.sql）',
+      description: '列出项目 meta/ 下的需求/设计文档（.md/.txt/.html）、过程语句（.sql）及导入的前端参考源码（.js/.jsx/.mjs/.css）',
       parameters: z.object({ project: z.string() }),
       execute: async ({ project }) => projects.listDocs(project)
     }),
 
     read_doc: tool({
-      description: `按需读取项目 meta/ 文档（.md/.txt/.html/.sql）。默认 overview 只返回标题结构和短预览；
+      description: `按需读取项目 meta/ 文档（.md/.txt/.html/.sql/.js/.jsx/.mjs/.css）。默认 overview 只返回标题结构和短预览；
 需要正文时用 view="content"，单次最多 6000 字符，并按 nextCursor 继续。query 会从 cursor 之后定位匹配文本再返回片段。HTML 只作为文本源码读取，绝不执行。`,
       parameters: z.object({
         project: z.string(),
@@ -156,7 +156,7 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     write_doc: tool({
-      description: '写入/更新项目文档（meta/ 目录，.md / .txt / .html / .sql）。需求确认、设计沉淀、过程语句备份都放这里',
+      description: '写入/更新项目元数据文件（meta/ 目录，.md / .txt / .html / .sql / .js / .jsx / .mjs / .css）。需求确认、设计沉淀、过程语句备份与前端参考源码都可放这里',
       parameters: z.object({ project: z.string(), name: z.string(), content: z.string().min(1) }),
       execute: async ({ project, name, content }) => { projects.saveDoc(project, name, content); return { ok: true } }
     }),

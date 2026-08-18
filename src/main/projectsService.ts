@@ -20,8 +20,13 @@ import type {
 import dataTemplateRaw from './templates/base_cpt_data.cpt?raw'
 
 const NAME_RE = /^[a-z][a-z0-9_]*$/
-const DOC_NAME_RE = /^[\w.\-\u4e00-\u9fa5 ]+\.(md|txt|html|sql)$/i
+/** 可作为项目 meta/ 上下文维护的文本文件；二进制附件不纳入 Agent 读取范围。 */
+const DOC_NAME_RE = /^[\w.\-\u4e00-\u9fa5 ]+\.(md|markdown|txt|html|htm|sql|js|jsx|mjs|css)$/i
 const MAX_IMPORTED_DOC_BYTES = 2 * 1024 * 1024
+
+function docMetaType(name: string): DocMeta['type'] {
+  return /\.(?:md|markdown)$/i.test(name) ? 'markdown' : /\.sql$/i.test(name) ? 'sql' : 'other'
+}
 
 export function assertProjectName(name: string): void {
   if (!NAME_RE.test(name)) throw new Error('名称仅允许小写字母/数字/下划线（= reportlets 子目录名）')
@@ -663,12 +668,12 @@ export function listDocs(project: string): DocMeta[] {
   const dir = metaRoot(project)
   if (!existsSync(dir)) return []
   return readdirSync(dir)
-    .filter((f) => /\.(md|txt|html|sql)$/i.test(f))
+    .filter((f) => DOC_NAME_RE.test(f))
     .map((f) => {
       const st = statSync(join(dir, f))
       return {
         name: f,
-        type: /\.md$/i.test(f) ? 'markdown' as const : /\.sql$/i.test(f) ? 'sql' as const : 'other' as const,
+        type: docMetaType(f),
         size: st.size,
         mtime: st.mtimeMs
       }
@@ -687,12 +692,12 @@ export function readDoc(project: string, name: string): string {
 export function inspectDoc(project: string, name: string, options: DocInspectOptions = {}): Record<string, unknown> {
   const content = readDoc(project, name)
   const stat = statSync(join(metaRoot(project), name))
-  const type = /\.md$/i.test(name) ? 'markdown' : /\.sql$/i.test(name) ? 'sql' : 'other'
+  const type = docMetaType(name)
   return inspectDocumentContent(content, { name, type, size: stat.size, mtime: stat.mtimeMs }, options)
 }
 
 export function saveDoc(project: string, name: string, content: string): void {
-  if (!DOC_NAME_RE.test(name)) throw new Error('文档名仅支持 .md / .txt / .html / .sql 结尾')
+  if (!DOC_NAME_RE.test(name)) throw new Error('文档名仅支持 .md / .txt / .html / .sql / .js / .jsx / .mjs / .css 结尾')
   mkdirSync(metaRoot(project), { recursive: true })
   writeFileSync(join(metaRoot(project), name), content, 'utf-8')
 }
@@ -704,7 +709,7 @@ export function importDoc(project: string, source: string): DocMeta {
   if (!stat.isFile()) throw new Error('只能导入文件')
   if (stat.size > MAX_IMPORTED_DOC_BYTES) throw new Error('文档超过 2MB，暂不支持导入')
   const original = basename(source)
-  if (!DOC_NAME_RE.test(original)) throw new Error('仅支持导入 .md / .txt / .html / .sql 文本文件')
+  if (!DOC_NAME_RE.test(original)) throw new Error('仅支持导入 Markdown、文本、HTML、SQL、JavaScript 或 CSS 文件')
 
   const dir = metaRoot(project)
   mkdirSync(dir, { recursive: true })
@@ -714,7 +719,7 @@ export function importDoc(project: string, source: string): DocMeta {
   let index = 1
   while (existsSync(join(dir, name))) name = `${stem}-${index++}${ext}`
   copyFileSync(source, join(dir, name))
-  return { name, type: /\.md$/i.test(name) ? 'markdown' : /\.sql$/i.test(name) ? 'sql' : 'other', size: stat.size, mtime: statSync(join(dir, name)).mtimeMs }
+  return { name, type: docMetaType(name), size: stat.size, mtime: statSync(join(dir, name)).mtimeMs }
 }
 
 export function deleteDoc(project: string, name: string): void {
@@ -723,7 +728,7 @@ export function deleteDoc(project: string, name: string): void {
 }
 
 export function renameDoc(project: string, name: string, newName: string): void {
-  if (!DOC_NAME_RE.test(newName)) throw new Error('文档名仅支持 .md / .txt / .html / .sql 结尾')
+  if (!DOC_NAME_RE.test(newName)) throw new Error('文档名仅支持 .md / .txt / .html / .sql / .js / .jsx / .mjs / .css 结尾')
   const dir = metaRoot(project)
   renameSync(join(dir, name), join(dir, newName))
 }

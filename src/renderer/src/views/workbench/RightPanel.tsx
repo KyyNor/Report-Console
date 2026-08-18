@@ -86,16 +86,17 @@ function connChip(c: string): React.ReactElement {
 
 // ── 主入口 ──────────────────────────────────────────────────────
 
-export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExitAgent }: {
+export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExitAgent, onResourcesChanged }: {
   ctx: SelCtx
   data: WBData
   acts: WBActs
   agentMode: boolean
   agentCtx: { project: string; resource?: string } | null
   onExitAgent: () => void
+  onResourcesChanged?: () => void
 }): React.ReactElement {
   // 项目切换必须卸载旧会话面板：附件、输入草稿和聊天快照都不能跨项目保留。
-  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} />
+  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onResourcesChanged={onResourcesChanged} />
   const { sel } = ctx
   const r = sel ? sel : null
   if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} />
@@ -604,11 +605,12 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
-function AgentPanel({ ctx, project, data, onProjectSettings }: {
+function AgentPanel({ ctx, project, data, onProjectSettings, onResourcesChanged }: {
   ctx: { project: string; resource?: string } | null
   project: Project | null
   data: WBData
   onProjectSettings: () => void
+  onResourcesChanged?: () => void
 }): React.ReactElement {
   const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
@@ -669,6 +671,7 @@ function AgentPanel({ ctx, project, data, onProjectSettings }: {
           mentionOptions={options}
           onAttach={(a) => setAttachments((prev) => prev.some((x) => x.key === a.key) ? prev : [...prev, a])}
           onDetach={(key) => setAttachments((prev) => prev.filter((x) => x.key !== key))}
+          onToolCompleted={onResourcesChanged}
           placeholder="描述开发任务；输入 @ 附加当前项目资源…"
         />}
       </div>

@@ -475,6 +475,7 @@ export default function WorkbenchView(): React.ReactElement {
             agentMode={agentMode}
             agentCtx={agentCtx}
             onExitAgent={() => { setSel(null); setAgentCtx(cur ? { project: cur } : null); setAgentMode(true) }}
+            onResourcesChanged={() => { void refresh() }}
           />
         </aside>
       </div>

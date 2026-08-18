@@ -13,6 +13,14 @@ import { Icon } from '../../components/Icon'
 import { Markdown } from './Markdown'
 import type { PiAgentHandle } from '../piAgent'
 
+/** 这些工具成功后会改变工作台资源或其构建、实测状态。 */
+const RESOURCE_MUTATING_TOOLS = new Set([
+  'save_dataset', 'delete_dataset', 'build_data_cpt', 'test_dataset',
+  'save_procedure', 'apply_procedure',
+  'write_doc',
+  'write_page', 'create_page', 'update_page_paths', 'build_page'
+])
+
 // ── 视图状态：事件 → 快照（rAF 合并，流式增量不逐 token 重渲染） ──
 
 interface ChatView {
@@ -53,7 +61,7 @@ export interface ChatAttachment {
   label: string
 }
 
-export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach }: {
+export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach, onToolCompleted }: {
   handle: PiAgentHandle
   placeholder?: string
   /** 每次任务发送时附带的轻量资源引用，不含资源正文。 */
@@ -62,6 +70,8 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
   mentionOptions?: ChatAttachment[]
   onAttach?: (attachment: ChatAttachment) => void
   onDetach?: (key: string) => void
+  /** 资源写入类工具成功完成后通知宿主刷新自己的资源视图。 */
+  onToolCompleted?: (toolName: string) => void
 }): React.ReactElement {
   const agent = handle.agent
   const view = useChatView(agent)
@@ -72,12 +82,31 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
     for (const msg of view.messages) if (msg.role === 'toolResult') m.set(msg.toolCallId, msg)
     return m
   }, [view.messages])
+  // toolResult 已由其 assistant toolCall 内的 ToolBlock 渲染；只有确实找不到
+  // 对应调用时才走下方的孤儿兜底，避免同一次工具执行出现一个正确块和一个 {} 块。
+  const calledToolIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const msg of view.messages) {
+      if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue
+      for (const block of msg.content) if (block.type === 'toolCall') ids.add(block.id)
+    }
+    return ids
+  }, [view.messages])
   // 工具显示名：AgentTool 的 label 优先（与工具注册名一致时无差别）
   const toolLabels = useMemo(() => {
     const m = new Map<string, string>()
     for (const t of agent.state.tools) m.set(t.name, t.label ?? t.name)
     return m
   }, [agent])
+
+  useEffect(() => {
+    if (!onToolCompleted) return
+    return agent.subscribe((event) => {
+      if (event.type === 'tool_execution_end' && !event.isError && RESOURCE_MUTATING_TOOLS.has(event.toolName)) {
+        onToolCompleted(event.toolName)
+      }
+    })
+  }, [agent, onToolCompleted])
 
   // 贴底滚动：用户上翻阅历史时不打扰，新内容到达时若原本贴底则继续贴底
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -138,7 +167,7 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
               return <AssistantCard key={`a${i}`} msg={m} results={results} pending={view.pending} toolLabels={toolLabels} />
             }
             // 孤儿 toolResult（无对应 assistant 工具调用，如手工注入）兜底渲染
-            if (m.role === 'toolResult') {
+            if (m.role === 'toolResult' && !calledToolIds.has(m.toolCallId)) {
               const orphan: ToolCall = { type: 'toolCall', id: m.toolCallId, name: m.toolName, arguments: {} }
               return <ToolBlock key={`t${i}`} call={orphan} result={m} running={false} label={toolLabels.get(m.toolName) ?? m.toolName} />
             }

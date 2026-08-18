@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Report Console 多端 Agent 与预览诊断实施报告</title>
+  <style>
+    :root{--ink:#162033;--muted:#657087;--line:#dce3ee;--paper:#fff;--wash:#f4f7fb;--blue:#2563eb;--blue2:#eaf2ff;--green:#14804a;--green2:#e9f8ef;--amber:#a35b00;--amber2:#fff4dd;--red:#b42318;--red2:#fff0ee;--navy:#0f1d35;--code:#111827}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#eef3fa 0,#f8fafc 42%,#eef4ff 100%);color:var(--ink);font:15px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+    a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}.page{max-width:1180px;margin:36px auto;padding:0 24px 72px}.hero{position:relative;overflow:hidden;padding:52px 54px;border-radius:24px;background:var(--navy);color:#fff;box-shadow:0 24px 70px rgba(31,51,83,.18)}
+    .hero:after{content:"";position:absolute;right:-90px;top:-140px;width:390px;height:390px;border-radius:50%;background:radial-gradient(circle,#3778ff 0,rgba(37,99,235,.08) 68%,transparent 69%)}.eyebrow{font:700 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#90b6ff}.hero h1{max-width:800px;margin:16px 0 10px;font-size:42px;line-height:1.18;letter-spacing:-.03em}.hero p{max-width:780px;margin:0;color:#c9d6e9;font-size:17px}.hero-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.pill{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(255,255,255,.08);font:600 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace}.dot{width:8px;height:8px;border-radius:50%;background:#48d597;box-shadow:0 0 0 4px rgba(72,213,151,.14)}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 38px}.stat{padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.88);box-shadow:0 9px 26px rgba(31,51,83,.06)}.stat b{display:block;font-size:26px;line-height:1.15}.stat span{display:block;margin-top:6px;color:var(--muted);font-size:12px}
+    section{margin:34px 0;padding:30px 32px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.94);box-shadow:0 12px 36px rgba(31,51,83,.055)}h2{margin:0 0 6px;font-size:25px;letter-spacing:-.02em}h3{margin:24px 0 9px;font-size:17px}p{margin:7px 0;color:#33405a}.lead{margin-bottom:20px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}.card h3{margin:0 0 7px}.card p{font-size:13px;color:var(--muted)}.badge{display:inline-block;padding:3px 8px;border-radius:999px;font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}.done{color:var(--green);background:var(--green2)}.partial{color:var(--amber);background:var(--amber2)}.scope{color:var(--blue);background:var(--blue2)}
+    .matrix{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}.matrix th,.matrix td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.matrix th{background:var(--wash);font-size:12px;color:#516078}.matrix td{font-size:13px}.matrix tr:last-child td{border-bottom:0}.matrix td:first-child{font-weight:700;width:24%}.matrix td:last-child{color:var(--muted)}
+    .flow{display:grid;grid-template-columns:1fr 34px 1fr 34px 1fr;align-items:stretch;gap:5px;margin:18px 0}.node{padding:17px;border:1px solid #cdd9ea;border-radius:14px;background:linear-gradient(180deg,#fff,#f7faff)}.node b{display:block}.node small{display:block;margin-top:5px;color:var(--muted);line-height:1.55}.arrow{display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:22px;font-weight:700}
+    .mock{border:1px solid #cbd6e6;border-radius:16px;overflow:hidden;background:#f7f9fc}.mockbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #d7e0ec;background:#fff}.mockbar strong{margin-right:auto}.mockbtn{padding:5px 9px;border:1px solid #c9d4e3;border-radius:8px;background:#fff;color:#31415e;font-size:11px}.mockbtn.on{border-color:#8ab1ff;background:#ebf3ff;color:#155bd7}.mockbody{padding:14px}.logrow{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:10px;padding:10px;border:1px solid #dce4ef;border-radius:10px;background:#fff;align-items:center;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.status{padding:4px 7px;border-radius:999px;background:var(--green2);color:var(--green);font-weight:700}.status.bad{background:var(--red2);color:var(--red)}
+    code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}code{padding:2px 5px;border:1px solid #d4dfed;border-radius:5px;background:#f1f5fa;color:#244b87;font-size:.9em}pre{overflow:auto;padding:16px 18px;border-radius:12px;background:var(--code);color:#dbe6f5;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.callout{margin:16px 0;padding:14px 16px;border-left:4px solid var(--blue);border-radius:0 10px 10px 0;background:var(--blue2);color:#27466f}.callout.warn{border-left-color:#e09426;background:var(--amber2);color:#724513}.callout.bad{border-left-color:#dc4c43;background:var(--red2);color:#78332d}
+    ul{margin:7px 0;padding-left:21px;color:#33405a}li{margin:5px 0}.steps{counter-reset:step;display:grid;gap:10px}.step{position:relative;padding:14px 16px 14px 54px;border:1px solid var(--line);border-radius:12px}.step:before{counter-increment:step;content:counter(step);position:absolute;left:15px;top:14px;width:25px;height:25px;display:grid;place-items:center;border-radius:8px;background:var(--blue);color:#fff;font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace}.step b{display:block}.step span{color:var(--muted);font-size:13px}
+    .commit{display:grid;grid-template-columns:92px 1fr;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.commit:last-child{border:0}.hash{font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--blue)}.commit small{display:block;color:var(--muted)}footer{padding:16px 4px;color:var(--muted);font-size:12px;text-align:center}
+    @media(max-width:800px){.page{padding:0 12px}.hero{padding:36px 26px}.hero h1{font-size:31px}.summary,.grid{grid-template-columns:1fr 1fr}.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}section{padding:24px 20px}.matrix{display:block;overflow-x:auto}}
+    @media(max-width:520px){.summary,.grid{grid-template-columns:1fr}.hero h1{font-size:27px}}
+    @media print{body{background:#fff}.page{max-width:none;margin:0;padding:0}.hero,section,.stat{box-shadow:none;break-inside:avoid}.hero{border-radius:0}.summary{margin-top:14px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="eyebrow">Report Console · Implementation report</div>
+      <h1>多端 Agent、讨论模式与预览诊断</h1>
+      <p>在独立 worktree 中完成桌面端 / 移动端 / 双端项目模型、场景化提示词与 Skill、一次性 @ 引用、只读规范查看，以及按项目隔离的 Data API 会话日志。</p>
+      <div class="hero-meta">
+        <span class="pill"><span class="dot"></span>分支 codex/agent-modes-mobile</span>
+        <span class="pill">Worktree report-console-agent-modes</span>
+        <span class="pill">2026-08-18</span>
+      </div>
+    </header>
+
+    <div class="summary">
+      <div class="stat"><b>3</b><span>项目端型：桌面 / 移动 / 双端</span></div>
+      <div class="stat"><b>6</b><span>可查看的提示词场景组合</span></div>
+      <div class="stat"><b>2 层</b><span>讨论模式写入防线</span></div>
+      <div class="stat"><b>39</b><span>全量单测通过</span></div>
+    </div>
+
+    <section>
+      <span class="badge done">结论</span>
+      <h2>本轮目标已经形成一套连贯的产品能力</h2>
+      <p class="lead">不是简单增加一个“移动端”开关，而是把项目事实、构建骨架、质量门、Agent 提示词、运行工具和查看界面贯通。旧项目缺少端型字段时继续按桌面端读取，桌面端原有构建链路保持不变。</p>
+      <table class="matrix">
+        <thead><tr><th>需求</th><th>状态</th><th>实现结论</th></tr></thead>
+        <tbody>
+          <tr><td>桌面 / 移动 / 双端</td><td><span class="badge done">已完成</span></td><td><code>project.yaml.platform</code> 成为可迁移事实；双端项目每个页面仍明确选择 desktop/mobile。</td></tr>
+          <tr><td>不同提示词与规范</td><td><span class="badge done">已完成</span></td><td>系统提示词按“公共约束 + 端型规范 + 工作模式”组合；移动端有专属 Skill 与质量门。</td></tr>
+          <tr><td>@ 只作用一次</td><td><span class="badge done">已完成</span></td><td>引用随本次用户消息发送，成功发出后立即清空；下一轮不会继续注入。</td></tr>
+          <tr><td>提示词 / Skill 查看</td><td><span class="badge done">已完成</span></td><td>新增只读“规范”主导航，可切换端型、模式与 Skill；无编辑入口。</td></tr>
+          <tr><td>讨论需求模式</td><td><span class="badge done">已完成</span></td><td>Agent 顶栏一键切换；只开放读取类工具，只能输出结构化开发计划。</td></tr>
+          <tr><td>DevTools</td><td><span class="badge done">已完成</span></td><td>预览页右上角入口打开 Electron 原生 Chromium DevTools，不是自行仿制的控制台。</td></tr>
+          <tr><td>Data API 日志</td><td><span class="badge done">已完成</span></td><td>“Data 日志”与“版本”并列；查看当前预览会话的请求、响应、状态、耗时与 SQL 诊断。</td></tr>
+          <tr><td>页面自动操作</td><td><span class="badge scope">本轮不做</span></td><td>遵循此前约定：只采集错误和网络信息，不让 Agent 点击或填写业务页面。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <span class="badge scope">项目模型</span>
+      <h2>端型信息跟项目目录迁移</h2>
+      <div class="flow">
+        <div class="node"><b>project.yaml</b><small>记录项目 platform，以及受管页面各自的 platform 与 jsx/mjs/cpt 路径。</small></div><div class="arrow">→</div>
+        <div class="node"><b>构建服务</b><small>按页面端型选择 PC 或移动骨架、检查器和预览 URL；数据层继续共用。</small></div><div class="arrow">→</div>
+        <div class="node"><b>Agent</b><small>按项目端型组合系统提示词；双端项目修改页面前先读取页面端型。</small></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h3>兼容旧项目</h3><p>旧 YAML 没有 <code>platform</code> 时默认为 desktop。已有桌面页面不会因升级被改成移动端，也不需要批量迁移。</p></div>
+        <div class="card"><h3>双端不混写</h3><p>桌面和移动可共享接口契约，但页面分别建页、分别构建；不允许在同一个 JSX 中用运行时条件混用 antd 与 antdMobile。</p></div>
+        <div class="card"><h3>移动骨架</h3><p>新增移动 CPT 骨架与通用 starter，走 <code>/decision/url/mobile#/report</code>，由骨架处理 antd-mobile 依赖加载。</p></div>
+        <div class="card"><h3>移动质量门</h3><p>隔离在移动构建路径，拦截 PC antd、window.__*、100vh、过高 z-index 等；桌面检查器未改变。</p></div>
+      </div>
+      <div class="callout">移动规范对照了原始 <a href="https://github.com/xiaomaomi-distinct/fr-flow-v3">fr-flow-v3</a> 的并行 frm 流水线：数据层共用，展示层使用 antd-mobile，移动入口、骨架和 QA 规则独立。</div>
+    </section>
+
+    <section>
+      <span class="badge scope">Agent</span>
+      <h2>提示词从一份常量变成场景组合</h2>
+      <pre>系统提示词 = 公共项目隔离与安全约束
+           + desktop | mobile | dual 端型规范
+           + development | discussion 工作模式</pre>
+      <div class="grid">
+        <div class="card"><h3>开发模式</h3><p>开放当前项目内的写入、构建、实测与预览工具，仍受 CPT 构建管线、SQL 审计和项目隔离约束。</p></div>
+        <div class="card"><h3>讨论需求模式</h3><p>提示词要求只输出计划；渲染层只传入读取类工具，主进程桥再次拒绝任何写入工具，防止仅靠模型自觉。</p></div>
+        <div class="card"><h3>一次性 @</h3><p>附件只进入本次 <code>contextPrefix</code>。消息发出后触发 <code>onPromptSent</code> 清空，下轮输入恢复为无附件状态。</p></div>
+        <div class="card"><h3>规范查看</h3><p>新增“规范”Tab，能只读查看 3 种端型 × 2 种模式的完整系统提示词，以及内置 Skill 内容。</p></div>
+      </div>
+      <h3>讨论模式的输出边界</h3>
+      <div class="steps">
+        <div class="step"><b>先理解问题</b><span>按需调用项目内读取工具，不要求机械列出所有接口、页面、过程和文档。</span></div>
+        <div class="step"><b>只形成计划</b><span>输出目标、范围、现状、数据方案、页面方案、步骤、验收、风险与待确认项。</span></div>
+        <div class="step"><b>切回开发</b><span>用户确认方案后手动切换“开发”，写工具才重新可用。</span></div>
+      </div>
+    </section>
+
+    <section>
+      <span class="badge scope">预览诊断</span>
+      <h2>Data 日志的界面与采集链路</h2>
+      <p class="lead">入口位于 Agent 会话顶栏，和“版本”并列。点击后进入项目级 Data 日志页；面板每 1.5 秒刷新当前应用进程内的预览会话。</p>
+      <div class="mock">
+        <div class="mockbar"><strong>Agent 会话</strong><span class="mockbtn">开发</span><span class="mockbtn">版本</span><span class="mockbtn on">Data 日志</span><span class="mockbtn">新建会话</span></div>
+        <div class="mockbody">
+          <div class="logrow"><span class="status">HTTP 200</span><b>ds_table_lineage_qry</b><span>lineage_ledger</span><span>58ms</span></div>
+          <div style="height:8px"></div>
+          <div class="logrow"><span class="status bad">业务错误 400</span><b>dict_ds_lineage_type</b><span>lineage_graph</span><span>43ms</span></div>
+        </div>
+      </div>
+      <h3>采集过程</h3>
+      <div class="flow">
+        <div class="node"><b>Electron webRequest</b><small>始终记录请求体、HTTP 状态和网络失败；DevTools 打开时仍有效。</small></div><div class="arrow">+</div>
+        <div class="node"><b>Chromium CDP</b><small>DevTools 未占用调试会话时读取响应正文，并识别 HTTP 200 中的帆软业务错误。</small></div><div class="arrow">→</div>
+        <div class="node"><b>进程内会话账本</b><small>按 project/page/window 隔离；每个会话最多 100 次调用，正文限制 20,000 字符。</small></div>
+      </div>
+      <ul>
+        <li>列表展示 HTTP / 业务状态、数据集、页面、时间和耗时。</li>
+        <li>详情展示 <code>report_path</code>、请求 URL、请求体和响应体。</li>
+        <li>只从当前项目的 <code>project.yaml</code> 反查同名接口 SQL；不会读取其他项目。</li>
+        <li>关闭窗口后本次会话仍可查看；应用重启后清空，不写项目目录和 SQLite。</li>
+      </ul>
+    </section>
+
+    <section>
+      <span class="badge partial">重要边界</span>
+      <h2>“实际 SQL”能看到什么、不能承诺什么</h2>
+      <div class="flow">
+        <div class="node"><b>接口 SQL 模板</b><small>来自当前项目数据集契约，可靠可追溯。</small></div><div class="arrow">→</div>
+        <div class="node"><b>参数代入公式</b><small>把本次 API 的参数值只代入 <code>${...}</code> 表达式。</small></div><div class="arrow">→</div>
+        <div class="node"><b>公式求值 SQL</b><small>桌面预览页显式使用 FR.remoteEvaluate 逐段求值，拼回调试 SQL。</small></div>
+      </div>
+      <div class="callout warn"><b>它不是数据库端的最终执行日志。</b> 帆软服务端仍可能做转义、驱动参数化、方言改写或执行计划处理。要证明 MySQL 真正收到的 SQL，需要数据库 general log / performance_schema、JDBC 代理或帆软服务端插件。</div>
+      <ul>
+        <li>公式求值是用户主动点击，不在每个请求后自动执行。</li>
+        <li>移动 SPA 不执行二次 <code>FR.remoteEvaluate</code>，避免已知挂起风险；仅展示模板与参数代入表达式。</li>
+        <li>双端项目由页面 platform 决定是否可求值，而不是仅看项目标签。</li>
+      </ul>
+    </section>
+
+    <section>
+      <span class="badge done">稳定性</span>
+      <h2>如何避免影响现有桌面端功能</h2>
+      <div class="grid">
+        <div class="card"><h3>独立 worktree</h3><p>全部新功能在 <code>/Users/kyynor/Code/report-console-agent-modes</code> 开发；主分支当前运行版本未被替换。</p></div>
+        <div class="card"><h3>缺省 desktop</h3><p>项目和旧页面没有端型字段时继续走原 PC 骨架、原检查器和原预览 URL。</p></div>
+        <div class="card"><h3>主进程再校验</h3><p>讨论模式不是只隐藏按钮；IPC 工具桥会拒绝写工具。项目参数仍由主进程注入，不能由模型跨项目改写。</p></div>
+        <div class="card"><h3>日志不落项目</h3><p>Data 日志仅进程内保存，不会污染 SVN 目录、project.yaml、版本检查点或项目 SQLite 事实。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <span class="badge done">验证</span>
+      <h2>自动验证结果</h2>
+      <table class="matrix">
+        <thead><tr><th>检查</th><th>结果</th><th>覆盖范围</th></tr></thead>
+        <tbody>
+          <tr><td><code>npm run typecheck</code></td><td><span class="badge done">通过</span></td><td>主进程、共享类型、渲染层与 Agent 接口。</td></tr>
+          <tr><td><code>npm test -- --run</code></td><td><span class="badge done">39 / 39</span></td><td>CPT、项目清单、Skills、诊断隔离、版本 Diff、文档与补丁。</td></tr>
+          <tr><td>Data SQL 专项</td><td><span class="badge done">3 / 3</span></td><td>请求参数代入、公式结果拼回、跨项目会话隔离。</td></tr>
+          <tr><td><code>npm run build</code></td><td><span class="badge done">通过</span></td><td>Electron main/preload/renderer 生产构建。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <span class="badge scope">提交记录</span>
+      <h2>关键节点均已提交</h2>
+      <div class="commit"><span class="hash">48e4125</span><div><b>页面错误诊断采集</b><small>主分支已有：原生 DevTools、Data 4xx/5xx 与 JavaScript error、Agent 读取错误。</small></div></div>
+      <div class="commit"><span class="hash">d377a74</span><div><b>桌面端与移动端项目模型</b><small>platform、双端页面、移动骨架、starter、预览 URL 与质量门。</small></div></div>
+      <div class="commit"><span class="hash">80a3564</span><div><b>讨论模式与规范查看</b><small>场景化提示词、只读工具防线、一次性 @、规范 Tab、移动与需求 Skill。</small></div></div>
+      <div class="commit"><span class="hash">482330f</span><div><b>Data API 会话日志</b><small>请求/响应账本、SQL 诊断、隔离 UI 与单元测试。</small></div></div>
+      <div class="commit"><span class="hash">499a91f</span><div><b>补齐移动端布局红线</b><small>NavBar、字号、100vh、z-index 与对应质量门。</small></div></div>
+    </section>
+
+    <section>
+      <span class="badge partial">尚需确认</span>
+      <h2>没有假装已经完成的部分</h2>
+      <ul>
+        <li><b>尚未合并 main：</b>按要求保留在独立 worktree，等待你审阅后再决定合并。</li>
+        <li><b>真实帆软移动环境：</b>自动测试和生产构建已通过，但移动 URL、CDN / 本地 fallback、企微 WebView 仍需在实际 FineReport 上冒烟。</li>
+        <li><b>FR.remoteEvaluate：</b>代码链路已实现；不同帆软版本对复杂公式的返回形式需要用真实页面确认。</li>
+        <li><b>DevTools 互斥：</b>Electron 原生 DevTools 与程序的 CDP 响应正文采集不能同时占用调试器。DevTools 打开时仍记录请求和状态，关闭后会恢复响应正文采集。</li>
+        <li><b>日志持久化：</b>目前按“当前会话”要求仅在内存保存。若要跨重启审计，需要再设计容量、脱敏与清理策略。</li>
+        <li><b>数据库实际 SQL：</b>当前是公式求值后的调试 SQL。若必须与 MySQL 收到的语句逐字一致，应另做服务端或数据库侧日志。</li>
+        <li><b>页面操作自动化：</b>本轮没有实现 Agent 点击/输入；仍保持只采集错误，符合之前确定的范围。</li>
+      </ul>
+      <div class="callout bad">建议合并前做三条真实环境验收：旧桌面项目构建预览、一个移动 starter 构建预览、一个包含帆软公式的数据接口触发并点击“解析公式 SQL”。</div>
+    </section>
+
+    <footer>Report Console · 多端 Agent 与预览诊断实施报告 · 生成于 2026-08-18</footer>
+  </main>
+</body>
+</html>

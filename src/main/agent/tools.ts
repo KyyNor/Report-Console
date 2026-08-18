@@ -10,6 +10,7 @@ import { z } from 'zod'
 import * as projects from '../projectsService'
 import * as pages from '../pagesService'
 import * as sql from '../mysqlService'
+import * as legacyCpt from '../legacyCptService'
 
 export { SYSTEM_PROMPT } from '@shared/agentPrompt'
 
@@ -221,6 +222,22 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
         openPreviewWindow(url, `${project}/${page}`)
         return { ok: true, url }
       }
+    }),
+
+    inspect_legacy_cpt: tool({
+      description: `按需检查当前项目内的传统 CPT（未被 project.yaml 管理），不会返回或修改整份 XML。
+先用 overview 了解数据集、表单控件、事件和引用；需要细节时再按 datasets / parameters / widgets / scripts / references 分区读取。
+path 必须来自用户通过 @ 附加的传统 CPT，或当前项目的传统 CPT 列表；可用 query 过滤、cursor 翻页。脚本、数据集和布局项均有严格的单次返回上限，继续读取请使用 nextCursor。`,
+      parameters: z.object({
+        project: z.string(),
+        path: z.string().min(1).describe('当前项目内传统 CPT 的相对路径'),
+        view: z.enum(['overview', 'datasets', 'parameters', 'widgets', 'scripts', 'references']).default('overview'),
+        query: z.string().max(200).optional().describe('仅返回匹配文本的记录'),
+        cursor: z.number().int().min(0).optional().describe('从第几条记录开始分页'),
+        limit: z.number().int().min(1).max(20).optional().describe('本次最多返回的记录数')
+      }),
+      execute: async ({ project, path, view, query, cursor, limit }) =>
+        legacyCpt.inspectLegacyCpt(project, path, { view, query, cursor, limit })
     }),
 
     // ── 数据库（按连接路由） ──────────────────────────────

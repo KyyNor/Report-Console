@@ -681,7 +681,7 @@ function buildDigest(project: Project | null, attachments: ChatAttachment[]): st
   for (const attachment of attachments) {
     const [kind, name] = [attachment.key.slice(0, attachment.key.indexOf(':')), attachment.key.slice(attachment.key.indexOf(':') + 1)]
     if (kind === 'legacy') {
-      lines.push(`附加资源：传统 CPT 文件 ${name}。`)
+      lines.push(`附加资源：传统 CPT 文件 ${name}；需要了解结构时先调用 inspect_legacy_cpt(path="${name}", view="overview")。`)
       continue
     }
     const kindName = kind === 'if' ? '数据接口' : kind === 'sp' ? '存储过程' : kind === 'pg' ? '页面' : '文档'

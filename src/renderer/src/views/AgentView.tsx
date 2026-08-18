@@ -75,7 +75,7 @@ export default function AgentView({ onNavigate }: { onNavigate?: (v: string) => 
         {!status.error && !handle && (
           <div className="banner info" style={{ margin: '12px 8px' }}><Icon n="info" /><div>正在初始化 pi Agent（加载平台工具与会话）…</div></div>
         )}
-        {handle && <PiChat handle={handle} />}
+        {handle && <PiChat key={handle.sessionId} handle={handle} />}
       </div>
     </div>
   )

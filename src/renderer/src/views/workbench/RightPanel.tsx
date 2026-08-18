@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { CodeBlk, fmtBytes, fmtTime, mdToHtml } from '../../components/ui'
 import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
-import { getSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
+import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
 import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding } from '@shared/types'
@@ -94,7 +94,8 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   agentCtx: { project: string; resource?: string } | null
   onExitAgent: () => void
 }): React.ReactElement {
-  if (agentMode) return <AgentPanel ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} />
+  // 项目切换必须卸载旧会话面板：附件、输入草稿和聊天快照都不能跨项目保留。
+  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} />
   const { sel } = ctx
   const r = sel ? sel : null
   if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} />
@@ -636,12 +637,21 @@ function AgentPanel({ ctx, project, data, onProjectSettings }: {
   }, [project?.name])
 
   const digest = buildDigest(project, attachments)
+  const newSession = () => {
+    if (!project) return
+    setState({})
+    setAttachments([])
+    void resetSharedPiAgent({ project: project.name })
+      .then((handle) => setState({ handle }))
+      .catch((e) => setState({ error: (e as Error).message }))
+  }
 
   return (
     <div className="rp">
       <div className="ag-head">
         <span className="ttl">Agent 会话</span>
         {state.handle && <span className="ctx-chip" title={`当前项目：${project?.name ?? '-'}；模型在「设置」页配置`}>{state.handle.modelId} · {project?.name}</span>}
+        {state.handle && <button className="btn sm" title="在当前项目中开始空白会话" onClick={newSession}><Icon n="plus" size={13} />新建会话</button>}
         {project && <button className="iconbtn" title="项目设置" onClick={onProjectSettings}><Icon n="set" /></button>}
       </div>
       <div className="ag-thread-wrap" style={{ padding: '8px 10px 10px', display: 'flex' }}>
@@ -650,7 +660,7 @@ function AgentPanel({ ctx, project, data, onProjectSettings }: {
           : !state.handle
             ? <div className="banner info" style={{ margin: 12 }}><Icon n="info" /><div>正在初始化（加载平台工具与会话）…</div></div>
             : null}
-        {state.handle && <PiChat
+        {state.handle && <PiChat key={state.handle.sessionId}
           handle={state.handle}
           contextPrefix={digest}
           attachments={attachments}

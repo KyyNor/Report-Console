@@ -175,7 +175,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
             <div className="guide">
               <div className="gstep done"><span className="no">✓</span><div><div className="gt2">创建项目</div><div className="gd">绑定目录与连接（{p.connections.join('、') || '-'}）</div></div></div>
               <div className="gstep"><span className="no">2</span><div><div className="gt2">建表与存储过程</div><div className="gd">数据先行：过程返回 SELECT JSON_OBJECT，或关联已有过程</div></div></div>
-              <div className="gstep"><span className="no">3</span><div><div className="gt2">接口契约 → 构建实测</div><div className="gd">帆软实测通过之后才进入页面开发（顺序强约定）</div></div></div>
+              <div className="gstep"><span className="no">3</span><div><div className="gt2">接口契约 → 构建实测</div></div></div>
               <div className="gstep"><span className="no">4</span><div><div className="gt2">页面 jsx → 构建 → 预览</div><div className="gd">脚手架起步，过质量门，帆软 op=write 预览</div></div></div>
             </div>
             <div className="banner info"><Icon n="ai" /><div><b>把需求文档交给 Agent</b>：在「文档」组新建需求（meta/），然后点上方「让 Agent 从需求开始」。Agent 与手工共用同一工具链与质量门。</div></div>

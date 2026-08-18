@@ -181,7 +181,7 @@ CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
 
   <div class="stepcard">
     <div class="head"><span class="n">6</span><b>开发页面 → 构建 → 预览</b><span class="where">页面页 · Agent create_page / write_page / build_page / open_page</span></div>
-    <p>从脚手架起步（blank / list / form），CodeMirror 高亮编辑 jsx。<b>jsx 是全流程唯一手写产物</b>——直接用全局 React/antd/dayjs/PATH，不写 import、不重建 PATH。构建管线：</p>
+    <p>从脚手架起步（blank / list / form），JSX 通常由 Agent 生成，也可在 CodeMirror 中继续维护。业务代码直接用全局 React/antd/dayjs/PATH，不写 import、不重建 PATH。构建管线：</p>
     <pre>jsx <span class="k">--esbuild(iife)--▶</span> 去注释(字符串保护) <span class="k">--▶</span> \uXXXX 解码 <span class="k">--▶</span> Hook 解构转两步赋值
     <span class="k">--▶</span> 注入骨架「开发者代码区」<span class="k">--▶</span> 质量门 <span class="k">--▶</span> 清单指定位置产出 .mjs + .cpt</pre>
     <p>质量门查：XML 良构、PATH 被遮盖、<code>_MJS_</code> 占位符残留、Unicode 转义残留、自创标签——有 error 则 .cpt 不落盘（.mjs 保留供排查）。预览用帆软 <code>op=write</code> URL + 时间戳防缓存，独立窗口打开。</p>

@@ -344,7 +344,7 @@ export default function WorkbenchView(): React.ReactElement {
                   gk="docs" title="文档（元数据）" one="文档" count={docs.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
                   extra={<span className="gact" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>}
                   empty={{
-                    t: '还没有文档', d: '把需求 / 设计文档放进项目 meta/ 目录，Agent 可读取作为开发上下文',
+                    t: '还没有文档',
                     actions: <span className="mini" onClick={() => setModal({ k: 'newdoc' })}><Icon n="plus" size={12} />新建文档</span>
                   }}
                 >
@@ -369,7 +369,7 @@ export default function WorkbenchView(): React.ReactElement {
                     pageMenuAt(r.left, r.bottom + 6)
                   }}><Icon n="plus" size={12} />新建页面</span>}
                   empty={{
-                    t: '还没有页面', d: '页面 jsx 是全流程唯一手写产物，接口帆软实测通过后再开发页面',
+                    t: '还没有页面',
                     actions: <span className="mini" onClick={(e) => {
                       const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
                       pageMenuAt(r.left, r.bottom + 6)
@@ -397,7 +397,7 @@ export default function WorkbenchView(): React.ReactElement {
                   gk="ifs" title="数据接口" one="接口" count={datasets.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
                   extra={<span className="gact" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" size={12} />新建接口</span>}
                   empty={{
-                    t: '还没有数据接口', d: '顺序约定：建表 → 存储过程 → 接口契约 → 构建实测，接口先行',
+                    t: '还没有数据接口',
                     actions: <>
                       <button className="btn sm" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" />新建接口</button>
                       <span className="mini" onClick={() => acts.useAgent()}><Icon n="ai" size={12} />用 Agent 做</span>
@@ -437,7 +437,7 @@ export default function WorkbenchView(): React.ReactElement {
                     } catch (e) { toast((e as Error).message, 'err') }
                   }}><Icon n="link" size={12} />关联</span>}
                   empty={{
-                    t: '还没有存储过程', d: '写操作的唯一入口。可关联其他项目已有的过程（引用不复制），或从模板起步（约定返回 SELECT JSON_OBJECT）',
+                    t: '还没有存储过程',
                     actions: <>
                       <span className="mini" onClick={async () => {
                         try {
@@ -657,7 +657,7 @@ function Group({ gk, title, one, count, collapsed, onToggle, extra, empty, child
   collapsed: Record<string, boolean>
   onToggle: (g: string) => void
   extra?: React.ReactNode
-  empty?: { t: string; d: string; actions?: React.ReactNode }
+  empty?: { t: string; d?: string; actions?: React.ReactNode }
   children: React.ReactNode
 }): React.ReactElement {
   const col = collapsed[gk]
@@ -674,7 +674,7 @@ function Group({ gk, title, one, count, collapsed, onToggle, extra, empty, child
         ? <div className="rows">{children}</div>
         : <div className="rows"><div className="grp-empty">
             <div className="e1">{empty?.t ?? `还没有${one}`}</div>
-            <div className="e2">{empty?.d ?? ''}</div>
+            {empty?.d && <div className="e2">{empty.d}</div>}
             {empty?.actions && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>{empty.actions}</div>}
           </div></div>)}
     </div>

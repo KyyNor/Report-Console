@@ -130,7 +130,6 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
               <Icon n="ai" />
               <b>与 Agent 对话驱动平台开发</b>
               <span>项目管理、接口契约、存储过程、页面构建、SQL 查询与帆软实测均封装为工具，Agent 会在需要时自行调用。</span>
-              <span>约定：数据接口先行、实测通过再做页面。</span>
             </div>
           )}
           {view.messages.map((m, i) => {

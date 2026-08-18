@@ -33,9 +33,9 @@ export function buildTools() {
   return {
     // ── 内置开发 Skill（只读、按需注入）────────────────────
     read_skill: tool({
-      description: '按需读取内置开发 Skill，不会访问本机任意文件。可用：page_interaction（跳转/Modal/iframe 通信）、file_transfer（上传/下载/导出边界）、table_patterns（列表/筛选/分页）。任务命中对应场景时先读 Skill，再实现。',
+      description: '按需读取应用内置开发 Skill，不会访问本机任意文件。包含桌面交互、文件传输、表格模式、移动端开发/验收与需求规划。任务命中对应场景时先读 Skill，再实施。',
       parameters: z.object({
-        name: z.enum(['page_interaction', 'file_transfer', 'table_patterns'])
+        name: z.enum(['page_interaction', 'file_transfer', 'table_patterns', 'mobile_display', 'mobile_qa', 'requirements_planning'])
       }),
       execute: async ({ name }) => readBuiltinSkill(name)
     }),

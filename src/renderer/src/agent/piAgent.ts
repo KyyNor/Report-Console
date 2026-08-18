@@ -15,10 +15,20 @@ import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completio
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { buildSystemPrompt } from '@shared/agentPrompt'
 import { call } from '../api'
-import type { AppSettings } from '@shared/types'
+import type { AgentMode, AppSettings, ProjectPlatform } from '@shared/types'
 import { initSessionStorage, restoreLatestSession, saveSessionSnapshot, newSessionId, titleFromMessages, type SaveSnapshot } from './piSessions'
 
-export interface AgentScope { project: string }
+export interface AgentScope { project: string; platform?: ProjectPlatform; mode?: AgentMode }
+
+const DISCUSSION_READ_ONLY_TOOLS = new Set([
+  'read_skill',
+  'list_datasets', 'read_dataset',
+  'list_procedures', 'read_procedure',
+  'list_docs', 'read_doc',
+  'list_pages', 'read_page',
+  'collect_page_errors', 'inspect_legacy_cpt',
+  'sql_query', 'list_tables', 'describe_table'
+])
 
 const OPENAI_DEFAULT = 'https://api.openai.com/v1'
 const ANTHROPIC_DEFAULT = 'https://api.anthropic.com'
@@ -87,6 +97,8 @@ export interface PiAgentHandle {
   scope: AgentScope
   /** 当前生效模型 id（设置页配置） */
   modelId: string
+  setMode: (mode: AgentMode) => void
+  setPlatform: (platform: ProjectPlatform) => void
 }
 
 /** 无 Key 时明确报错（不做演示模式兜底）：提示去设置页配置后重试 */
@@ -97,6 +109,8 @@ export const NO_KEY_ERROR = '模型未配置：Agent 需要真实模型，请先
  * @param fresh true = 跳过会话恢复，从空白会话开始（用于「新建会话」）
  */
 export async function createPiAgent(scope: AgentScope, fresh = false): Promise<PiAgentHandle> {
+  scope.platform ??= 'desktop'
+  scope.mode ??= 'development'
   const s = await call<AppSettings>('config:get')
   if (!s.llmApiKey) throw new Error(NO_KEY_ERROR)
   const tools = await buildPlatformTools(scope)
@@ -118,7 +132,7 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
     streamFn: (m, ctx, opts) => models.streamSimple(m.provider === model.provider ? m : model, ctx, opts),
     getApiKey: () => s.llmApiKey || undefined,
     initialState: {
-      systemPrompt: buildSystemPrompt(scope.project),
+      systemPrompt: buildSystemPrompt(scope.project, scope.platform, scope.mode),
       model,
       // 配置页控制开关与级别；对 GLM 关闭时也保留 reasoning=true，以显式传递 disabled。
       thinkingLevel: s.llmThinkingEnabled ? s.llmThinkingLevel : 'off',
@@ -136,7 +150,26 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
     void saveSessionSnapshot(snapshot, agent.state)
   })
 
-  return { agent, sessionId: snapshot.id, scope, modelId: model.id }
+  const applyScope = () => {
+    agent.state.systemPrompt = buildSystemPrompt(scope.project, scope.platform ?? 'desktop', scope.mode ?? 'development')
+    agent.state.tools = scope.mode === 'discussion' ? tools.filter((item) => DISCUSSION_READ_ONLY_TOOLS.has(item.name)) : tools
+  }
+  return {
+    agent,
+    sessionId: snapshot.id,
+    scope,
+    modelId: model.id,
+    setMode: (mode) => {
+      if (agent.state.isStreaming) throw new Error('Agent 运行中不能切换模式')
+      scope.mode = mode
+      applyScope()
+    },
+    setPlatform: (platform) => {
+      if (agent.state.isStreaming) throw new Error('Agent 运行中不能切换项目端型')
+      scope.platform = platform
+      applyScope()
+    }
+  }
 }
 
 // ── 每项目共享单例：工作台右栏与 Agent 页复用同项目会话，不跨项目串话。 ─────
@@ -150,7 +183,11 @@ export function getSharedPiAgent(scope: AgentScope): Promise<PiAgentHandle> {
     handle = createPiAgent(scope, false).catch((e) => { shared.delete(scope.project); throw e })
     shared.set(scope.project, handle)
   }
-  return handle
+  return handle.then((resolved) => {
+    if (scope.platform && resolved.scope.platform !== scope.platform) resolved.setPlatform(scope.platform)
+    if (scope.mode && resolved.scope.mode !== scope.mode) resolved.setMode(scope.mode)
+    return resolved
+  })
 }
 
 /** 新建会话并替换共享单例 */

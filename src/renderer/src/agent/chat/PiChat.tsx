@@ -19,8 +19,8 @@ import type { DevelopmentCheckpoint } from '@shared/types'
 const RESOURCE_MUTATING_TOOLS = new Set([
   'save_dataset', 'delete_dataset', 'build_data_cpt', 'test_dataset',
   'save_procedure', 'apply_procedure',
-  'write_doc',
-  'write_page', 'create_page', 'update_page_paths', 'build_page'
+  'write_doc', 'patch_doc',
+  'write_page', 'patch_page', 'create_page', 'update_page_paths', 'build_page'
 ])
 
 // ── 视图状态：事件 → 快照（rAF 合并，流式增量不逐 token 重渲染） ──
@@ -63,7 +63,7 @@ export interface ChatAttachment {
   label: string
 }
 
-export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach, onToolCompleted, onCheckpointCreated }: {
+export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach, onPromptSent, onToolCompleted, onCheckpointCreated }: {
   handle: PiAgentHandle
   placeholder?: string
   /** 每次任务发送时附带的轻量资源引用，不含资源正文。 */
@@ -72,6 +72,8 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
   mentionOptions?: ChatAttachment[]
   onAttach?: (attachment: ChatAttachment) => void
   onDetach?: (key: string) => void
+  /** 消息已固化当前 contextPrefix 后触发；宿主可据此清空一次性 @ 引用。 */
+  onPromptSent?: () => void
   /** 资源写入类工具成功完成后通知宿主刷新自己的资源视图。 */
   onToolCompleted?: (toolName: string) => void
   /** Agent 回合结束且源码变更时，RC 已自动创建开发检查点。 */
@@ -138,6 +140,7 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
     requestAnimationFrame(autoSize)
     stick.current = true
     const message = contextPrefix ? `${contextPrefix}\n\n[任务]\n${text}` : text
+    onPromptSent?.()
     void (async () => {
       // 先固化本回合基线；工具写入后才能准确得到“这轮改了什么”。
       let turnId: string | null = null

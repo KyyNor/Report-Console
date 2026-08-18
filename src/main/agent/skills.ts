@@ -8,10 +8,13 @@
 import pageInteraction from './skills/page_interaction.md?raw'
 import fileTransfer from './skills/file_transfer.md?raw'
 import tablePatterns from './skills/table_patterns.md?raw'
+import mobileDisplay from './skills/mobile_display.md?raw'
+import mobileQa from './skills/mobile_qa.md?raw'
+import requirementsPlanning from './skills/requirements_planning.md?raw'
 
-export type BuiltinSkillName = 'page_interaction' | 'file_transfer' | 'table_patterns'
+export type BuiltinSkillName = 'page_interaction' | 'file_transfer' | 'table_patterns' | 'mobile_display' | 'mobile_qa' | 'requirements_planning'
 
-interface BuiltinSkill {
+export interface BuiltinSkill {
   name: BuiltinSkillName
   description: string
   content: string
@@ -32,9 +35,28 @@ const skills: Record<BuiltinSkillName, BuiltinSkill> = {
     name: 'table_patterns',
     description: '列表筛选、分页、行操作以及与数据接口契约协作的页面模式。',
     content: tablePatterns
+  },
+  mobile_display: {
+    name: 'mobile_display',
+    description: '移动端 React + antd-mobile 页面组件、布局、路由和运行边界。',
+    content: mobileDisplay
+  },
+  mobile_qa: {
+    name: 'mobile_qa',
+    description: '移动 SPA 生命周期、窄屏触控与移动页面验收检查。',
+    content: mobileQa
+  },
+  requirements_planning: {
+    name: 'requirements_planning',
+    description: '讨论需求模式下的澄清维度、分层计划结构与验收清单。',
+    content: requirementsPlanning
   }
 }
 
 export function readBuiltinSkill(name: BuiltinSkillName): BuiltinSkill {
   return skills[name]
+}
+
+export function listBuiltinSkills(): BuiltinSkill[] {
+  return Object.values(skills)
 }

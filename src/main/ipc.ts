@@ -9,6 +9,8 @@ import * as mysql from './mysqlService'
 import * as projects from './projectsService'
 import * as pages from './pagesService'
 import { piToolDefs, piToolExec } from './agent/piBridge'
+import { listBuiltinSkills } from './agent/skills'
+import { promptScenarios } from '@shared/agentPrompt'
 import { pingFrServer, callApiData } from './frClient'
 import { openPreviewWindow } from './windows'
 import * as checkpoints from './checkpointService'
@@ -239,10 +241,14 @@ export function registerIpc(): void {
 
   // ── pi Agent 桥（渲染层 Agent 的平台工具通道）──────────
   handle('pi:toolDefs', () => piToolDefs())
+  handle('agent:referenceCatalog', (a) => ({
+    prompts: promptScenarios((a as { project?: string } | undefined)?.project || '<当前项目>'),
+    skills: listBuiltinSkills()
+  }))
   handle('pi:toolExec', (a) => piToolExec(
     (a as { name: string }).name,
     (a as { args: unknown }).args,
-    (a as { scope: { project: string } }).scope
+    (a as { scope: import('./agent/piBridge').PiToolScope }).scope
   ))
 }
 

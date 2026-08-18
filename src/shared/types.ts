@@ -28,6 +28,7 @@ export interface ConnectionHealth {
 
 export type ProjectPlatform = 'desktop' | 'mobile' | 'dual'
 export type PagePlatform = 'desktop' | 'mobile'
+export type AgentMode = 'development' | 'discussion'
 
 export interface Project {
   id: number

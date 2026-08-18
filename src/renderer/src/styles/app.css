@@ -382,7 +382,32 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 .ctx-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;padding:3px 9px;border-radius:999px;
   background:var(--accent-s);color:oklch(40% 0.1 259);font-family:var(--font-mono)}
 .ctx-chip b{font-weight:600}
+.agent-mode-switch{display:inline-flex;padding:2px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;gap:2px}
+.agent-mode-switch button{padding:3px 8px;border-radius:5px;font-size:10.5px;color:var(--muted)}
+.agent-mode-switch button:hover{color:var(--fg);background:var(--surface)}
+.agent-mode-switch button.on{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px oklch(20% 0.02 250/.08);font-weight:650}
+.agent-mode-switch button:disabled{opacity:.55;cursor:not-allowed}
 .ag-thread-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* ========== Agent 提示词 / Skill 只读规范页 ========== */
+.reference-tabs{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.reference-tabs button{padding:6px 12px;border-radius:6px;font-size:11.5px;color:var(--muted)}
+.reference-tabs button.on{background:var(--accent-s);color:var(--accent);font-weight:650}
+.reference-layout{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr);padding:12px;gap:12px}
+.reference-side,.reference-content{min-height:0;border:1px solid var(--border);border-radius:9px;background:var(--surface);overflow:auto}
+.reference-side{padding:10px;display:flex;flex-direction:column;align-items:stretch;gap:5px}
+.reference-side label{font:600 10px/1.4 var(--font-mono);color:var(--faint);margin:8px 6px 2px;text-transform:uppercase;letter-spacing:.06em}
+.reference-side button{text-align:left;padding:7px 9px;border-radius:6px;color:var(--muted);font-size:11.5px}
+.reference-side button:hover{background:var(--surface2);color:var(--fg)}
+.reference-side button.on{background:var(--accent-s);color:var(--accent);font-weight:650}
+.reference-side.skill-list button{display:flex;flex-direction:column;gap:3px}
+.reference-side.skill-list button b{font:600 11px/1.3 var(--font-mono)}
+.reference-side.skill-list button span{font-size:10px;line-height:1.4;color:var(--faint);font-weight:400}
+.reference-content{display:flex;flex-direction:column}
+.reference-title{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.reference-title b{font:650 12px/1.4 var(--font-ui)}
+.reference-title span{font-size:10px;color:var(--faint)}
+.reference-content pre{flex:1;margin:0;padding:16px 18px;white-space:pre-wrap;overflow:auto;font:11px/1.75 var(--font-mono);color:var(--muted);background:var(--surface)}
 
 /* ========== 弹层（浅色） ========== */
 .mask{position:fixed;inset:0;z-index:150;background:oklch(22% 0.02 250/.42);display:flex;align-items:flex-start;

@@ -10,6 +10,7 @@
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { buildTools, type PlatformTools } from './tools'
 import * as projects from '../projectsService'
+import type { AgentMode } from '@shared/types'
 
 export interface PiToolDef {
   name: string
@@ -20,6 +21,7 @@ export interface PiToolDef {
 /** Agent 会话由项目启动；模型不能自行扩大此范围。 */
 export interface PiToolScope {
   project: string
+  mode?: AgentMode
 }
 
 type AnyTool = { description?: string; parameters?: unknown; execute?: (args: unknown, options: unknown) => PromiseLike<unknown> }
@@ -50,6 +52,15 @@ const PROJECT_TOOLS = new Set([
   'inspect_legacy_cpt'
 ])
 const SQL_TOOLS = new Set(['sql_query', 'sql_exec', 'list_tables', 'describe_table'])
+export const DISCUSSION_READ_ONLY_TOOLS = new Set([
+  'read_skill',
+  'list_datasets', 'read_dataset',
+  'list_procedures', 'read_procedure',
+  'list_docs', 'read_doc',
+  'list_pages', 'read_page',
+  'collect_page_errors', 'inspect_legacy_cpt',
+  'sql_query', 'list_tables', 'describe_table'
+])
 
 function scopedArgs(name: string, raw: unknown, scope: PiToolScope): Record<string, unknown> {
   const args = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {}
@@ -77,6 +88,9 @@ export async function piToolExec(name: string, args: unknown, scope: PiToolScope
   const { tools } = registry()
   const t = (tools as unknown as Record<string, AnyTool>)[name]
   if (!t || typeof t.execute !== 'function') return { ok: false, error: `未知工具：${name}` }
+  if (scope.mode === 'discussion' && !DISCUSSION_READ_ONLY_TOOLS.has(name)) {
+    return { ok: false, error: `讨论需求模式只允许读取现状，禁止调用 ${name}；请先形成计划，再由用户切换到开发模式。` }
+  }
   try {
     const data = await t.execute(scopedArgs(name, args, scope), { toolCallId: `pi-${Date.now()}`, messages: [] })
     return { ok: true, data }

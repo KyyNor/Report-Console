@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readBuiltinSkill } from '@main/agent/skills'
+import { listBuiltinSkills, readBuiltinSkill } from '@main/agent/skills'
+import { buildSystemPrompt, promptScenarios } from '@shared/agentPrompt'
 
 describe('内置 Agent Skill', () => {
   it('按名字返回页面联动规范', () => {
@@ -13,5 +14,24 @@ describe('内置 Agent Skill', () => {
     const skill = readBuiltinSkill('file_transfer')
     expect(skill.content).toContain('不是业务页面的上传能力')
     expect(skill.content).toContain('不要猜测')
+  })
+
+  it('移动端 Skill 与需求规划 Skill 可按需查看', () => {
+    expect(readBuiltinSkill('mobile_display').content).toContain('antdMobile')
+    expect(readBuiltinSkill('mobile_qa').content).toContain('移动 SPA')
+    expect(readBuiltinSkill('requirements_planning').content).toContain('不得调用写入')
+    expect(listBuiltinSkills().map((item) => item.name)).toContain('mobile_display')
+  })
+
+  it('系统提示按端型与模式隔离，讨论模式明确只读', () => {
+    const mobile = buildSystemPrompt('demo', 'mobile', 'development')
+    expect(mobile).toContain('当前项目固定为：demo')
+    expect(mobile).toContain('antdMobile')
+    expect(mobile).not.toContain('当前模式：讨论需求（只读）')
+
+    const discussion = buildSystemPrompt('demo', 'desktop', 'discussion')
+    expect(discussion).toContain('当前模式：讨论需求（只读）')
+    expect(discussion).toContain('最终答复只能给出开发计划')
+    expect(promptScenarios()).toHaveLength(6)
   })
 })

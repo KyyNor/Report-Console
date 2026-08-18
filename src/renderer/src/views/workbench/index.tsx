@@ -40,7 +40,7 @@ export default function WorkbenchView(): React.ReactElement {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [modal, setModal] = useState<ModalState>(null)
   const [agentMode, setAgentMode] = useState(true)
-  const [agentCtx, setAgentCtx] = useState<{ project: string; resource?: string } | null>(null)
+  const [agentCtx, setAgentCtx] = useState<{ project: string; resource?: string; nonce?: number } | null>(null)
 
   // 项目资源
   const [datasets, setDatasets] = useState<Dataset[]>([])
@@ -254,7 +254,7 @@ export default function WorkbenchView(): React.ReactElement {
     },
     useAgent: (resource) => {
       if (!cur) return
-      setAgentCtx({ project: cur, resource })
+      setAgentCtx({ project: cur, resource, nonce: Date.now() + Math.random() })
       setAgentMode(true)
     }
   }

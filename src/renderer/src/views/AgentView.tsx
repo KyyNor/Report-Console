@@ -5,25 +5,28 @@
  * 实例按项目共享：工作台右栏与本页在同一项目内复用同一会话流，不跨项目串话。
  * 模型未配置时初始化直接失败，横幅提示并引导去「设置」页。
  */
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../agent/piAgent'
 import { PiChat } from '../agent/chat/PiChat'
 import { call } from '../api'
-import type { Project } from '@shared/types'
+import type { AgentMode, Project } from '@shared/types'
 
 export default function AgentView({ onNavigate }: { onNavigate?: (v: string) => void }): React.ReactElement {
   const [handle, setHandle] = useState<PiAgentHandle | null>(null)
   const [status, setStatus] = useState<{ error?: string; modelId?: string }>({})
   const [projects, setProjects] = useState<Project[]>([])
   const [project, setProject] = useState('')
+  const [mode, setMode] = useState<AgentMode>('development')
+  const modeRef = useRef<AgentMode>('development')
+  const platform = projects.find((item) => item.name === project)?.platform ?? 'desktop'
 
   const start = useCallback(async (fresh: boolean) => {
     if (!project) return
     setHandle(null)
     setStatus({})
     try {
-      const scope = { project }
+      const scope = { project, platform, mode: modeRef.current }
       const h = fresh ? await resetSharedPiAgent(scope) : await getSharedPiAgent(scope)
       setHandle(h)
       setStatus({ modelId: h.modelId })
@@ -34,7 +37,14 @@ export default function AgentView({ onNavigate }: { onNavigate?: (v: string) => 
     } catch (e) {
       setStatus({ error: (e as Error).message })
     }
-  }, [project])
+  }, [project, platform])
+
+  const switchMode = (next: AgentMode) => {
+    if (handle?.agent.state.isStreaming) return
+    handle?.setMode(next)
+    modeRef.current = next
+    setMode(next)
+  }
 
   useEffect(() => {
     void call<Project[]>('projects:list').then((ps) => {
@@ -49,7 +59,7 @@ export default function AgentView({ onNavigate }: { onNavigate?: (v: string) => 
       <div className="page-head">
         <Icon n="ai" />
         <b>Agent 开发助手</b>
-        <select value={project} onChange={(e) => setProject(e.target.value)} aria-label="Agent 当前项目">
+        <select value={project} onChange={(e) => { modeRef.current = 'development'; setMode('development'); setProject(e.target.value) }} aria-label="Agent 当前项目">
           {!projects.length && <option value="">暂无项目</option>}
           {projects.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
         </select>
@@ -58,6 +68,10 @@ export default function AgentView({ onNavigate }: { onNavigate?: (v: string) => 
             <Icon n="ai" />{status.modelId}
           </span>
         )}
+        {handle && <span className="agent-mode-switch" title="讨论需求模式只允许读取现状并输出开发计划">
+          <button className={mode === 'development' ? 'on' : ''} disabled={handle.agent.state.isStreaming} onClick={() => switchMode('development')}>开发</button>
+          <button className={mode === 'discussion' ? 'on' : ''} disabled={handle.agent.state.isStreaming} onClick={() => switchMode('discussion')}>讨论需求</button>
+        </span>}
         <span className="sub">当前会话仅访问所选项目与其绑定连接 · 质量门/审计内建 · 会话按项目自动保存</span>
         <span className="grow" />
         <button className="btn sm" disabled={!handle} onClick={() => { void start(true) }}><Icon n="plus" />新建会话</button>
@@ -75,7 +89,7 @@ export default function AgentView({ onNavigate }: { onNavigate?: (v: string) => 
         {!status.error && !handle && (
           <div className="banner info" style={{ margin: '12px 8px' }}><Icon n="info" /><div>正在初始化 pi Agent（加载平台工具与会话）…</div></div>
         )}
-        {handle && <PiChat key={handle.sessionId} handle={handle} />}
+        {handle && <PiChat key={handle.sessionId} handle={handle} placeholder={mode === 'discussion' ? '描述需求或约束；本模式只会形成开发计划…' : undefined} />}
       </div>
     </div>
   )

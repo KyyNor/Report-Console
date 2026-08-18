@@ -8,7 +8,7 @@ import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
+import type { AgentMode, Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
 import { buildUnifiedLineDiff } from '@shared/textDiff'
 
 export interface WBData {
@@ -92,7 +92,7 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   data: WBData
   acts: WBActs
   agentMode: boolean
-  agentCtx: { project: string; resource?: string } | null
+  agentCtx: { project: string; resource?: string; nonce?: number } | null
   onExitAgent: () => void
   onShowVersions: () => void
   onResourcesChanged?: () => void
@@ -743,7 +743,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
 function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onResourcesChanged }: {
-  ctx: { project: string; resource?: string } | null
+  ctx: { project: string; resource?: string; nonce?: number } | null
   project: Project | null
   data: WBData
   onProjectSettings: () => void
@@ -752,13 +752,18 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onR
 }): React.ReactElement {
   const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const [mode, setMode] = useState<AgentMode>('development')
+  const attachedNonce = useRef<number | undefined>(undefined)
   const options = useMemo(() => resourceAttachments(data), [data.datasets, data.procs, data.pages, data.docs, data.traditionalCpts])
 
   useEffect(() => {
-    if (!ctx?.resource) return
+    if (!ctx?.resource || attachedNonce.current === ctx.nonce) return
     const attachment = options.find((x) => x.key === ctx.resource)
-    if (attachment) setAttachments((prev) => prev.some((x) => x.key === attachment.key) ? prev : [...prev, attachment])
-  }, [ctx?.resource, options])
+    if (attachment) {
+      attachedNonce.current = ctx.nonce
+      setAttachments((prev) => prev.some((x) => x.key === attachment.key) ? prev : [...prev, attachment])
+    }
+  }, [ctx?.resource, ctx?.nonce, options])
 
   useEffect(() => {
     let alive = true
@@ -769,21 +774,21 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onR
     setState({})
     void (async () => {
       try {
-        const handle = await getSharedPiAgent({ project: project.name })
+        const handle = await getSharedPiAgent({ project: project.name, platform: project.platform, mode })
         if (alive) setState({ handle })
       } catch (e) {
         if (alive) setState({ error: (e as Error).message })
       }
     })()
     return () => { alive = false }
-  }, [project?.name])
+  }, [project?.name, project?.platform])
 
   const digest = buildDigest(project, attachments)
   const newSession = () => {
     if (!project) return
     setState({})
     setAttachments([])
-    void resetSharedPiAgent({ project: project.name })
+    void resetSharedPiAgent({ project: project.name, platform: project.platform, mode })
       .then((handle) => setState({ handle }))
       .catch((e) => setState({ error: (e as Error).message }))
   }
@@ -793,6 +798,10 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onR
       <div className="ag-head">
         <span className="ttl">Agent 会话</span>
         {state.handle && <span className="ctx-chip" title={`当前项目：${project?.name ?? '-'}；模型在「设置」页配置`}>{state.handle.modelId} · {project?.name}</span>}
+        {state.handle && <span className="agent-mode-switch" title="讨论需求模式只允许读取现状并输出开发计划">
+          <button className={mode === 'development' ? 'on' : ''} disabled={state.handle.agent.state.isStreaming} onClick={() => { state.handle?.setMode('development'); setMode('development') }}>开发</button>
+          <button className={mode === 'discussion' ? 'on' : ''} disabled={state.handle.agent.state.isStreaming} onClick={() => { state.handle?.setMode('discussion'); setMode('discussion') }}>讨论需求</button>
+        </span>}
         {project && <button className="btn sm" title="查看本项目的开发检查点与源码变更" onClick={onShowVersions}><Icon n="clock" size={13} />版本</button>}
         {state.handle && <button className="btn sm" title="在当前项目中开始空白会话" onClick={newSession}><Icon n="plus" size={13} />新建会话</button>}
         {project && <button className="iconbtn" title="项目设置" onClick={onProjectSettings}><Icon n="set" /></button>}
@@ -810,9 +819,10 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onR
           mentionOptions={options}
           onAttach={(a) => setAttachments((prev) => prev.some((x) => x.key === a.key) ? prev : [...prev, a])}
           onDetach={(key) => setAttachments((prev) => prev.filter((x) => x.key !== key))}
+          onPromptSent={() => setAttachments([])}
           onToolCompleted={onResourcesChanged}
           onCheckpointCreated={() => onResourcesChanged?.()}
-          placeholder="描述开发任务；输入 @ 附加当前项目资源…"
+          placeholder={mode === 'discussion' ? '描述需求或约束；本模式只会形成开发计划…' : '描述开发任务；输入 @ 附加当前项目资源…'}
         />}
       </div>
     </div>
@@ -831,8 +841,8 @@ function resourceAttachments(data: WBData): ChatAttachment[] {
 
 /** 每次任务附带轻量引用；Agent 必须主动调读取工具，资源正文不会进入聊天上下文。 */
 function buildDigest(project: Project | null, attachments: ChatAttachment[]): string {
-  if (!project) return ''
-  const lines = [`[上下文] 当前项目：${project.name}`, `绑定连接：${project.connections.join('、')}`]
+  if (!project || attachments.length === 0) return ''
+  const lines = ['[本次任务附加资源]']
   for (const attachment of attachments) {
     const [kind, name] = [attachment.key.slice(0, attachment.key.indexOf(':')), attachment.key.slice(attachment.key.indexOf(':') + 1)]
     if (kind === 'legacy') {

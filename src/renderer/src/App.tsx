@@ -5,18 +5,20 @@ import WorkbenchView from './views/workbench'
 import ConnectionsView from './views/ConnectionsView'
 import AgentView from './views/AgentView'
 import SettingsView from './views/SettingsView'
+import AgentReferenceView from './views/AgentReferenceView'
 
-type ViewKey = 'dashboard' | 'workbench' | 'connections' | 'agent' | 'settings'
+type ViewKey = 'dashboard' | 'workbench' | 'connections' | 'agent' | 'reference' | 'settings'
 
 const ITEMS: Array<{ key: ViewKey; icon: string; label: string }> = [
   { key: 'dashboard', icon: 'dash', label: '总览' },
   { key: 'workbench', icon: 'folder', label: '项目' },
   { key: 'connections', icon: 'db', label: '连接' },
   { key: 'agent', icon: 'ai', label: 'Agent' },
+  { key: 'reference', icon: 'file', label: '规范' },
   { key: 'settings', icon: 'set', label: '设置' }
 ]
 
-const VALID_VIEWS: string[] = ['dashboard', 'workbench', 'connections', 'agent', 'settings', 'datasets', 'procedures', 'pages']
+const VALID_VIEWS: string[] = ['dashboard', 'workbench', 'connections', 'agent', 'reference', 'settings', 'datasets', 'procedures', 'pages']
 
 /** 支持以 #view 打开指定视图（如 #agent），供深链与冒烟验收使用；旧视图名映射到工作台 */
 function initialView(): ViewKey {
@@ -50,6 +52,7 @@ export default function App(): React.ReactElement {
         {view === 'workbench' && <WorkbenchView />}
         {view === 'connections' && <ConnectionsView />}
         {view === 'agent' && <AgentView onNavigate={(v) => setView(v as ViewKey)} />}
+        {view === 'reference' && <AgentReferenceView />}
         {view === 'settings' && <SettingsView />}
       </div>
     </div>

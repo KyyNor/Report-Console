@@ -103,6 +103,7 @@ export function registerIpc(): void {
   handle('projects:scan', () => projects.scanDeployedProjects())
   handle('projects:export', (a) => projects.exportProject((a as { project: string }).project))
   handle('projects:import', (a) => projects.importProject((a as { json: string }).json, (a as { overwrite: boolean }).overwrite))
+  handle('resources:traditionalCpts', (a) => projects.listTraditionalCpts((a as { project: string }).project))
 
   // ── 接口契约 + 构建 + 实测 ────────────────────────────
   handle('datasets:list', (a) => projects.listDatasets((a as { project: string }).project))

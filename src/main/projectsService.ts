@@ -11,6 +11,7 @@ import { checkDataCpt, hasError } from './cpt/checker'
 import { callApiData, type ApiDataRequest } from './frClient'
 import { getConnection, requireConnection } from './connectionsService'
 import { applyProcedureMysql, guardedExec, pingConnection } from './mysqlService'
+import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, writeManifest } from './projectManifest'
 import type {
   Project, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
   BuildResult, CheckerFinding, ConnectionHealth
@@ -75,9 +76,7 @@ export function listProjects(): Project[] {
 }
 
 function countPages(project: string): number {
-  const dir = join(projectDir(project), 'pages')
-  if (!existsSync(dir)) return 0
-  try { return readdirSync(dir).filter((f) => f.endsWith('.jsx')).length } catch { return 0 }
+  try { return manifestForProject(project).managed.pages.length } catch { return 0 }
 }
 
 function countDocs(project: string): number {
@@ -86,38 +85,19 @@ function countDocs(project: string): number {
   try { return readdirSync(dir).filter((f) => /\.(md|sql)$/i.test(f)).length } catch { return 0 }
 }
 
-/** 项目目录内的自描述配置（打开本地项目的凭据）：随创建/更新自动同步 */
-export interface ProjectConfig {
-  generator: 'report-console'
-  version: 1
-  name: string
-  comment: string
-  connections: string[]
-  createdAt: string
-}
-
-const PROJECT_CONFIG = 'project.json'
-
-function projectConfigPath(root: string): string {
-  return join(root, PROJECT_CONFIG)
-}
-
-/** 把当前注册表里的项目信息写回 {root}/project.json（目录存在才写，失败不阻断） */
-function syncProjectConfig(name: string): void {
+/** 把项目身份与受管资源写回 {root}/project.yaml；SQLite 不保存资源布局。 */
+function syncProjectManifest(name: string): void {
   try {
     const p = getProjectByName(name)
     if (!p) return
     const root = projectDir(name)
     if (!existsSync(root)) return
-    const cfg: ProjectConfig = {
-      generator: 'report-console',
-      version: 1,
-      name: p.name,
-      comment: p.comment,
-      connections: projectConnections(p.id),
-      createdAt: p.createdAt
-    }
-    writeFileSync(projectConfigPath(root), JSON.stringify(cfg, null, 2) + '\n', 'utf-8')
+    let manifest
+    try { manifest = readManifest(root) } catch { manifest = createManifest(p.name, p.comment, projectConnections(p.id)) }
+    manifest.name = p.name
+    manifest.comment = p.comment
+    manifest.connections = projectConnections(p.id)
+    writeManifest(root, manifest)
   } catch { /* 目录缺失/只读时不阻断主流程 */ }
 }
 
@@ -136,31 +116,23 @@ export function createProject(name: string, connections: string[], comment = '',
   for (const cn of connections) {
     bind.run(pid, (getConnection({ name: cn }) as { id: number }).id)
   }
-  // 目录三分：data/ pages/ meta/
+  // 这是新建项目的默认布局，不是平台的路径约束。
   for (const sub of ['data', 'pages', 'meta']) mkdirSync(join(root, sub), { recursive: true })
-  syncProjectConfig(name)
+  writeManifest(root, createManifest(name, comment, connections))
   return listProjects().find((p) => p.id === pid)!
 }
 
-/** 打开本地项目：读取目录内 project.json，按其中声明注册（名字/连接需先在本机注册表就绪） */
+/** 打开本地项目：读取可迁移的 project.yaml，按其中连接声明注册本机账本。 */
 export function openProject(dir: string): Project {
   if (!existsSync(dir)) throw new Error(`目录不存在：${dir}`)
-  const cfgPath = projectConfigPath(dir)
-  if (!existsSync(cfgPath)) throw new Error(`目录里没有 ${PROJECT_CONFIG}，不是 Report Console 项目目录（新建项目时会自动生成）`)
-  let cfg: Partial<ProjectConfig>
-  try {
-    cfg = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Partial<ProjectConfig>
-  } catch (e) {
-    throw new Error(`${PROJECT_CONFIG} 解析失败：${(e as Error).message}`)
-  }
-  if (!cfg.name || !NAME_RE.test(cfg.name)) throw new Error(`${PROJECT_CONFIG} 的 name 缺失或不合法（需 [a-z][a-z0-9_]*）`)
+  const cfg = readManifest(dir)
   const existing = getProjectByName(cfg.name)
   if (existing) {
     if (projectDir(cfg.name) === dir) return listProjects().find((p) => p.id === existing.id)! // 已打开，直接聚焦
     throw new Error(`同名项目已注册（当前指向 ${projectDir(cfg.name)}）；如需改指向本目录，请在项目设置中重绑目录`)
   }
   const conns = cfg.connections ?? []
-  if (!conns.length) throw new Error(`${PROJECT_CONFIG} 未声明 connections`)
+  if (!conns.length) throw new Error(`${PROJECT_MANIFEST} 未声明 connections`)
   const missing = conns.filter((cn) => !getConnection({ name: cn }))
   if (missing.length) throw new Error(`连接未注册：${missing.join('、')}（先在「连接」页注册同名连接再打开）`)
   const d = getDb()
@@ -170,7 +142,8 @@ export function openProject(dir: string): Project {
   for (const cn of conns) {
     bind.run(pid, (getConnection({ name: cn }) as { id: number }).id)
   }
-  for (const sub of ['data', 'pages', 'meta']) mkdirSync(join(dir, sub), { recursive: true })
+  // 兼容旧 project.json 时，首次打开即写出 project.yaml；不创建/调整任何业务目录。
+  writeManifest(dir, cfg)
   return listProjects().find((p) => p.id === pid)!
 }
 
@@ -196,7 +169,7 @@ export function updateProject(id: number, patch: { comment?: string; connections
     // 数据集引用了被解绑的连接时给出提示（不强制阻止，构建时连接名仍会写入）
   }
   const r = d.prepare('SELECT name FROM projects WHERE id=?').get(id) as { name: string } | undefined
-  if (r) syncProjectConfig(r.name)
+  if (r) syncProjectManifest(r.name)
 }
 
 export function deleteProject(id: number): void {
@@ -211,9 +184,14 @@ export function scanDeployedProjects(): string[] {
   return readdirSync(s.reportletsPath)
     .filter((f) => {
       const p = join(s.reportletsPath, f)
-      try { return statSync(p).isDirectory() && (existsSync(join(p, 'data')) || existsSync(join(p, 'pages'))) } catch { return false }
+      try { return statSync(p).isDirectory() && (existsSync(join(p, PROJECT_MANIFEST)) || existsSync(join(p, 'project.json'))) } catch { return false }
     })
     .filter((f) => NAME_RE.test(f) && !known.has(f))
+}
+
+/** 传统 CPT 不进入 project.yaml；仅用于工作台浏览/Agent 的轻量引用。 */
+export function listTraditionalCpts(project: string) {
+  return scanTraditionalCpts(project)
 }
 
 // ── 接口契约 ────────────────────────────────────────────────────
@@ -366,8 +344,9 @@ export function buildDataCpt(project: string): BuildResult {
   const warnCount = findings.filter((f) => f.severity === 'warning').length
   log.push(`质量门：${errCount} error / ${warnCount} warning`)
 
-  const outDir = join(projectDir(project), 'data')
-  const outputPath = join(outDir, `${project}_data.cpt`)
+  const cptPath = dataCptForProject(project)
+  const outputPath = join(projectDir(project), cptPath)
+  const outDir = join(outputPath, '..')
 
   const ok = !hasError(findings)
   if (ok) {
@@ -379,9 +358,9 @@ export function buildDataCpt(project: string): BuildResult {
   }
 
   getDb().prepare('INSERT INTO builds(kind, target, ok, log) VALUES(?,?,?,?)')
-    .run('data', `${project}/data/${project}_data.cpt`, ok ? 1 : 0, JSON.stringify(log))
+    .run('data', `${project}/${cptPath}`, ok ? 1 : 0, JSON.stringify(log))
 
-  return { ok, kind: 'data', target: `${project}/data/${project}_data.cpt`, outputPath: ok ? outputPath : undefined, findings, log }
+  return { ok, kind: 'data', target: `${project}/${cptPath}`, outputPath: ok ? outputPath : undefined, findings, log }
 }
 
 // ── 接口实测 ────────────────────────────────────────────────────
@@ -412,7 +391,7 @@ export async function testDataset(project: string, datasetName: string, override
     }))
 
   const req: ApiDataRequest = {
-    report_path: `${project}/data/${project}_data.cpt`,
+    report_path: reportletFile(project, dataCptForProject(project)),
     datasource_name: datasetName,
     page_number: -1,
     page_size: -1,

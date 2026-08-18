@@ -27,9 +27,9 @@ export function apiDataUrl(): string {
   return `${s.frServerUrl.replace(/\/+$/, '')}/webroot/decision/api/data`
 }
 
-export function previewPageUrl(module: string, pageName: string): string {
+/** reportlet 为 FineReport reportlets 根目录内的完整相对路径。 */
+export function previewPageUrl(reportlet: string): string {
   const s = getSettings()
-  const reportlet = `${module}/pages/${pageName}.cpt`
   return `${s.frServerUrl.replace(/\/+$/, '')}/webroot/decision/view/report?op=write&reportlet=${encodeURIComponent(reportlet)}&t=${Date.now()}`
 }
 

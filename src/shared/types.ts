@@ -111,6 +111,10 @@ export interface ProcRecord {
 export interface PageMeta {
   project: string
   name: string       // 不含扩展名
+  /** project.yaml 内相对路径；受管页面可以位于项目树的任何位置。 */
+  jsxPath?: string
+  mjsPath?: string
+  cptPath?: string
   jsxExists: boolean
   mjsExists: boolean
   cptExists: boolean
@@ -120,6 +124,14 @@ export interface PageMeta {
   size?: number
   lastBuildAt?: string
   lastBuildOk?: boolean
+}
+
+/** 目录内存在、但不在 project.yaml managed 清单中的传统 CPT。 */
+export interface TraditionalCptMeta {
+  path: string       // 项目根目录内相对路径
+  name: string
+  size: number
+  mtime: number
 }
 
 // ── 文档（项目 meta/ 元数据） ───────────────────────────────────

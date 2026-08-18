@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { fmtBytes, useToast } from '../../components/ui'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, StatusPayload, DbConnection, BuildResult } from '@shared/types'
+import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, StatusPayload, DbConnection, BuildResult } from '@shared/types'
 import RightPanel, { type WBData, type WBActs } from './RightPanel'
 import {
   ProjectWizardModal, DatasetEditModal, ApplyProcModal, CallProcModal, LinkProcModal, NewProcModal,
@@ -48,6 +48,7 @@ export default function WorkbenchView(): React.ReactElement {
   const [procs, setProcs] = useState<ProcRecord[]>([])
   const [pages, setPages] = useState<PageMeta[]>([])
   const [docs, setDocs] = useState<DocMeta[]>([])
+  const [traditionalCpts, setTraditionalCpts] = useState<TraditionalCptMeta[]>([])
 
   const curProject = useMemo(() => projects.find((p) => p.name === cur) ?? null, [projects, cur])
 
@@ -71,18 +72,20 @@ export default function WorkbenchView(): React.ReactElement {
 
   const loadResources = useCallback(async (project: string) => {
     try {
-      const [ds, st, sp, pg, dc] = await Promise.all([
+      const [ds, st, sp, pg, dc, legacy] = await Promise.all([
         call<Dataset[]>('datasets:list', { project }),
         call<Record<string, DatasetStatus>>('datasets:statuses', { project }).catch(() => ({})),
         call<ProcRecord[]>('procs:list', { project }).catch(() => []),
         call<PageMeta[]>('pages:list', { project }).catch(() => []),
-        call<DocMeta[]>('docs:list', { project }).catch(() => [])
+        call<DocMeta[]>('docs:list', { project }).catch(() => []),
+        call<TraditionalCptMeta[]>('resources:traditionalCpts', { project }).catch(() => [])
       ])
       setDatasets(ds)
       setStatuses(st)
       setProcs(sp)
       setPages(pg)
       setDocs(dc)
+      setTraditionalCpts(legacy)
     } catch (e) {
       toast((e as Error).message, 'err')
     }
@@ -118,10 +121,10 @@ export default function WorkbenchView(): React.ReactElement {
     setAgentMode(true)
   }
 
-  /** 打开本地项目：选目录 → 读 project.json 注册进本机账本 */
+  /** 打开本地项目：选目录 → 读 project.yaml 注册进本机账本 */
   const openLocalProject = async () => {
     try {
-      const dir = await call<string | null>('dialog:pickDir', { title: '打开本地项目（含 project.json 的目录）' })
+      const dir = await call<string | null>('dialog:pickDir', { title: '打开本地项目（含 project.yaml 的目录）' })
       if (!dir) return
       const p = await call<Project>('projects:open', { dir })
       toast(`已打开项目 ${p.name}`, 'ok')
@@ -253,7 +256,7 @@ export default function WorkbenchView(): React.ReactElement {
   }, [status])
 
   const downConns = curProject ? curProject.connections.filter((c) => connHealthMap[c] === false) : []
-  const data: WBData = { datasets, statuses, procs, pages, docs }
+  const data: WBData = { datasets, statuses, procs, pages, docs, traditionalCpts }
 
   return (
     <div className="stage">
@@ -269,8 +272,8 @@ export default function WorkbenchView(): React.ReactElement {
               <div className="cl-empty">
                 <h4>欢迎使用 Report Console</h4>
                 <p>还没有项目。项目是顶层的组织单元：绑定一个 reportlets 目录与多个数据库连接。</p>
-                <button className="big" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" /><span><b>新建项目</b><span>名称 · 目录 · 勾选连接 · 自动建 data/pages/meta</span></span></button>
-                <button className="big" onClick={() => void openLocalProject()}><Icon n="folderOpen" /><span><b>打开本地项目</b><span>选择含 project.json 的目录，注册进本机</span></span></button>
+                <button className="big" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" /><span><b>新建项目</b><span>名称 · 目录 · 勾选连接 · 写入 project.yaml</span></span></button>
+                <button className="big" onClick={() => void openLocalProject()}><Icon n="folderOpen" /><span><b>打开本地项目</b><span>选择含 project.yaml 的目录，注册进本机</span></span></button>
                 <ScanButton onScaned={loadProjects} />
               </div>
             )}
@@ -490,7 +493,7 @@ export default function WorkbenchView(): React.ReactElement {
           onClose={() => setModal(null)}
           onCreate={async (name, dir, cs, comment) => {
             await call('projects:create', { name, connections: cs, comment, dir })
-            toast(`项目 ${name} 已创建（data/ pages/ meta/ + project.json 就绪）`, 'ok')
+            toast(`项目 ${name} 已创建（project.yaml 与默认目录就绪）`, 'ok')
             setModal(null)
             await loadProjects()
             selectProject(name)

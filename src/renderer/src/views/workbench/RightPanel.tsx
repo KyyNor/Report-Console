@@ -8,7 +8,7 @@ import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, ConnectionHealth, BuildResult, CheckerFinding } from '@shared/types'
+import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding } from '@shared/types'
 
 export interface WBData {
   datasets: Dataset[]
@@ -16,6 +16,7 @@ export interface WBData {
   procs: ProcRecord[]
   pages: PageMeta[]
   docs: DocMeta[]
+  traditionalCpts: TraditionalCptMeta[]
 }
 
 export interface WBActs {
@@ -165,7 +166,7 @@ function ProjectPanel({ ctx, data, acts }: { ctx: SelCtx; data: WBData; acts: WB
           <div className="blk-t"><Icon n="folder" />项目信息</div>
           <div className="kv">
             <span className="k2">绑定目录</span><span className="v2">{p.missingDir ? <span style={{ color: 'var(--warn)' }}>{p.dir}（缺失）</span> : p.dir}</span>
-            <span className="k2">目录三分</span><span className="v2">data/（数据层产物）+ pages/（页面）+ meta/（文档与过程语句）</span>
+            <span className="k2">受管布局</span><span className="v2">由 project.yaml 声明；data/、pages/ 仅为新建项目默认目录</span>
             <span className="k2">资源规模</span><span className="v2">接口 {c.ifs} · 过程 {c.sps} · 页面 {c.pgs} · 文档 {c.docs}</span>
           </div>
         </div>
@@ -603,7 +604,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 function AgentPanel({ ctx, project, data }: { ctx: { project: string; resource?: string } | null; project: Project | null; data: WBData }): React.ReactElement {
   const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
-  const options = useMemo(() => resourceAttachments(data), [data.datasets, data.procs, data.pages, data.docs])
+  const options = useMemo(() => resourceAttachments(data), [data.datasets, data.procs, data.pages, data.docs, data.traditionalCpts])
 
   useEffect(() => {
     if (!ctx?.resource) return
@@ -662,7 +663,8 @@ function resourceAttachments(data: WBData): ChatAttachment[] {
     ...data.datasets.map((x) => ({ key: `if:${x.name}`, label: `接口 ${x.name}` })),
     ...data.procs.map((x) => ({ key: `sp:${x.name}`, label: `过程 ${x.name}` })),
     ...data.pages.map((x) => ({ key: `pg:${x.name}`, label: `页面 ${x.name}` })),
-    ...data.docs.map((x) => ({ key: `doc:${x.name}`, label: `文档 ${x.name}` }))
+    ...data.docs.map((x) => ({ key: `doc:${x.name}`, label: `文档 ${x.name}` })),
+    ...data.traditionalCpts.map((x) => ({ key: `legacy:${x.path}`, label: `传统 CPT ${x.path}` }))
   ]
 }
 
@@ -672,6 +674,10 @@ function buildDigest(project: Project | null, attachments: ChatAttachment[]): st
   const lines = [`[上下文] 当前项目：${project.name}`, `绑定连接：${project.connections.join('、')}`]
   for (const attachment of attachments) {
     const [kind, name] = [attachment.key.slice(0, attachment.key.indexOf(':')), attachment.key.slice(attachment.key.indexOf(':') + 1)]
+    if (kind === 'legacy') {
+      lines.push(`附加资源：传统 CPT 文件 ${name}。`)
+      continue
+    }
     const kindName = kind === 'if' ? '数据接口' : kind === 'sp' ? '存储过程' : kind === 'pg' ? '页面' : '文档'
     const tool = kind === 'if' ? 'read_dataset' : kind === 'sp' ? 'read_procedure' : kind === 'pg' ? 'read_page' : 'read_doc'
     lines.push(`附加资源：${kindName} ${name}；需要现状时先调用 ${tool}。`)

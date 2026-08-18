@@ -47,7 +47,7 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
     <Modal
       title="新建项目" icon="folder" onClose={onClose}
       footer={<>
-        <span className="m-note">项目 = 项目目录（project.json 自描述）+ 多连接绑定</span>
+        <span className="m-note">项目 = 可迁移目录（project.yaml 自描述）+ 本机连接绑定</span>
         <button className="btn" onClick={onClose}>取消</button>
         <button className="btn pri" onClick={create} disabled={busy}><Icon n="plus" />{busy ? '创建中…' : '创建项目'}</button>
       </>}
@@ -66,7 +66,7 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
               onChange={(e) => { setDir(e.target.value); setDirTouched(true) }} />
             <button className="btn" onClick={() => void browse()}><Icon n="folderOpen" />选择目录</button>
           </div>
-          <div className="fh">目录可任意位置；创建时写入 project.json（可被「打开项目」再次识别）</div>
+          <div className="fh">目录可任意位置；创建时写入 project.yaml（可被「打开项目」再次识别）</div>
         </div>
       </div>
       <div className="fld">
@@ -91,7 +91,7 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
       </div>
       <div className="fld">
         <label>目录结构（自动创建）</label>
-        <div className="tree">{leaf}/<br />├─ <span className="d">project.json</span>　<span className="c">项目自描述（名称/说明/连接，随设置同步）</span><br />├─ <span className="d">data/</span>　<span className="c">数据层产物（构建生成 {leaf}_data.cpt）</span><br />├─ <span className="d">pages/</span>　<span className="c">页面 jsx 源码与 .mjs/.cpt 产物</span><br />└─ <span className="d">meta/</span>　<span className="c">需求 / 设计文档、过程创建语句</span></div>
+        <div className="tree">{leaf}/<br />├─ <span className="d">project.yaml</span>　<span className="c">项目清单：受管 jsx / mjs / cpt 的相对路径</span><br />├─ <span className="d">data/</span>　<span className="c">默认数据产物目录（可在清单中调整）</span><br />├─ <span className="d">pages/</span>　<span className="c">默认页面目录（可在清单中调整）</span><br />└─ <span className="d">任意子目录</span>　<span className="c">未声明的 CPT 保持为传统 CPT，不会被 Console 改写</span></div>
       </div>
       {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
     </Modal>
@@ -433,7 +433,7 @@ export function ProjectSettingsModal({ name, comment, dir, connections, allConns
   const [err, setErr] = useState<string | null>(null)
   const browse = async () => {
     try {
-      const d = await call<string | null>('dialog:pickDir', { title: '重新绑定项目目录（含 project.json）' })
+      const d = await call<string | null>('dialog:pickDir', { title: '重新绑定项目目录（含 project.yaml）' })
       if (d) setDv(d)
     } catch { /* 取消不处理 */ }
   }
@@ -454,7 +454,7 @@ export function ProjectSettingsModal({ name, comment, dir, connections, allConns
           <input type="text" style={{ flex: 1 }} value={dv} spellCheck={false} onChange={(e) => setDv(e.target.value)} />
           <button className="btn" onClick={() => void browse()}><Icon n="folderOpen" />选择目录</button>
         </div>
-        <div className="fh">保存时会同步重写目录内的 project.json</div>
+        <div className="fh">保存时会同步重写目录内的 project.yaml（资源路径以清单为准）</div>
       </div>
       <div className="fld">
         <label>说明</label>

@@ -1,14 +1,15 @@
 /**
- * 页面管理 — jsx/mjs/cpt 全部原地放在 reportlets/{project}/pages/
- * 构建：jsx → esbuild → 净化 → 注入骨架 → .mjs + .cpt 同目录落盘
+ * 受管页面服务 — 页面位置由 project.yaml 声明，而不是固定 pages/ 目录。
+ * 构建：jsx → esbuild → 净化 → 注入骨架 → 指定的 .mjs + .cpt。
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs'
-import { join, basename, extname } from 'path'
-import { getDb, getSettings } from './db'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, unlinkSync } from 'fs'
+import { dirname } from 'path'
+import { getDb } from './db'
 import { compileJsx, generatePageCpt } from './cpt/displayWriter'
 import { checkPageCpt, hasError } from './cpt/checker'
 import { previewPageUrl } from './frClient'
+import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, type ManagedPage } from './projectManifest'
 import type { PageMeta, BuildResult } from '@shared/types'
 import pageTemplateRaw from './templates/base_cpt_page.cpt?raw'
 import starterBlank from './templates/starters/blank.jsx?raw'
@@ -23,48 +24,46 @@ const STARTERS: Record<string, string> = {
 
 const NAME_RE = /^[a-z][a-z0-9_]*$/
 
-function pagesRoot(projectName?: string): string {
-  const s = getSettings()
-  return projectName ? join(s.reportletsPath, projectName, 'pages') : join(s.reportletsPath)
+function pagePaths(project: string, page: ManagedPage): { jsx: string; mjs: string; cpt: string } {
+  const root = projectRoot(project)
+  return { jsx: resolveProjectFile(root, page.jsx), mjs: resolveProjectFile(root, page.mjs), cpt: resolveProjectFile(root, page.cpt) }
 }
 
 // ── 扫描 ────────────────────────────────────────────────────────
 
 export function listPages(projectFilter?: string): PageMeta[] {
-  const root = getSettings().reportletsPath
-  if (!existsSync(root)) return []
+  const projects = projectFilter
+    ? [projectFilter]
+    : (getDb().prepare('SELECT name FROM projects ORDER BY name').all() as Array<{ name: string }>).map((x) => x.name)
   const out: PageMeta[] = []
-  const mods = projectFilter ? [projectFilter] : readdirSync(root)
-  for (const mod of mods) {
-    const pagesDir = join(root, mod, 'pages')
-    if (!existsSync(pagesDir)) continue
-    for (const f of readdirSync(pagesDir)) {
-      if (extname(f) !== '.jsx') continue
-      out.push(scanPage(mod, basename(f, '.jsx'), pagesDir))
-    }
+  for (const project of projects) {
+    try { out.push(...manifestForProject(project).managed.pages.map((page) => scanPage(project, page))) } catch { /* 未迁移或目录缺失 */ }
   }
   return out.sort((a, b) => (a.project + a.name).localeCompare(b.project + b.name))
 }
 
-function scanPage(mod: string, name: string, pagesDir: string): PageMeta {
-  const jsxPath = join(pagesDir, `${name}.jsx`)
-  const mjsPath = join(pagesDir, `${name}.mjs`)
-  const cptPath = join(pagesDir, `${name}.cpt`)
-  const jsxMtime = statSync(jsxPath).mtimeMs
-  const cptMtime = existsSync(cptPath) ? statSync(cptPath).mtimeMs : 0
+function scanPage(project: string, page: ManagedPage): PageMeta {
+  const paths = pagePaths(project, page)
+  const jsxExists = existsSync(paths.jsx)
+  const cptExists = existsSync(paths.cpt)
+  const jsxMtime = jsxExists ? statSync(paths.jsx).mtimeMs : 0
+  const cptMtime = cptExists ? statSync(paths.cpt).mtimeMs : 0
   const last = getDb().prepare(
     "SELECT ok, created_at FROM builds WHERE kind='page' AND target=? ORDER BY id DESC LIMIT 1"
-  ).get(`${mod}/pages/${name}.cpt`) as { ok: number; created_at: string } | undefined
+  ).get(`${project}/${page.cpt}`) as { ok: number; created_at: string } | undefined
   return {
-    project: mod,
-    name,
-    jsxExists: true,
-    mjsExists: existsSync(mjsPath),
-    cptExists: existsSync(cptPath),
-    jsxMtime,
-    cptMtime,
-    stale: !existsSync(cptPath) || cptMtime < jsxMtime,
-    size: statSync(jsxPath).size,
+    project,
+    name: page.id,
+    jsxPath: page.jsx,
+    mjsPath: page.mjs,
+    cptPath: page.cpt,
+    jsxExists,
+    mjsExists: existsSync(paths.mjs),
+    cptExists,
+    jsxMtime: jsxExists ? jsxMtime : undefined,
+    cptMtime: cptExists ? cptMtime : undefined,
+    stale: !jsxExists || !cptExists || cptMtime < jsxMtime,
+    size: jsxExists ? statSync(paths.jsx).size : 0,
     lastBuildAt: last?.created_at,
     lastBuildOk: last ? last.ok === 1 : undefined
   }
@@ -78,56 +77,60 @@ function assertName(name: string): void {
 
 export function readPage(projectName: string, pageName: string): string {
   assertName(projectName); assertName(pageName)
-  const p = join(pagesRoot(projectName), `${pageName}.jsx`)
-  if (!existsSync(p)) throw new Error(`页面不存在：${projectName}/pages/${pageName}.jsx`)
-  return readFileSync(p, 'utf-8')
+  const paths = pagePaths(projectName, pageForProject(projectName, pageName))
+  if (!existsSync(paths.jsx)) throw new Error(`受管页面源文件不存在：${projectName}/${pageName}`)
+  return readFileSync(paths.jsx, 'utf-8')
 }
 
 export function savePage(projectName: string, pageName: string, content: string): void {
   assertName(projectName); assertName(pageName)
   if (!content.trim()) throw new Error('页面内容为空')
-  const dir = pagesRoot(projectName)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, `${pageName}.jsx`), content, 'utf-8')
+  const paths = pagePaths(projectName, pageForProject(projectName, pageName))
+  mkdirSync(dirname(paths.jsx), { recursive: true })
+  writeFileSync(paths.jsx, content, 'utf-8')
 }
 
 export function createPage(projectName: string, pageName: string, starter: keyof typeof STARTERS = 'blank'): void {
   assertName(projectName); assertName(pageName)
-  const dir = pagesRoot(projectName)
-  const p = join(dir, `${pageName}.jsx`)
-  if (existsSync(p)) throw new Error(`页面已存在：${projectName}/pages/${pageName}.jsx`)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(p, STARTERS[starter] ?? STARTERS.blank, 'utf-8')
+  // 新建时仍采用默认路径；以后可直接编辑 project.yaml 调整路径。
+  const page: ManagedPage = { id: pageName, jsx: `pages/${pageName}.jsx`, mjs: `pages/${pageName}.mjs`, cpt: `pages/${pageName}.cpt` }
+  const paths = pagePaths(projectName, page)
+  if (existsSync(paths.jsx)) throw new Error(`页面源文件已存在：${page.jsx}`)
+  addManagedPage(projectName, page)
+  try {
+    mkdirSync(dirname(paths.jsx), { recursive: true })
+    writeFileSync(paths.jsx, STARTERS[starter] ?? STARTERS.blank, 'utf-8')
+  } catch (e) {
+    removeManagedPage(projectName, pageName)
+    throw e
+  }
 }
 
 export function deletePage(projectName: string, pageName: string): void {
   assertName(projectName); assertName(pageName)
-  const dir = pagesRoot(projectName)
-  for (const ext of ['.jsx', '.mjs', '.cpt']) {
-    const p = join(dir, `${pageName}${ext}`)
-    if (existsSync(p)) unlinkSync(p)
-  }
+  const paths = pagePaths(projectName, pageForProject(projectName, pageName))
+  for (const path of [paths.jsx, paths.mjs, paths.cpt]) if (existsSync(path)) unlinkSync(path)
+  removeManagedPage(projectName, pageName)
 }
 
 // ── 构建 ────────────────────────────────────────────────────────
 
 export async function buildPage(projectName: string, pageName: string): Promise<BuildResult> {
   assertName(projectName); assertName(pageName)
-  const dir = pagesRoot(projectName)
-  const jsxPath = join(dir, `${pageName}.jsx`)
-  const mjsPath = join(dir, `${pageName}.mjs`)
-  const cptPath = join(dir, `${pageName}.cpt`)
-  if (!existsSync(jsxPath)) throw new Error(`页面不存在：${projectName}/pages/${pageName}.jsx`)
+  const page = pageForProject(projectName, pageName)
+  const paths = pagePaths(projectName, page)
+  if (!existsSync(paths.jsx)) throw new Error(`受管页面源文件不存在：${projectName}/${page.jsx}`)
 
   const log: string[] = []
-  const jsx = readFileSync(jsxPath, 'utf-8')
-  log.push(`读取 JSX（${jsx.length} 字符）`)
+  const jsx = readFileSync(paths.jsx, 'utf-8')
+  log.push(`读取 JSX（${jsx.length} 字符）：${page.jsx}`)
 
   const { mjs, clean, hooksTransformed } = await compileJsx(jsx)
   log.push(`esbuild 编译完成；Hook 解构转换 ${hooksTransformed} 处`)
 
-  writeFileSync(mjsPath, mjs, 'utf-8')
-  log.push(`.mjs 已落盘：${basename(mjsPath)}`)
+  mkdirSync(dirname(paths.mjs), { recursive: true })
+  writeFileSync(paths.mjs, mjs, 'utf-8')
+  log.push(`.mjs 已落盘：${page.mjs}`)
 
   const cpt = generatePageCpt(pageTemplateRaw, clean)
   const findings = checkPageCpt(cpt, pageTemplateRaw)
@@ -137,18 +140,19 @@ export async function buildPage(projectName: string, pageName: string): Promise<
 
   const ok = !hasError(findings)
   if (ok) {
-    writeFileSync(cptPath, cpt, 'utf-8')
-    log.push(`已部署：${basename(cptPath)}`)
+    mkdirSync(dirname(paths.cpt), { recursive: true })
+    writeFileSync(paths.cpt, cpt, 'utf-8')
+    log.push(`已部署：${page.cpt}`)
   } else {
     log.push('存在 error，CPT 未落盘（.mjs 保留供排查）')
   }
 
   getDb().prepare('INSERT INTO builds(kind, target, ok, log) VALUES(?,?,?,?)')
-    .run('page', `${projectName}/pages/${pageName}.cpt`, ok ? 1 : 0, JSON.stringify(log))
+    .run('page', `${projectName}/${page.cpt}`, ok ? 1 : 0, JSON.stringify(log))
 
-  return { ok, kind: 'page', target: `${projectName}/pages/${pageName}.cpt`, outputPath: ok ? cptPath : undefined, findings, log }
+  return { ok, kind: 'page', target: `${projectName}/${page.cpt}`, outputPath: ok ? paths.cpt : undefined, findings, log }
 }
 
 export function pagePreviewUrl(projectName: string, pageName: string): string {
-  return previewPageUrl(projectName, pageName)
+  return previewPageUrl(reportletFile(projectName, pageForProject(projectName, pageName).cpt))
 }

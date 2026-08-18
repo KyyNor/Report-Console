@@ -6,16 +6,18 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, unlinkSync } from 'fs'
 import { dirname } from 'path'
 import { getDb } from './db'
-import { compileJsx, generatePageCpt } from './cpt/displayWriter'
-import { checkApiDataParameters, checkFineReportAjaxCompatibility, checkPageCpt, hasError } from './cpt/checker'
-import { previewPageUrl } from './frClient'
+import { compileJsx, generateMobilePageCpt, generatePageCpt } from './cpt/displayWriter'
+import { checkApiDataParameters, checkFineReportAjaxCompatibility, checkMobilePageCpt, checkPageCpt, hasError } from './cpt/checker'
+import { previewMobilePageUrl, previewPageUrl } from './frClient'
 import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPagePaths, type ManagedPage } from './projectManifest'
 import { replaceUniqueText } from './textPatch'
-import type { PageMeta, BuildResult } from '@shared/types'
+import type { PageMeta, PagePlatform, BuildResult } from '@shared/types'
 import pageTemplateRaw from './templates/base_cpt_page.cpt?raw'
+import mobilePageTemplateRaw from './templates/base_cpt_page_mobile.cpt?raw'
 import starterBlank from './templates/starters/blank.jsx?raw'
 import starterList from './templates/starters/list.jsx?raw'
 import starterForm from './templates/starters/form.jsx?raw'
+import starterMobile from './templates/starters/mobile.jsx?raw'
 
 const STARTERS: Record<string, string> = {
   blank: starterBlank,
@@ -55,6 +57,7 @@ function scanPage(project: string, page: ManagedPage): PageMeta {
   return {
     project,
     name: page.id,
+    platform: page.platform,
     jsxPath: page.jsx,
     mjsPath: page.mjs,
     cptPath: page.cpt,
@@ -103,16 +106,19 @@ export function patchPage(projectName: string, pageName: string, oldText: string
   writeFileSync(paths.jsx, replaceUniqueText(content, oldText, newText, `页面 ${pageName}`), 'utf-8')
 }
 
-export function createPage(projectName: string, pageName: string, starter: keyof typeof STARTERS = 'blank'): void {
+export function createPage(projectName: string, pageName: string, starter: keyof typeof STARTERS = 'blank', requestedPlatform?: PagePlatform): void {
   assertName(projectName); assertName(pageName)
+  const projectPlatform = manifestForProject(projectName).platform
+  const platform: PagePlatform = requestedPlatform ?? (projectPlatform === 'mobile' ? 'mobile' : projectPlatform === 'desktop' ? 'desktop' : (() => { throw new Error('双端项目新建页面时必须指定 platform=desktop 或 mobile') })())
+  if (projectPlatform !== 'dual' && projectPlatform !== platform) throw new Error(`${projectPlatform} 项目不能新建 ${platform} 页面`)
   // 新建时仍采用默认路径；以后可直接编辑 project.yaml 调整路径。
-  const page: ManagedPage = { id: pageName, jsx: `pages/${pageName}.jsx`, mjs: `pages/${pageName}.mjs`, cpt: `pages/${pageName}.cpt` }
+  const page: ManagedPage = { id: pageName, platform, jsx: `pages/${pageName}.jsx`, mjs: `pages/${pageName}.mjs`, cpt: `pages/${pageName}.cpt` }
   const paths = pagePaths(projectName, page)
   if (existsSync(paths.jsx)) throw new Error(`页面源文件已存在：${page.jsx}`)
   addManagedPage(projectName, page)
   try {
     mkdirSync(dirname(paths.jsx), { recursive: true })
-    writeFileSync(paths.jsx, STARTERS[starter] ?? STARTERS.blank, 'utf-8')
+    writeFileSync(paths.jsx, platform === 'mobile' ? starterMobile : (STARTERS[starter] ?? STARTERS.blank), 'utf-8')
   } catch (e) {
     removeManagedPage(projectName, pageName)
     throw e
@@ -150,8 +156,13 @@ export async function buildPage(projectName: string, pageName: string): Promise<
   writeFileSync(paths.mjs, mjs, 'utf-8')
   log.push(`.mjs 已落盘：${page.mjs}`)
 
-  const cpt = generatePageCpt(pageTemplateRaw, clean)
-  const findings = [...checkPageCpt(cpt, pageTemplateRaw), ...checkApiDataParameters(jsx), ...checkFineReportAjaxCompatibility(jsx)]
+  const template = page.platform === 'mobile' ? mobilePageTemplateRaw : pageTemplateRaw
+  const cpt = page.platform === 'mobile' ? generateMobilePageCpt(template, clean) : generatePageCpt(template, clean)
+  const findings = [
+    ...(page.platform === 'mobile' ? checkMobilePageCpt(cpt, template) : checkPageCpt(cpt, template)),
+    ...checkApiDataParameters(jsx),
+    ...checkFineReportAjaxCompatibility(jsx)
+  ]
   const errCount = findings.filter((f) => f.severity === 'error').length
   const warnCount = findings.filter((f) => f.severity === 'warning').length
   log.push(`质量门：${errCount} error / ${warnCount} warning`)
@@ -172,5 +183,7 @@ export async function buildPage(projectName: string, pageName: string): Promise<
 }
 
 export function pagePreviewUrl(projectName: string, pageName: string): string {
-  return previewPageUrl(reportletFile(projectName, pageForProject(projectName, pageName).cpt))
+  const page = pageForProject(projectName, pageName)
+  const reportlet = reportletFile(projectName, page.cpt)
+  return page.platform === 'mobile' ? previewMobilePageUrl(reportlet) : previewPageUrl(reportlet)
 }

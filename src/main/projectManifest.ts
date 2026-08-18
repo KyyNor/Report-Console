@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
 import { parse, stringify } from 'yaml'
 import { getDb, getSettings } from './db'
-import type { DatasetKind, DatasetParam, TraditionalCptMeta } from '@shared/types'
+import type { DatasetKind, DatasetParam, PagePlatform, ProjectPlatform, TraditionalCptMeta } from '@shared/types'
 
 export const PROJECT_MANIFEST = 'project.yaml'
 const LEGACY_CONFIG = 'project.json'
@@ -15,6 +15,7 @@ const NAME_RE = /^[a-z][a-z0-9_]*$/
 
 export interface ManagedPage {
   id: string
+  platform: PagePlatform
   jsx: string
   mjs: string
   cpt: string
@@ -45,6 +46,7 @@ export interface ProjectManifest {
   version: 1
   name: string
   comment: string
+  platform: ProjectPlatform
   connections: string[]
   managed: {
     pages: ManagedPage[]
@@ -73,6 +75,7 @@ function normalize(raw: unknown): ProjectManifest {
   const x = raw as Record<string, unknown>
   if (x.version !== 1) throw new Error('project.yaml 仅支持 version: 1')
   if (typeof x.name !== 'string' || !NAME_RE.test(x.name)) throw new Error('project.yaml 的 name 不合法（需 [a-z][a-z0-9_]*）')
+  const platform: ProjectPlatform = x.platform === 'mobile' || x.platform === 'dual' ? x.platform : 'desktop'
   const managed = (x.managed && typeof x.managed === 'object' && !Array.isArray(x.managed) ? x.managed : {}) as Record<string, unknown>
   const pagesRaw = Array.isArray(managed.pages) ? managed.pages : []
   const dataRaw = Array.isArray(managed.data) ? managed.data : []
@@ -87,7 +90,13 @@ function normalize(raw: unknown): ProjectManifest {
     const mjs = assertRelativePath(item.mjs, `managed.pages[${i}].mjs`, '.mjs')
     const cpt = assertRelativePath(item.cpt, `managed.pages[${i}].cpt`, '.cpt')
     if (new Set([jsx, mjs, cpt]).size !== 3) throw new Error(`managed.pages[${i}] 的 jsx/mjs/cpt 路径不能重复`)
-    return { id, jsx, mjs, cpt }
+    const pagePlatform: PagePlatform = item.platform === 'mobile' || item.platform === 'desktop'
+      ? item.platform
+      : platform === 'mobile' ? 'mobile' : 'desktop'
+    if (platform !== 'dual' && pagePlatform !== platform) {
+      throw new Error(`managed.pages[${i}].platform=${pagePlatform} 不属于 ${platform} 项目`)
+    }
+    return { id, platform: pagePlatform, jsx, mjs, cpt }
   })
   const dataIds = new Set<string>()
   const data = dataRaw.map((v, i) => {
@@ -132,17 +141,19 @@ function normalize(raw: unknown): ProjectManifest {
     version: 1,
     name: x.name,
     comment: typeof x.comment === 'string' ? x.comment : '',
+    platform,
     connections: [...new Set(connections)],
     managed: { pages, data },
     contracts: { datasets, procedures }
   }
 }
 
-export function createManifest(name: string, comment: string, connections: string[]): ProjectManifest {
+export function createManifest(name: string, comment: string, connections: string[], platform: ProjectPlatform = 'desktop'): ProjectManifest {
   return {
     version: 1,
     name,
     comment,
+    platform,
     connections: [...new Set(connections)],
     managed: {
       pages: [],
@@ -164,7 +175,7 @@ function appendLegacyPages(root: string, manifest: ProjectManifest): void {
     if (extname(file) !== '.jsx') continue
     const id = basename(file, '.jsx')
     if (NAME_RE.test(id) && !manifest.managed.pages.some((page) => page.id === id)) {
-      manifest.managed.pages.push({ id, jsx: `pages/${id}.jsx`, mjs: `pages/${id}.mjs`, cpt: `pages/${id}.cpt` })
+      manifest.managed.pages.push({ id, platform: 'desktop', jsx: `pages/${id}.jsx`, mjs: `pages/${id}.mjs`, cpt: `pages/${id}.cpt` })
     }
   }
 }

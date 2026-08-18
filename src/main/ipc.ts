@@ -114,7 +114,8 @@ export function registerIpc(): void {
       (a as { name: string }).name,
       (a as { connections: string[] }).connections,
       (a as { comment?: string }).comment,
-      (a as { dir?: string }).dir
+      (a as { dir?: string }).dir,
+      (a as { platform?: import('@shared/types').ProjectPlatform }).platform
     )
     checkpoints.ensureBaseline(project.name)
     return project
@@ -203,7 +204,7 @@ export function registerIpc(): void {
   })
   handle('pages:create', (a) => {
     const project = (a as { project: string }).project
-    return checkpointed(project, `人工新建页面 ${(a as { page: string }).page}`, () => { pages.createPage(project, (a as { page: string }).page, (a as { starter: 'blank' | 'list' | 'form' }).starter ?? 'blank'); return true })
+    return checkpointed(project, `人工新建页面 ${(a as { page: string }).page}`, () => { pages.createPage(project, (a as { page: string }).page, (a as { starter: 'blank' | 'list' | 'form' }).starter ?? 'blank', (a as { platform?: import('@shared/types').PagePlatform }).platform); return true })
   })
   handle('pages:delete', (a) => {
     const project = (a as { project: string }).project
@@ -212,7 +213,7 @@ export function registerIpc(): void {
   handle('pages:updatePaths', (a) => {
     const project = (a as { project: string }).project
     return checkpointed(project, `人工调整页面路径 ${(a as { page: string }).page}`, () => {
-      pages.updatePagePaths(project, (a as { page: string }).page, (a as { paths: { jsx: string; mjs: string; cpt: string } }).paths)
+      pages.updatePagePaths(project, (a as { page: string }).page, (a as { paths: { platform: import('@shared/types').PagePlatform; jsx: string; mjs: string; cpt: string } }).paths)
       return true
     })
   })

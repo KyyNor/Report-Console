@@ -11,6 +11,7 @@ describe('project.yaml', () => {
       const manifest = createManifest('demo', '可迁移项目', ['warehouse'])
       manifest.managed.pages.push({
         id: 'orders',
+        platform: 'desktop',
         jsx: '01-business/orders/orders.jsx',
         mjs: '01-business/orders/orders.mjs',
         cpt: '01-business/orders/orders.cpt'
@@ -21,6 +22,20 @@ describe('project.yaml', () => {
       const restored = readManifest(root)
       expect(restored.managed.pages).toEqual([manifest.managed.pages[0]])
       expect(restored.managed.data[0].cpt).toBe('data/demo_data.cpt')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('旧清单缺少端型时保持桌面端；移动项目的页面端型随项目恢复', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rc-manifest-'))
+    try {
+      writeFileSync(join(root, 'project.yaml'), `version: 1\nname: demo\nconnections: []\nmanaged:\n  pages:\n    - id: old_page\n      jsx: pages/old_page.jsx\n      mjs: pages/old_page.mjs\n      cpt: pages/old_page.cpt\n  data: []\ncontracts:\n  datasets: []\n  procedures: []\n`)
+      expect(readManifest(root).platform).toBe('desktop')
+      expect(readManifest(root).managed.pages[0].platform).toBe('desktop')
+
+      writeFileSync(join(root, 'project.yaml'), `version: 1\nname: demo\nplatform: mobile\nconnections: []\nmanaged:\n  pages:\n    - id: mobile_page\n      jsx: pages/mobile_page.jsx\n      mjs: pages/mobile_page.mjs\n      cpt: pages/mobile_page.cpt\n  data: []\ncontracts:\n  datasets: []\n  procedures: []\n`)
+      expect(readManifest(root).managed.pages[0].platform).toBe('mobile')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

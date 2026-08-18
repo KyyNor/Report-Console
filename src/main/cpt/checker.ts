@@ -111,7 +111,7 @@ export function checkDataCpt(cptXml: string): CheckerFinding[] {
 
 /** 从 CPT 提取 afterload JS（解析 CDATA 文本） */
 export function extractJsFromCpt(cptXml: string): string {
-  const m = cptXml.match(/<Listener event="afterload">[\s\S]*?<Content><!\[CDATA\[([\s\S]*?)\]\]><\/Content>/)
+  const m = cptXml.match(/<Listener event="afterload">[\s\S]*?<Content>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*<\/Content>/)
   return m ? m[1] : ''
 }
 
@@ -395,6 +395,45 @@ export function checkPageCpt(cptXml: string, baseTemplateXml: string): CheckerFi
     ...checkPathResolution(cptXml, baseTemplateXml),
     ...checkTagsWhitelist(cptXml, baseTemplateXml)
   ]
+}
+
+/** 移动端专属质量门：阻止 PC antd 与移动 SPA 已知致命写法混入移动页面。 */
+export function checkMobilePageCpt(cptXml: string, baseTemplateXml: string): CheckerFinding[] {
+  const js = extractJsFromCpt(cptXml)
+  const findings = checkPageCpt(cptXml, baseTemplateXml)
+  const zoneStart = '/* ===== DEVELOPER ZONE BEGIN ===== */'
+  const zoneEnd = '/* ===== DEVELOPER ZONE END ===== */'
+  const start = js.indexOf(zoneStart)
+  const end = js.indexOf(zoneEnd, start + zoneStart.length)
+  // 移动骨架本身必须访问 window.React / window.antdMobile 等全局依赖；移动规范只约束
+  // 注入的业务代码，不能把骨架的固定加载逻辑误判为业务违规。
+  const businessJs = start >= 0 && end > start ? js.slice(start + zoneStart.length, end) : js
+  const report = (rule: string, severity: CheckerFinding['severity'], match: RegExpExecArray, message: string) => {
+    findings.push({ rule, severity, line: lineAt(businessJs, match.index), message })
+  }
+
+  const desktopAntd = /\bantd(?!Mobile|-mobile|_)\s*(?:\.|\[|[;,)}])/g
+  let match: RegExpExecArray | null
+  while ((match = desktopAntd.exec(businessJs)) !== null) {
+    report('js_uses_antd_mobile', 'error', match, '移动端页面禁止使用 PC 全局变量 antd；请使用 antdMobile（antd-mobile 5）。')
+  }
+  const modal = /\bantdMobile\.Modal\b|\{[^}]*\bModal\b[^}]*\}\s*=\s*antdMobile\b/g
+  while ((match = modal.exec(businessJs)) !== null) {
+    report('js_mobile_no_modal', 'warning', match, 'antd-mobile 没有 Modal；容器型交互用 Popup，确认用 Dialog，动作菜单用 ActionSheet。')
+  }
+  const table = /\bantdMobile\.Table\b|\{[^}]*\bTable\b[^}]*\}\s*=\s*antdMobile\b/g
+  while ((match = table.exec(businessJs)) !== null) {
+    report('js_mobile_no_table', 'warning', match, 'antd-mobile 没有 Table；移动端数据展示请使用 List / Grid / IndexBar。')
+  }
+  const iframe = /<iframe\b|document\.createElement\(\s*['"]iframe['"]\s*\)/gi
+  while ((match = iframe.exec(businessJs)) !== null) {
+    report('js_mobile_no_iframe', 'warning', match, '移动端不应使用 iframe 弹窗；优先同页 Popup，复杂场景使用移动 SPA 路由跳转。')
+  }
+  const windowCustom = /\bwindow\.__[A-Za-z_$][\w$]*\s*=/g
+  while ((match = windowCustom.exec(businessJs)) !== null) {
+    report('js_mobile_window_custom_state', 'error', match, '移动 SPA 禁止给 window.__* 写自定义状态，可能阻塞同一 window 内的后续路由页面；改用闭包、React state 或 DOM data 属性。')
+  }
+  return findings
 }
 
 /** 判定构建是否通过（存在 error 即失败） */

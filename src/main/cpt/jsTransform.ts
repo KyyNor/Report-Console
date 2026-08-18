@@ -52,7 +52,7 @@ export function removeComments(js: string): string {
 // ── Hook 解构转换（帆软预览环境兼容） ────────────────────────────
 
 const HOOKS_DESTRUCT_RE =
-  /\b(const|var|let)\s*\[\s*(\w+)\s*,\s*(\w+)\s*\]\s*=\s*(React|antd)\.useState\(([\s\S]*?)\);/g
+  /\b(const|var|let)\s*\[\s*(\w+)\s*,\s*(\w+)\s*\]\s*=\s*(React|antd|antdMobile)\.useState\(([\s\S]*?)\);/g
 
 /**
  * const [v, setV] = React.useState(init);

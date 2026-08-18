@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { fmtBytes, useToast } from '../../components/ui'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, StatusPayload, DbConnection, BuildResult } from '@shared/types'
+import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, StatusPayload, DbConnection, BuildResult } from '@shared/types'
 import RightPanel, { type WBData, type WBActs } from './RightPanel'
 import {
   ProjectWizardModal, DatasetEditModal, ApplyProcModal, CallProcModal, LinkProcModal, NewProcModal,
@@ -206,10 +206,10 @@ export default function WorkbenchView(): React.ReactElement {
     deletePage: async (page) => {
       try { await call('pages:delete', { project: cur, page }); toast(`已删除页面 ${page}（连带 .mjs/.cpt）`, 'ok'); setSel(null); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
-    createPage: async (page, starter) => {
+    createPage: async (page, starter, platform) => {
       try {
-        await call('pages:create', { project: cur, page, starter })
-        toast(`已创建 ${page}.jsx（${starter} 脚手架）`, 'ok')
+        await call('pages:create', { project: cur, page, starter, platform })
+        toast(`已创建 ${page}.jsx（${platform === 'mobile' ? '移动端' : starter} 脚手架）`, 'ok')
         await refresh()
         setSel(`pg:${page}`)
       } catch (e) { toast((e as Error).message, 'err') }
@@ -295,6 +295,7 @@ export default function WorkbenchView(): React.ReactElement {
               <div key={p.id} className={`pj${cur === p.name ? ' on' : ''}${p.missingDir ? ' missing' : ''}`} onClick={() => selectProject(p.name)} title={p.comment || p.name}>
                 <div className="nm">
                   {p.name}
+                  <span className="tag src" style={{ marginLeft: 7 }}>{p.platform === 'desktop' ? '桌面' : p.platform === 'mobile' ? '移动' : '双端'}</span>
                   {p.missingDir && <span className="pc-warn" title="项目目录缺失：目录已被移动或删除，资源只读"><Icon n="alert" size={14} /></span>}
                 </div>
                 <div className="dir" title={p.dir}>{p.dir}</div>
@@ -390,7 +391,7 @@ export default function WorkbenchView(): React.ReactElement {
                       <div key={x.name} className={`row${sel === `pg:${x.name}` ? ' on' : ''}`} onClick={() => { setSel(`pg:${x.name}`); setAgentMode(false) }}>
                         <span className={`st ${x.stale ? 'y' : 'g'}`} title={stl[1]} />
                         <div className="main">
-                          <div className="nm"><b>{x.name}</b><span className={`stale ${stl[0]}`}>{stl[1]}</span></div>
+                          <div className="nm"><b>{x.name}</b><span className="tag src">{x.platform === 'mobile' ? '移动' : '桌面'}</span><span className={`stale ${stl[0]}`}>{stl[1]}</span></div>
                           <div className="sub">{fmtBytes(x.size)} · 产物 {x.cptExists ? '.mjs+.cpt' : '-'}</div>
                         </div>
                         <div className="meta">构建<br />{x.lastBuildAt ? fmtShort(x.lastBuildAt) : '-'}</div>
@@ -492,8 +493,8 @@ export default function WorkbenchView(): React.ReactElement {
           connections={conns}
           reportletsPath={status?.reportletsPath ?? ''}
           onClose={() => setModal(null)}
-          onCreate={async (name, dir, cs, comment) => {
-            await call('projects:create', { name, connections: cs, comment, dir })
+          onCreate={async (name, dir, cs, comment, platform) => {
+            await call('projects:create', { name, connections: cs, comment, dir, platform })
             toast(`项目 ${name} 已创建（project.yaml 与默认目录就绪）`, 'ok')
             setModal(null)
             await loadProjects()
@@ -593,13 +594,22 @@ export default function WorkbenchView(): React.ReactElement {
       )}
       {modal?.k === 'projsettings' && curProject && (
         <ProjectSettingsModal
-          name={curProject.name} comment={curProject.comment} dir={curProject.dir} connections={curProject.connections} allConns={conns} pages={pages}
+          name={curProject.name} comment={curProject.comment} dir={curProject.dir} platform={curProject.platform} connections={curProject.connections} allConns={conns} pages={pages}
           onClose={() => setModal(null)}
-          onSave={async (comment, cs, dir, pagePaths) => {
-            await call('projects:update', { id: curProject.id, comment, connections: cs, dir })
-            for (const page of pagePaths) {
-              await call('pages:updatePaths', { project: curProject.name, page: page.name, paths: { jsx: page.jsx, mjs: page.mjs, cpt: page.cpt } })
+          onSave={async (comment, cs, dir, platform, pagePaths) => {
+            // 先用双端作为过渡态，确保从单端切换到另一端时页面端型调整可以原子完成。
+            if (curProject.platform !== platform && platform !== 'dual' && pagePaths.some((page) => page.platform !== platform)) {
+              throw new Error('单端项目中的所有页面必须与项目目标端一致；请先选择双端并调整页面端型')
             }
+            if (curProject.platform !== 'dual' && platform !== curProject.platform) {
+              await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform: 'dual' })
+            } else {
+              await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform })
+            }
+            for (const page of pagePaths) {
+              await call('pages:updatePaths', { project: curProject.name, page: page.name, paths: { platform: page.platform, jsx: page.jsx, mjs: page.mjs, cpt: page.cpt } })
+            }
+            if (platform !== 'dual') await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform })
             toast('项目设置已保存', 'ok')
             setModal(null)
             await refresh()
@@ -612,18 +622,20 @@ export default function WorkbenchView(): React.ReactElement {
   // ── 弹出菜单 ────────────────────────────────────────────────
 
   function pageMenuAt(x: number, y: number): void {
-    openMenu(x, y, [
-      { i: 'file', t: 'blank 脚手架', s: '空白页', onClick: () => askCreatePage('blank') },
-      { i: 'file', t: 'list 脚手架', s: '列表页', onClick: () => askCreatePage('list') },
-      { i: 'file', t: 'form 脚手架', s: '表单页', onClick: () => askCreatePage('form') }
-    ])
+    const desktop = [
+      { i: 'file', t: '桌面空白页', s: 'blank', onClick: () => askCreatePage('blank', 'desktop' as const) },
+      { i: 'file', t: '桌面列表页', s: 'list', onClick: () => askCreatePage('list', 'desktop' as const) },
+      { i: 'file', t: '桌面表单页', s: 'form', onClick: () => askCreatePage('form', 'desktop' as const) }
+    ]
+    const mobile = [{ i: 'file', t: '移动端页面', s: 'antd-mobile', onClick: () => askCreatePage('mobile', 'mobile') }]
+    openMenu(x, y, curProject?.platform === 'mobile' ? mobile : curProject?.platform === 'dual' ? [...desktop, { div: true }, ...mobile] : desktop)
   }
 
-  function askCreatePage(starter: string): void {
+  function askCreatePage(starter: string, platform: PagePlatform): void {
     const name = prompt(`页面名（小写字母/数字/下划线，${starter} 脚手架）：`)
     if (!name) return
     if (!/^[a-z][a-z0-9_]*$/.test(name)) { toast('页面名仅允许小写字母/数字/下划线', 'err'); return }
-    void acts.createPage(name, starter)
+    void acts.createPage(name, starter, platform)
   }
 }
 

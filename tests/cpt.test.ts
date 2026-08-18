@@ -3,13 +3,14 @@ import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import { generateDataCpt, buildTableDataXml } from '@main/cpt/dataWriter'
 import { removeComments, transformHooksDestructuring } from '@main/cpt/jsTransform'
-import { compileJsx, generatePageCpt } from '@main/cpt/displayWriter'
-import { checkApiDataParameters, checkDataCpt, checkFineReportAjaxCompatibility, checkPageCpt, extractJsFromCpt } from '@main/cpt/checker'
+import { compileJsx, generateMobilePageCpt, generatePageCpt } from '@main/cpt/displayWriter'
+import { checkApiDataParameters, checkDataCpt, checkFineReportAjaxCompatibility, checkMobilePageCpt, checkPageCpt, extractJsFromCpt } from '@main/cpt/checker'
 import { XMLParser } from 'fast-xml-parser'
 
 const TPL_DIR = resolve(__dirname, '../src/main/templates')
 const dataTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_data.cpt'), 'utf-8')
 const pageTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_page.cpt'), 'utf-8')
+const mobilePageTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_page_mobile.cpt'), 'utf-8')
 
 // python 工具链对同一契约的真实产物（侦察阶段生成）
 const GOLDEN_PY = '/tmp/frtoolchain-test/frdemo_data.cpt'
@@ -130,6 +131,12 @@ describe('jsTransform', () => {
     expect(code).toContain('var _hook_')
     expect(code).not.toContain('const [b, setB]')
   })
+
+  it('antdMobile Hook 解构同样转换', () => {
+    const { code, count } = transformHooksDestructuring('var [value, setValue] = antdMobile.useState(0);')
+    expect(count).toBe(1)
+    expect(code).toContain('var _hook_')
+  })
 })
 
 describe('displayWriter + checker', () => {
@@ -171,6 +178,18 @@ describe('displayWriter + checker', () => {
     const cpt = generatePageCpt(pageTemplate, clean)
     const findings = checkPageCpt(cpt, pageTemplate)
     expect(findings.some((f) => f.rule === 'js_path_resolution' && f.message.includes('遮盖'))).toBe(true)
+  })
+
+  it('移动端骨架注入并执行移动专属质量门', async () => {
+    const jsx = readFileSync(resolve(TPL_DIR, 'starters/mobile.jsx'), 'utf-8')
+    const { clean } = await compileJsx(jsx)
+    const cpt = generateMobilePageCpt(mobilePageTemplate, clean)
+    expect(cpt).not.toContain('/* @FRM_DEVELOPER_ZONE@ */')
+    expect(checkMobilePageCpt(cpt, mobilePageTemplate).filter((f) => f.severity === 'error')).toEqual([])
+
+    const desktop = await compileJsx('var Button = antd.Button; function Root(){ return <Button>bad</Button>; } ReactDOM.createRoot(document.getElementById("app-root")).render(<Root/>);')
+    const bad = generateMobilePageCpt(mobilePageTemplate, desktop.clean)
+    expect(checkMobilePageCpt(bad, mobilePageTemplate).some((f) => f.rule === 'js_uses_antd_mobile' && f.severity === 'error')).toBe(true)
   })
 
   it('/api/data parameters 必须是数组，识别对象字面量和对象工厂透传', () => {

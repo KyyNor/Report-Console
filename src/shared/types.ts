@@ -26,6 +26,9 @@ export interface ConnectionHealth {
 
 // ── 项目 ────────────────────────────────────────────────────────
 
+export type ProjectPlatform = 'desktop' | 'mobile' | 'dual'
+export type PagePlatform = 'desktop' | 'mobile'
+
 export interface Project {
   id: number
   name: string          // = reportlets 子目录名 [a-z][a-z0-9_]*
@@ -33,6 +36,7 @@ export interface Project {
   createdAt: string
   dir: string           // reportlets/{name} 绝对路径
   missingDir: boolean   // 目录被移动/删除
+  platform: ProjectPlatform // 项目面向桌面端、移动端或双端；可迁移定义来自 project.yaml
   connections: string[] // 绑定的连接名
   counts: { ifs: number; sps: number; pgs: number; docs: number }
 }
@@ -111,6 +115,7 @@ export interface ProcRecord {
 export interface PageMeta {
   project: string
   name: string       // 不含扩展名
+  platform: PagePlatform
   /** project.yaml 内相对路径；受管页面可以位于项目树的任何位置。 */
   jsxPath?: string
   mjsPath?: string

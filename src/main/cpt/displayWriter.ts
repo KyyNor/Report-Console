@@ -46,6 +46,7 @@ export async function compileJsx(jsxSource: string): Promise<CompileResult> {
 
 export const DEV_ZONE_START = '/* ===== 开发者代码区 START ===== */'
 export const DEV_ZONE_END = '/* ===== 开发者代码区 END ===== */'
+export const MOBILE_DEV_ZONE = '/* @FRM_DEVELOPER_ZONE@ */'
 
 /**
  * 把干净代码注入页面骨架的「开发者代码区」，整体包 CDATA 后返回完整 CPT 文本。
@@ -66,4 +67,13 @@ export function generatePageCpt(templateXml: string, cleanCode: string): string 
 
   // CDATA 安全：cleanCode 已 assertCdataSafe；模板自身无风险内容
   return injected
+}
+
+/** 移动骨架在 bootBusiness() 内保留单一注入标记，避免破坏异步加载 antd-mobile 的固定结构。 */
+export function generateMobilePageCpt(templateXml: string, cleanCode: string): string {
+  const first = templateXml.indexOf(MOBILE_DEV_ZONE)
+  if (first === -1 || first !== templateXml.lastIndexOf(MOBILE_DEV_ZONE)) {
+    throw new Error(`移动端骨架必须且只能包含一个注入标记 ${MOBILE_DEV_ZONE}`)
+  }
+  return templateXml.replace(MOBILE_DEV_ZONE, cleanCode)
 }

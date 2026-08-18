@@ -8,7 +8,7 @@ import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
+import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff } from '@shared/types'
 import { buildUnifiedLineDiff } from '@shared/textDiff'
 
 export interface WBData {
@@ -30,7 +30,7 @@ export interface WBActs {
   buildPage: (page: string) => Promise<BuildResult | null>
   openPage: (page: string) => Promise<void>
   deletePage: (page: string) => Promise<void>
-  createPage: (page: string, starter: string) => Promise<void>
+  createPage: (page: string, starter: string, platform: PagePlatform) => Promise<void>
   saveProcDef: (rec: ProcRecord, def: string) => Promise<void>
   applyProc: (rec: ProcRecord) => void
   callProc: (rec: ProcRecord) => void
@@ -154,7 +154,7 @@ function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; da
   return (
     <div className="rp">
       <div className="rp-head">
-        <div className="rp-r1"><span className="ttl reg">{p.name}</span></div>
+        <div className="rp-r1"><span className="ttl reg">{p.name}</span><span className="tag src">{p.platform === 'desktop' ? '桌面端' : p.platform === 'mobile' ? '移动端' : '双端'}</span></div>
         <div className="rp-r2">
           {p.connections.map((cn) => connChip(cn))}
           <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>创建于 {p.createdAt.slice(0, 10)}{p.comment ? ` · ${p.comment}` : ''}</span>
@@ -175,6 +175,7 @@ function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; da
           <div className="kv">
             <span className="k2">绑定目录</span><span className="v2">{p.missingDir ? <span style={{ color: 'var(--warn)' }}>{p.dir}（缺失）</span> : p.dir}</span>
             <span className="k2">受管布局</span><span className="v2">由 project.yaml 声明；data/、pages/ 仅为新建项目默认目录</span>
+            <span className="k2">目标端</span><span className="v2">{p.platform === 'desktop' ? '桌面端（React + antd）' : p.platform === 'mobile' ? '移动端（React + antd-mobile）' : '双端（页面分别选择端型）'}</span>
             <span className="k2">资源规模</span><span className="v2">接口 {c.ifs} · 过程 {c.sps} · 页面 {c.pgs} · 文档 {c.docs}</span>
           </div>
         </div>
@@ -610,7 +611,7 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
     <div className="rp">
       <div className="rp-head">
         <div className="rp-r1">
-          <span className="ttl">{pg.name}.jsx</span>
+          <span className="ttl">{pg.name}.jsx</span><span className="tag src">{pg.platform === 'mobile' ? '移动端' : '桌面端'}</span>
           <span className={`stale ${stale ? 'old' : pg.cptExists ? 'new' : 'none'}`}>{stale ? 'cpt 落后 jsx · 待重建' : pg.cptExists ? '最新' : '从未构建'}</span>
         </div>
         <div className="rp-r2">

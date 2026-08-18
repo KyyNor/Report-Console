@@ -185,9 +185,12 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     read_page: tool({
-      description: '读取页面 JSX 源码',
+      description: '读取当前项目内受管页面的 JSX 源码；页面端型由 project.yaml 决定。',
       parameters: z.object({ project: z.string(), page: z.string() }),
-      execute: async ({ project, page }) => pages.readPage(project, page)
+      execute: async ({ project, page }) => {
+        const meta = pages.listPages(project).find((item) => item.name === page)
+        return { page, platform: meta?.platform ?? 'desktop', content: pages.readPage(project, page) }
+      }
     }),
 
     write_page: tool({
@@ -217,13 +220,14 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     create_page: tool({
-      description: '从脚手架新建页面：blank（空白）/ list（列表页）/ form（表单弹窗）',
+      description: '从脚手架新建页面。桌面端支持 blank/list/form；移动端使用 mobile（React + antdMobile）。双端项目必须明确 platform。',
       parameters: z.object({
         project: z.string(),
         page: z.string(),
-        starter: z.enum(['blank', 'list', 'form']).default('blank')
+        starter: z.enum(['blank', 'list', 'form', 'mobile']).default('blank'),
+        platform: z.enum(['desktop', 'mobile']).optional()
       }),
-      execute: async ({ project, page, starter }) => { pages.createPage(project, page, starter); return { ok: true } }
+      execute: async ({ project, page, starter, platform }) => { pages.createPage(project, page, starter === 'mobile' ? 'blank' : starter, platform ?? (starter === 'mobile' ? 'mobile' : undefined)); return { ok: true } }
     }),
 
     update_page_paths: tool({
@@ -232,15 +236,18 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
       parameters: z.object({
         project: z.string(),
         page: z.string(),
+        platform: z.enum(['desktop', 'mobile']).optional().describe('可选；切换页面端型时必须明确指定'),
         jsx: z.string().min(5).describe('项目根目录内的 .jsx 相对路径'),
         mjs: z.string().min(5).describe('项目根目录内的 .mjs 相对路径'),
         cpt: z.string().min(5).describe('项目根目录内的 .cpt 相对路径'),
         confirm: z.literal(true).describe('确认移动现有受管文件并修改 project.yaml')
       }),
-      execute: async ({ project, page, jsx, mjs, cpt, confirm }) => {
+      execute: async ({ project, page, platform, jsx, mjs, cpt, confirm }) => {
         if (!confirm) return { ok: false, error: '需要 confirm=true' }
-        pages.updatePagePaths(project, page, { jsx, mjs, cpt })
-        return { ok: true, page, paths: { jsx, mjs, cpt } }
+        const current = pages.listPages(project).find((item) => item.name === page)
+        if (!current) throw new Error(`页面不存在：${page}`)
+        pages.updatePagePaths(project, page, { platform: platform ?? current.platform, jsx, mjs, cpt })
+        return { ok: true, page, platform: platform ?? current.platform, paths: { jsx, mjs, cpt } }
       }
     }),
 

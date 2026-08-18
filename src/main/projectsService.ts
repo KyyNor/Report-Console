@@ -15,7 +15,7 @@ import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpt
 import { inspectDocumentContent, type DocInspectOptions } from './docInspector'
 import { replaceUniqueText } from './textPatch'
 import type {
-  Project, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
+  Project, ProjectPlatform, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
   BuildResult, CheckerFinding, ConnectionHealth
 } from '@shared/types'
 import dataTemplateRaw from './templates/base_cpt_data.cpt?raw'
@@ -73,6 +73,7 @@ export function listProjects(): Project[] {
       createdAt: r.created_at as string,
       dir,
       missingDir: getSettings().reportletsPath ? !existsSync(dir) : true,
+      platform: projectPlatform(name),
       connections: projectConnections(r.id as number),
       counts: {
         ifs: r.cIfs as number,
@@ -82,6 +83,10 @@ export function listProjects(): Project[] {
       }
     }
   })
+}
+
+function projectPlatform(project: string): ProjectPlatform {
+  try { return manifestForProject(project).platform } catch { return 'desktop' }
 }
 
 function countPages(project: string): number {
@@ -118,8 +123,9 @@ function syncProjectManifest(name: string): void {
   } catch { /* 目录缺失/只读时不阻断主流程 */ }
 }
 
-export function createProject(name: string, connections: string[], comment = '', dir?: string): Project {
+export function createProject(name: string, connections: string[], comment = '', dir?: string, platform: ProjectPlatform = 'desktop'): Project {
   assertProjectName(name)
+  if (!['desktop', 'mobile', 'dual'].includes(platform)) throw new Error('项目平台必须是 desktop / mobile / dual')
   if (!connections.length) throw new Error('至少绑定一个连接（来自「连接」注册表）')
   for (const cn of connections) {
     if (!getConnection({ name: cn })) throw new Error(`连接不存在：${cn}（先在「连接」页注册）`)
@@ -135,7 +141,7 @@ export function createProject(name: string, connections: string[], comment = '',
   }
   // 这是新建项目的默认布局，不是平台的路径约束。
   for (const sub of ['data', 'pages', 'meta']) mkdirSync(join(root, sub), { recursive: true })
-  writeManifest(root, createManifest(name, comment, connections))
+  writeManifest(root, createManifest(name, comment, connections, platform))
   return listProjects().find((p) => p.id === pid)!
 }
 
@@ -169,13 +175,26 @@ export function openProject(dir: string): Project {
   return listProjects().find((p) => p.id === pid)!
 }
 
-export function updateProject(id: number, patch: { comment?: string; connections?: string[]; dir?: string }): void {
+export function updateProject(id: number, patch: { comment?: string; connections?: string[]; dir?: string; platform?: ProjectPlatform }): void {
   const d = getDb()
   if (patch.dir !== undefined) {
     if (!patch.dir.trim()) throw new Error('项目目录不能为空')
     d.prepare('UPDATE projects SET dir=? WHERE id=?').run(patch.dir.trim(), id)
   }
   if (patch.comment !== undefined) d.prepare('UPDATE projects SET comment=? WHERE id=?').run(patch.comment, id)
+  if (patch.platform !== undefined) {
+    if (!['desktop', 'mobile', 'dual'].includes(patch.platform)) throw new Error('项目平台必须是 desktop / mobile / dual')
+    const row = d.prepare('SELECT name FROM projects WHERE id=?').get(id) as { name: string } | undefined
+    if (!row) throw new Error('项目不存在')
+    const root = projectDir(row.name)
+    const manifest = readManifest(root)
+    const incompatible = manifest.managed.pages.filter((page) => patch.platform !== 'dual' && page.platform !== patch.platform)
+    if (incompatible.length > 0) {
+      throw new Error(`项目仍有不兼容的${incompatible[0].platform === 'desktop' ? '桌面端' : '移动端'}页面：${incompatible.map((x) => x.id).join('、')}；请先切换为双端并调整页面端类型`)
+    }
+    manifest.platform = patch.platform
+    writeManifest(root, manifest)
+  }
   if (patch.connections) {
     for (const cn of patch.connections) {
       if (!getConnection({ name: cn })) throw new Error(`连接不存在：${cn}`)

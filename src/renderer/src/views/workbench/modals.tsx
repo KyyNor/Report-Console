@@ -6,7 +6,7 @@ import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/ui'
 import { SqlEditor } from '../../components/CodeEditor'
 import { call } from '../../api'
-import type { Dataset, DatasetKind, DatasetParam, DbConnection, PageMeta } from '@shared/types'
+import type { Dataset, DatasetKind, DatasetParam, DbConnection, PageMeta, PagePlatform, ProjectPlatform } from '@shared/types'
 
 // ── 新建项目向导（3.1 / D1 / D4） ───────────────────────────────
 
@@ -14,10 +14,11 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
   connections: DbConnection[]
   reportletsPath: string
   onClose: () => void
-  onCreate: (name: string, dir: string, conns: string[], comment: string) => Promise<void>
+  onCreate: (name: string, dir: string, conns: string[], comment: string, platform: ProjectPlatform) => Promise<void>
 }): React.ReactElement {
   const [name, setName] = useState('')
   const [comment, setComment] = useState('')
+  const [platform, setPlatform] = useState<ProjectPlatform>('desktop')
   const [dir, setDir] = useState('')
   const [dirTouched, setDirTouched] = useState(false) // 未手改时目录自动跟随 reportlets/{name}
   const [picked, setPicked] = useState<string[]>(connections.length === 1 ? [connections[0].name] : [])
@@ -38,7 +39,7 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
     if (!picked.length) { setErr('至少勾选一个连接'); return }
     setBusy(true)
     setErr(null)
-    try { await onCreate(name, effDir.trim(), picked, comment) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+    try { await onCreate(name, effDir.trim(), picked, comment, platform) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
   const leaf = effDir ? effDir.split(/[\\/]/).filter(Boolean).pop() ?? '' : '{project}'
@@ -72,6 +73,15 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
       <div className="fld">
         <label>说明</label>
         <input type="text" value={comment} placeholder="项目用途（可选）" onChange={(e) => setComment(e.target.value)} />
+      </div>
+      <div className="fld">
+        <label>目标端</label>
+        <select value={platform} onChange={(e) => setPlatform(e.target.value as ProjectPlatform)}>
+          <option value="desktop">桌面端</option>
+          <option value="mobile">移动端</option>
+          <option value="dual">双端（页面分别标记端型）</option>
+        </select>
+        <div className="fh">数据接口可共用；页面会按端型选择不同骨架、质量门和预览入口。旧项目保持桌面端。</div>
       </div>
       <div className="fld">
         <label>勾选连接（可多选，来自「连接」注册表）</label>
@@ -417,21 +427,24 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
 
 // ── 项目设置（改绑定连接 / 说明） ────────────────────────────────
 
-export function ProjectSettingsModal({ name, comment, dir, connections, allConns, pages, onClose, onSave }: {
+export function ProjectSettingsModal({ name, comment, dir, platform, connections, allConns, pages, onClose, onSave }: {
   name: string
   comment: string
   dir: string
+  platform: ProjectPlatform
   connections: string[]
   allConns: DbConnection[]
   pages: PageMeta[]
   onClose: () => void
-  onSave: (comment: string, conns: string[], dir: string, pages: Array<{ name: string; jsx: string; mjs: string; cpt: string }>) => Promise<void>
+  onSave: (comment: string, conns: string[], dir: string, platform: ProjectPlatform, pages: Array<{ name: string; platform: PagePlatform; jsx: string; mjs: string; cpt: string }>) => Promise<void>
 }): React.ReactElement {
   const [cm, setCm] = useState(comment)
   const [dv, setDv] = useState(dir)
+  const [platformValue, setPlatformValue] = useState<ProjectPlatform>(platform)
   const [picked, setPicked] = useState<string[]>(connections)
   const [pagePaths, setPagePaths] = useState(() => pages.map((p) => ({
     name: p.name,
+    platform: p.platform,
     jsx: p.jsxPath ?? `pages/${p.name}.jsx`,
     mjs: p.mjsPath ?? `pages/${p.name}.mjs`,
     cpt: p.cptPath ?? `pages/${p.name}.cpt`
@@ -450,7 +463,7 @@ export function ProjectSettingsModal({ name, comment, dir, connections, allConns
       footer={<>
         <span className="m-note">解绑连接不影响已有契约，但新建接口只能从绑定清单选</span>
         <button className="btn" onClick={onClose}>取消</button>
-        <button className="btn pri" disabled={busy || picked.length === 0 || !dv.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(cm, picked, dv.trim(), pagePaths) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
+        <button className="btn pri" disabled={busy || picked.length === 0 || !dv.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(cm, picked, dv.trim(), platformValue, pagePaths) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
           <Icon n="check" />保存
         </button>
       </>}
@@ -468,13 +481,28 @@ export function ProjectSettingsModal({ name, comment, dir, connections, allConns
         <input type="text" value={cm} onChange={(e) => setCm(e.target.value)} />
       </div>
       <div className="fld">
+        <label>目标端</label>
+        <select value={platformValue} onChange={(e) => setPlatformValue(e.target.value as ProjectPlatform)}>
+          <option value="desktop">桌面端</option>
+          <option value="mobile">移动端</option>
+          <option value="dual">双端</option>
+        </select>
+        <div className="fh">单端项目只能包含同端页面；切换端型前应先在双端模式中调整每个页面的端型。</div>
+      </div>
+      <div className="fld">
         <label>受管页面路径</label>
         {pagePaths.length === 0
           ? <div className="fh">还没有受管页面。新建页面后会默认写入 pages/，也可在这里调整。</div>
           : <div style={{ display: 'grid', gap: 10 }}>
             {pagePaths.map((page, index) => (
               <div key={page.name} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: 10 }}>
-                <div style={{ fontWeight: 650, marginBottom: 7 }}>{page.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
+                  <span style={{ fontWeight: 650 }}>{page.name}</span>
+                  <select value={page.platform} disabled={platformValue !== 'dual'} onChange={(e) => setPagePaths((all) => all.map((x, i) => i === index ? { ...x, platform: e.target.value as PagePlatform } : x))}>
+                    <option value="desktop">桌面端</option>
+                    <option value="mobile">移动端</option>
+                  </select>
+                </div>
                 {(['jsx', 'mjs', 'cpt'] as const).map((field) => (
                   <label key={field} style={{ display: 'grid', gridTemplateColumns: '36px 1fr', alignItems: 'center', gap: 8, marginTop: 5, fontSize: 12, color: 'var(--muted)' }}>
                     <span>.{field}</span>

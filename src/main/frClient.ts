@@ -33,6 +33,12 @@ export function previewPageUrl(reportlet: string): string {
   return `${s.frServerUrl.replace(/\/+$/, '')}/webroot/decision/view/report?op=write&reportlet=${encodeURIComponent(reportlet)}&t=${Date.now()}`
 }
 
+/** 移动端走 FineReport 移动 SPA；骨架自行加载 antd-mobile，不依赖 PC viewer 的 jsImportList。 */
+export function previewMobilePageUrl(reportlet: string): string {
+  const s = getSettings()
+  return `${s.frServerUrl.replace(/\/+$/, '')}/webroot/decision/url/mobile#/report?nodePath=${encodeURIComponent(reportlet)}&t=${Date.now()}`
+}
+
 /** 调用 /api/data。网络/HTTP 层异常直接抛出；帆软层错误体现在 err_code */
 export async function callApiData(req: ApiDataRequest, timeoutMs = 15000): Promise<{ body: ApiDataResponse; durationMs: number; httpStatus: number }> {
   const started = Date.now()

@@ -99,7 +99,7 @@
   <h1>Report Console · 报表开发业务流程全景</h1>
   <p>一个报表从哪里开始、经历什么、产出什么、产物放在哪、由谁管理</p>
   <div class="meta">
-    <span>📅 2026-08-16</span>
+    <span>📅 更新至 2026-08-18</span>
     <span>🧱 三层架构：数据库 → 数据接口 → 页面</span>
     <span>🎯 数据先行，页面收尾，质量门贯穿</span>
   </div>
@@ -117,7 +117,7 @@
     <span class="badge b-grey">⌨️ 手写源码</span>
     <span class="badge b-green">⚙️ 工具生成</span>
   </div>
-  <p class="sub">一句话：<b style="color:var(--c-sqlite)">蓝</b>是契约与历史的账本（应用自己的 SQLite），<b style="color:var(--c-reportlets)">紫</b>是真正部署给帆软吃的文件，<b style="color:var(--c-mysql)">青</b>是业务数据本身，<b style="color:var(--c-fr)">黄</b>是运行时替你干活的服务。</p>
+  <p class="sub">一句话：<b style="color:var(--c-sqlite)">蓝</b>是本机注册、环境与运行历史账本，<b style="color:var(--c-reportlets)">紫</b>是项目自描述 <code>project.yaml</code> 与真正部署给帆软吃的文件，<b style="color:var(--c-mysql)">青</b>是业务数据本身，<b style="color:var(--c-fr)">黄</b>是运行时替你干活的服务。</p>
 </section>
 
 <!-- ═══════════ 流程总览 ═══════════ -->
@@ -128,7 +128,7 @@
     <div class="step-top"><div class="dot">0</div><div class="t">环境准备</div><div class="s">一次性</div></div>
     <div class="step-top"><div class="dot">1</div><div class="t">建表</div><div class="s">MySQL</div></div>
     <div class="step-top"><div class="dot">2</div><div class="t">存储过程</div><div class="s">MySQL</div></div>
-    <div class="step-top"><div class="dot">3</div><div class="t">接口契约</div><div class="s">SQLite</div></div>
+    <div class="step-top"><div class="dot">3</div><div class="t">接口契约</div><div class="s">project.yaml</div></div>
     <div class="step-top"><div class="dot">4</div><div class="t">构建数据层</div><div class="s">_data.cpt</div></div>
     <div class="step-top"><div class="dot">5</div><div class="t">实测接口</div><div class="s">/api/data</div></div>
     <div class="step-top"><div class="dot">6</div><div class="t">页面</div><div class="s">jsx→cpt→预览</div></div>
@@ -156,25 +156,25 @@
   </div>
 
   <div class="stepcard">
-    <div class="head"><span class="n">3</span><b>登记接口契约</b><span class="where">数据接口页 · Agent save_dataset · 产物：SQLite 契约</span></div>
-    <p>先<b>建模块</b>（名字 = reportlets 子目录名，绑定一个帆软数据连接名），再逐个登记<b>数据集</b>：名字 / 类型 / 参数 / SQL。命名有硬约定：</p>
+    <div class="head"><span class="n">3</span><b>登记接口契约</b><span class="where">数据接口页 · Agent save_dataset · 产物：project.yaml 契约</span></div>
+    <p>先新建或打开<b>项目</b>（绑定一个或多个帆软数据连接名），再逐个登记<b>数据集</b>：名字 / 类型 / 参数 / SQL。契约与其连接归属保存在项目根的 <code>project.yaml</code>；SQLite 只保留本机项目注册和运行记录。命名有硬约定：</p>
     <pre><span class="c">-- 列表（自行分页 + 可选条件，用帆软公式）</span>
 SELECT ... FROM 表 WHERE 1=1 <span class="s">${if(len(p_keyword)==0,""," AND title LIKE '%"+p_keyword+"%'")}</span>
 ORDER BY id DESC LIMIT <span class="s">${(p_page-1)*p_pagesize}</span>, <span class="s">${p_pagesize}</span>
 <span class="c">-- 写操作 = CALL 存储过程</span>
 CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
-    <p>当前用户类变量（如 <code>=$fine_username</code>）声明为 <code>formula</code> 类型参数，由帆软会话注入，<b>不随请求传递</b>。契约支持模块级 JSON 导入/导出，也可扫描 reportlets 已部署目录反向纳入管理。</p>
-    <div class="arts"><span class="lbl">产物：</span><span class="badge b-sqlite">📒 modules + datasets 表（幂等 upsert）</span></div>
+    <p>当前用户类变量（如 <code>=$fine_username</code>）声明为 <code>formula</code> 类型参数，由帆软会话注入，<b>不随请求传递</b>。项目可放在 reportlets 内任意目录；新项目默认 data/pages/meta 布局，但受管数据 CPT 与页面产物的实际路径由 <code>project.yaml</code> 声明。</p>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-reportlets">📁 project.yaml 的 contracts.datasets</span></div>
   </div>
 
   <div class="stepcard">
     <div class="head"><span class="n">4</span><b>构建数据层 CPT</b><span class="where">数据接口页「构建」· Agent build_data_cpt · 产物：_data.cpt</span></div>
     <p>把模块下全部契约一次性装配：每个数据集 → 一段 TableData XML（SQL 进 CDATA，参数类型映射 integer→<code>t="I"</code>、formula→Formula 类），替换骨架模板的 TableDataMap，整体落成一个文件。<b>质量门不过（结构缺失等 error）拒绝落盘。</b></p>
-    <div class="arts"><span class="lbl">产物：</span><span class="badge b-reportlets">📁 reportlets/{m}/data/{m}_data.cpt</span><span class="badge b-green">⚙️ 纯生成，永远可重建</span><span class="badge b-sqlite">📒 builds 历史</span></div>
+    <div class="arts"><span class="lbl">产物：</span><span class="badge b-reportlets">📁 project.yaml 指定的受管数据 CPT</span><span class="badge b-green">⚙️ 纯生成，永远可重建</span><span class="badge b-sqlite">📒 builds 历史</span></div>
   </div>
 
   <div class="stepcard">
-    <div class="head"><span class="n">5</span><b>实测接口</b><span class="where">数据接口页「实测」· Agent test_dataset / verify_module · 产物：测试历史</span></div>
+    <div class="head"><span class="n">5</span><b>实测接口</b><span class="where">数据接口页「实测」· Agent test_dataset · 产物：测试历史</span></div>
     <p>用契约参数默认值（可覆盖）POST 帆软 <code>/webroot/decision/api/data</code>（<code>page_number/page_size</code> 恒 -1），<code>err_code=0</code> 才算过。写接口用「插入→查到→删除→查不到」闭环验证。请求响应全量落历史，总览页可回看。</p>
     <div class="arts"><span class="lbl">产物：</span><span class="badge b-sqlite">📒 api_tests（每次实测的请求+响应+耗时）</span></div>
   </div>
@@ -183,12 +183,12 @@ CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
     <div class="head"><span class="n">6</span><b>开发页面 → 构建 → 预览</b><span class="where">页面页 · Agent create_page / write_page / build_page / open_page</span></div>
     <p>从脚手架起步（blank / list / form），CodeMirror 高亮编辑 jsx。<b>jsx 是全流程唯一手写产物</b>——直接用全局 React/antd/dayjs/PATH，不写 import、不重建 PATH。构建管线：</p>
     <pre>jsx <span class="k">--esbuild(iife)--▶</span> 去注释(字符串保护) <span class="k">--▶</span> \uXXXX 解码 <span class="k">--▶</span> Hook 解构转两步赋值
-    <span class="k">--▶</span> 注入骨架「开发者代码区」<span class="k">--▶</span> 质量门 <span class="k">--▶</span> 同目录产出 .mjs + .cpt</pre>
+    <span class="k">--▶</span> 注入骨架「开发者代码区」<span class="k">--▶</span> 质量门 <span class="k">--▶</span> 清单指定位置产出 .mjs + .cpt</pre>
     <p>质量门查：XML 良构、PATH 被遮盖、<code>_MJS_</code> 占位符残留、Unicode 转义残留、自创标签——有 error 则 .cpt 不落盘（.mjs 保留供排查）。预览用帆软 <code>op=write</code> URL + 时间戳防缓存，独立窗口打开。</p>
     <div class="arts"><span class="lbl">产物：</span>
-      <span class="badge b-reportlets">📁 {m}/pages/x.jsx</span><span class="badge b-grey">⌨️ 手写源码</span>
-      <span class="badge b-reportlets">📁 x.mjs</span><span class="badge b-green">⚙️ 中间产物</span>
-      <span class="badge b-reportlets">📁 x.cpt</span><span class="badge b-green">⚙️ 最终产物</span>
+      <span class="badge b-reportlets">📁 project.yaml 声明的 x.jsx</span><span class="badge b-grey">⌨️ 手写源码</span>
+      <span class="badge b-reportlets">📁 project.yaml 声明的 x.mjs</span><span class="badge b-green">⚙️ 中间产物</span>
+      <span class="badge b-reportlets">📁 project.yaml 声明的 x.cpt</span><span class="badge b-green">⚙️ 最终产物</span>
       <span class="badge b-sqlite">📒 builds 历史</span>
     </div>
   </div>
@@ -201,21 +201,20 @@ CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
   <h3>📒 SQLite（应用账本）<span class="sub">— ~/Library/Application Support/report-console/data.sqlite3 · WAL · 应用自己读写</span></h3>
   <table>
     <tr><th>表</th><th>存什么</th><th>谁写入</th><th>管理方式</th></tr>
-    <tr><td><code>modules / datasets</code></td><td><b>接口契约</b>（模块、数据集参数与 SQL）</td><td>数据接口页 / Agent</td><td>CRUD + JSON 导入导出 + 目录扫描导入；删除模块级联删契约</td></tr>
+    <tr><td><code>projects / connections / settings</code></td><td><b>本机注册与环境</b>（已添加的目录、连接、模型和帆软配置）</td><td>项目/连接/设置页</td><td>不保存项目资源布局或接口契约</td></tr>
     <tr><td><code>api_tests</code></td><td>每次接口实测的请求、响应、err_code、耗时</td><td>实测动作自动</td><td>只增不改，按时间倒序回看</td></tr>
     <tr><td><code>builds</code></td><td>每次构建的类型、目标、成败、日志</td><td>构建动作自动</td><td>只增不改，总览页最近构建</td></tr>
     <tr><td><code>ddl_log</code></td><td><b>SQL 审计</b>：建表/改表/CALL/过程应用的语句+结果+错误</td><td>受控写通道自动</td><td>只增不改，全量留痕</td></tr>
-    <tr><td><code>agent_sessions / messages</code></td><td>Agent 会话与消息（含工具调用 JSON）</td><td>Agent 服务自动</td><td>会话列表可删</td></tr>
-    <tr><td><code>settings</code></td><td>本机环境值（帆软地址/路径/MySQL/模型）</td><td>设置页</td><td>覆盖式更新，代码默认值中性</td></tr>
+    <tr><td><code>IndexedDB 会话</code></td><td>Agent 会话与消息（含工具调用事件）</td><td>Agent 聊天界面自动</td><td>会话可恢复；模型配置仍在 settings</td></tr>
   </table>
 
   <h3>📁 reportlets 目录（部署产物）<span class="sub">— 帆软工程 WEB-INF/reportlets · 应用直接原地读写</span></h3>
   <table>
     <tr><th>文件</th><th>性质</th><th>生成方式</th><th>生命周期</th></tr>
-    <tr><td><code>{m}/data/{m}_data.cpt</code></td><td>数据层（全部数据集的宿主）</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>契约一改就重建；被帆软 /api/data 加载</td></tr>
-    <tr><td><code>{m}/pages/x.jsx</code></td><td>页面源码 <span class="badge b-grey">⌨️ 唯一手写产物</span></td><td>人 / Agent 编写</td><td>长期演进； staleness 判断的基准（mtime）</td></tr>
-    <tr><td><code>{m}/pages/x.mjs</code></td><td>编译中间产物</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>每次构建覆盖；质量门失败时保留供排查</td></tr>
-    <tr><td><code>{m}/pages/x.cpt</code></td><td>页面最终产物</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>cpt mtime &lt; jsx mtime 即标 stale 待重建；帆软预览的入口</td></tr>
+    <tr><td><code>project.yaml</code></td><td>项目可迁移清单：连接、受管路径、接口与过程契约</td><td>项目/资源操作自动同步</td><td>资源布局的事实来源；旧项目可无损升级</td></tr>
+    <tr><td><code>managed.data[].cpt</code></td><td>数据层（全部数据集的宿主）</td><td>构建生成 <span class="badge b-green">⚙️</span></td><td>路径由清单指定；契约一改就重建</td></tr>
+    <tr><td><code>managed.pages[].jsx/mjs/cpt</code></td><td>页面源码、编译中间产物与最终产物</td><td>人 / Agent 编写 + 构建生成</td><td>都可为项目内任意相对路径；可安全调整，传统 CPT 不会被覆盖</td></tr>
+    <tr><td>未列入 <code>managed</code> 的 <code>.cpt</code></td><td>传统 CPT</td><td>外部/旧流程维护</td><td>Report Console 不生成、不覆盖；Agent 仅可按需读取结构摘要</td></tr>
   </table>
 
   <h3>🗄️ MySQL（业务数据）<span class="sub">— 页面真正运行时查询的库</span></h3>
@@ -240,8 +239,8 @@ CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
   <div class="grid2">
     <div>
       <h3 style="margin-top:0">🛠️ 开发时（本应用在场）</h3>
-      <div class="flow"><span class="hi">SQLite 契约</span> ──构建──▶ <span class="hi">_data.cpt</span>
-        <span class="dim">（质量门把门，reportlets 落盘）</span>
+      <div class="flow"><span class="hi">project.yaml 契约</span> ──构建──▶ <span class="hi">受管数据 CPT</span>
+        <span class="dim">（质量门把门，reportlets 落盘；SQLite 仅记历史）</span>
 契约参数 ──POST──▶ <span class="hi">帆软 /api/data</span> ──执行──▶ <span class="hi">MySQL</span>
         <span class="dim">（实测=借帆软链路验证，结果回写 SQLite）</span></div>
       <p class="sub">注意：应用<b>不自己执行</b>业务 SQL 来验证接口——它把和页面一模一样的请求发给帆软，测的是真实运行链路。</p>
@@ -288,7 +287,7 @@ CALL sp_book_insert(<span class="s">'${p_title}'</span>, ...)</pre>
 </section>
 
 <footer>
-  Report Console · 报表开发业务流程全景 · 2026-08-16 · 基于源码整理（main @ d1868d7）· 记录当前实现；项目制重组设计进行中，见 design-backlog.md
+  Report Console · 报表开发业务流程全景 · 2026-08-18 · 基于 project.yaml、受管路径、传统 CPT 检查与 Agent 项目作用域实现整理
 </footer>
 </div>
 </body>

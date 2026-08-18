@@ -9,10 +9,11 @@
 ## 组织模型（v2 项目制，务必先读）
 
 - **连接（Connection）是一等公民**：应用内注册表（SQLite `connections` 表），一条连接 = 一个 MySQL 连接，名字与帆软设计器里的数据连接**一一对应**。`_data.cpt` 的 TableData `DatabaseName` 与管理面 SQL 都按连接名路由。
-- **项目（Project）是顶层组织单元**：绑定一个项目目录（任意位置均可，缺省 `reportlets/{name}` 自动三分 `data/` + `pages/` + `meta/`）与**多个连接**；目录内 `project.json` 是项目自描述（名称/说明/连接清单，创建与保存设置时自动同步），「打开项目」凭它把本地目录注册进本机账本（`projects.dir` 列存目录，存量空值回退 `reportlets/{name}`）。项目名/接口名/页面名仅允许 `[a-z][a-z0-9_]*`。
-- **接口（数据集）单一归属项目**，各绑一个连接（从项目绑定清单中选）；构建为项目的一个 `_data.cpt`，**一项目一页、页内多连接**。
-- **存储过程归属项目创建**；复用其他项目的过程走**关联**（`proc_links` 引用，不复制），接口 SQL 直接 CALL。
-- **文档（meta/）**：需求/设计 `.md` 与过程创建语句 `.sql` 存项目 meta/ 目录；过程定义以 `meta/{name}.sql` 为源（缺省回退库内 SHOW CREATE），Agent 可读写作为上下文。
+- **项目（Project）是顶层组织单元**：绑定一个项目目录（任意位置均可，缺省 `reportlets/{name}` 自动三分 `data/` + `pages/` + `meta/`）与**多个连接**；目录内 **`project.yaml` 是可迁移的项目事实来源**，记录身份、连接、受管数据/页面产物和接口/过程契约。SQLite 只记录“本机是否添加该目录”、环境、连接及运行历史，绝不决定资源布局；「打开项目」凭 YAML 将本地目录注册进本机账本。旧 `project.json` 仅兼容读取，后续写入升级为 YAML。项目名/接口名/页面名仅允许 `[a-z][a-z0-9_]*`。
+- **受管产物与传统 CPT 必须区分**：`project.yaml.managed` 只记录由 Report Console 管理的 jsx/mjs/cpt；项目内其他 `.cpt` 一律为传统 CPT，平台不得把它们误纳入清单、覆盖或删除。默认目录仅是新项目约定，受管路径可为任何项目内相对路径。
+- **接口（数据集）单一归属项目**，各绑一个连接（从项目绑定清单中选）；契约保存在 `project.yaml`，构建为清单指定的一个数据 CPT，**一项目一页、页内多连接**。
+- **存储过程归属项目创建**；过程定义路径由 `project.yaml` 声明（默认 `meta/{name}.sql`）。跨项目过程关联是人工界面治理动作，Agent 无权发现、关联或读取其他项目过程。
+- **文档（meta/）**：需求/设计 `.md` 与过程创建语句 `.sql` 默认在项目 meta/ 目录；过程定义可按清单使用其他项目内相对路径，Agent 可读写作为上下文。
 
 ## 常用命令
 
@@ -43,16 +44,18 @@ npm run pack         # electron-builder 打包（dist/，不装 dmg）
 ```
 src/main/               Electron 主进程
   index.ts              入口：单实例锁、--selftest / --smoke 模式（含 pi 会话持久探测）
-  db.ts                 SQLite（连接/项目/契约/测试/构建/审计的唯一持久层，WAL；含 v1 模块制存量迁移）
+  db.ts                 SQLite（本机项目注册、连接、设置、测试/构建/审计账本，WAL；含 v1 模块制存量迁移）
   connectionsService.ts 连接注册表 CRUD（名字唯一、删除前查引用）
-  projectsService.ts    项目制核心：项目与连接绑定（目录任意位置 + project.json 自描述，支持打开本地项目）、
+  projectManifest.ts    project.yaml 读取/校验/写入、旧项目迁移、受管路径与传统 CPT 识别
+  projectsService.ts    项目制核心：项目与连接绑定（目录任意位置 + project.yaml 自描述，支持打开本地项目）、
                         接口契约（各绑连接）、数据层构建、实测、过程归属/关联（定义存 meta/）、项目文档（meta/）、导入导出
-  pagesService.ts       页面读写 + 原地构建（jsx → mjs + cpt）+ 预览 URL（按项目过滤）
+  pagesService.ts       页面读写 + 原地构建（jsx → mjs + cpt）+ 安全调整受管路径 + 预览 URL（按项目过滤）
   mysqlService.ts       按连接路由的多连接池 + 只读守卫 + 受控写（审计落 ddl_log，带连接名）
   frClient.ts           帆软 /api/data 封装 + 连通探测 + 预览 URL
-  cpt/                  核心资产：dataWriter（支持每数据集 dbConnection）/ displayWriter / jsTransform / checker
-  agent/tools.ts        平台动作的模型侧暴露面（连接/项目/契约/过程/文档/页面/SQL；SYSTEM_PROMPT 在 @shared/agentPrompt）
-  agent/piBridge.ts     工具 JSON Schema 导出 + 受控执行（渲染层 pi Agent 经 pi:toolDefs/pi:toolExec 调用）
+  cpt/                  核心资产：dataWriter（支持每数据集 dbConnection）/ displayWriter / jsTransform / checker / legacyInspector
+  legacyCptService.ts   传统 CPT 的当前项目、只读、结构摘要入口（5MB 上限）
+  agent/tools.ts        平台动作的模型侧暴露面（契约/过程/文档/页面/SQL/传统 CPT；SYSTEM_PROMPT 在 @shared/agentPrompt）
+  agent/piBridge.ts     工具 JSON Schema 导出 + 受控执行；强制注入当前项目和允许连接范围
   selftest.ts           27 步全链路自检（连接→建表→过程→项目→契约→构建→实测→页面→预览→文档）
   templates/            数据/页面 CPT 骨架（?raw 导入）+ 页面脚手架 blank/list/form
 src/renderer/           React 19 + CodeMirror，浅色 tech-utility 主题、深色代码块（样式移植 docs/prototypes/workbench.html）
@@ -87,6 +90,7 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 4. **formula 参数不随请求传递**。当前用户类变量（如 `=$fine_username`）声明为 `formula` 类型，由帆软会话注入；`testDataset` 构造请求时会过滤掉它们，别改这个行为。
 5. **页面运行约定**。业务 jsx 直接用全局 React/antd/dayjs/$/PATH，不写 import、不重建 PATH、不自建 `app-root`——骨架（base_cpt_page.cpt）负责兜底加载与挂载点。
 6. **连接引用完整性**。删除连接前必须确认无接口/过程引用（`deleteConnection` 已拦截）；接口/过程的 `connection` 必须来自项目绑定清单（`saveDataset`/`saveProcedure` 已拦截）。
+7. **传统 CPT 只读隔离**。Agent 只能用 `inspect_legacy_cpt` 查看当前项目、未列入 `project.yaml.managed` 的 CPT 摘要；不可读取整份 XML、不可写入，且不得利用模型参数越过项目或路径范围。
 
 ## 开发约定
 

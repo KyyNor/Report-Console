@@ -23,7 +23,7 @@
     <span class="eyebrow">DECISION REPORT · DRAFT</span>
     <h1>Agent 工作台优先化与服务化演进方案</h1>
     <p>目标不是把已有的 CPT 开发能力再包一层聊天，而是把它变成可定位、可验证、可审计、可迁移的项目开发工作台；Electron 继续是近期主交付形态，同时为 Web 部署保留正确边界。</p>
-    <div class="meta"><span>适用对象：Report Console</span><span>范围：交互 / Agent / 项目隔离 / 架构</span><span>结论版本：2026-08-17</span></div>
+    <div class="meta"><span>适用对象：Report Console</span><span>范围：交互 / Agent / 项目隔离 / 架构</span><span>结论更新：2026-08-18</span></div>
   </header>
 
   <nav><div class="toc"><a href="#answer">结论</a><a href="#agent">Agent 入口与附加</a><a href="#tools">现状与工具</a><a href="#scope">项目隔离</a><a href="#workflow">完成报表流程</a><a href="#ui">视觉改进</a><a href="#architecture">服务化架构</a><a href="#roadmap">实施路线</a></div></nav>
@@ -35,7 +35,7 @@
     <div class="grid">
       <div class="card"><span class="badge good">已完成</span><h3>桌面版强制项目作用域</h3><p>Agent 工具现在只能在当前项目及其绑定连接内执行；Web 化时再由服务端登录身份接管 scope。</p></div>
       <div class="card"><span class="badge good">已完成</span><h3>让 Agent 成为右栏默认</h3><p>资源详情改为临时视图，关闭后回到同一项目的 Agent 会话。</p></div>
-      <div class="card"><span class="badge good">已完成</span><h3>增加精确读取工具</h3><p><code>read_dataset</code> 已补充，资源附加后不必加载整个接口列表的完整契约。</p></div>
+      <div class="card"><span class="badge good">已完成</span><h3>轻量资源引用与传统 CPT 检查</h3><p><code>@</code> 附加当前项目资源；传统 CPT 通过 <code>inspect_legacy_cpt</code> 按视图读取结构摘要，而非传入整份 XML。</p></div>
       <div class="card"><span class="badge p1">P1</span><h3>抽出应用服务，再加 HTTP</h3><p>不建议先“把 Electron 拆成前后端”再修功能。先让 IPC 与未来 HTTP 共用同一批 use case。</p></div>
     </div>
   </section>
@@ -69,18 +69,18 @@
     <p>现在的上下文提示词已经是正确的最小雏形：告诉 Agent 当前项目、当前资源，以及应当调用什么工具。下一步应把它从一次性自然语言升级为结构化、可见、可删除、可持久化的引用。</p>
     <pre>ContextRef {
   projectId: 'frdemo',
-  kind: 'dataset' | 'page' | 'procedure' | 'doc',
+  kind: 'dataset' | 'page' | 'procedure' | 'doc' | 'traditional-cpt',
   name: 'book_by_id',
   lookup: 'read_dataset',
   revision: 'updatedAt（可选）'
 }</pre>
     <ul>
       <li><b>界面：</b>输入框上方显示引用 chip；可移除，可从资源列表“一键附加”，不应自动发送消息。</li>
-      <li><b><code>@</code>：</b>用于资源引用。先选类别（接口、页面、过程、文档），再按名称过滤；默认只列当前项目。</li>
-      <li><b>发送时：</b>运行时把引用转成“该资源在项目 X；先调用工具 Y 获取现状”的隐藏上下文/开发者消息；只有 Agent 真正调用读取工具时才加载正文。</li>
+      <li><b><code>@</code>：</b>用于资源引用。先选类别（接口、页面、过程、文档、传统 CPT），再按名称过滤；默认只列当前项目。</li>
+      <li><b>发送时：</b>运行时把引用转成“该资源在当前项目；先调用工具 Y 获取现状”的隐藏上下文/开发者消息；只有 Agent 真正调用读取工具时才加载正文。传统 CPT 仅提示先查概览，再按需查数据集、参数、组件、脚本或引用。</li>
       <li><b>安全：</b>引用不能成为绕过项目边界的参数。服务端依据会话 scope 校验 <code>projectId</code> 与资源归属。</li>
     </ul>
-    <div class="note warn"><b>要新增的工具：</b><code>read_dataset(project, name)</code>。目前 <code>list_datasets(project)</code> 的描述明确为“项目内全部接口的完整契约”。用它查看一个接口会既浪费上下文，也让 Agent 更容易误读相邻接口。</div>
+    <div class="note ok"><b>已落地的按需读取：</b><code>read_dataset(project, name)</code> 用于单接口；<code>inspect_legacy_cpt(path, view, query, cursor, limit)</code> 仅返回传统 CPT 的结构化、分页摘要，不提供整份 XML。这样既能让 Agent 借鉴旧页面，又不会用大文件挤占上下文。</div>
   </section>
 
   <section id="tools">
@@ -92,7 +92,7 @@
         <tr><td>环境与项目</td><td>不向 Agent 暴露全局项目/连接发现或建项目能力</td><td>项目由界面选择，避免模型把“找工作区”当成开发步骤，也消除跨项目发现入口。</td></tr>
         <tr><td>数据接口</td><td><code>list_datasets</code>、<code>read_dataset</code>、<code>save_dataset</code>、<code>delete_dataset</code>、<code>build_data_cpt</code>、<code>test_dataset</code></td><td><code>build_data_cpt</code> 在成功后自动验证安全的只读接口；写接口仍需显式测试，避免产生副作用。</td></tr>
         <tr><td>存储过程</td><td><code>list_procedures</code>、<code>read_procedure</code>、<code>save_procedure</code>、<code>apply_procedure</code></td><td>保留当前项目内的定义与应用；跨项目关联是人工治理动作，不交给 Agent。</td></tr>
-        <tr><td>文档与页面</td><td><code>list_docs</code>、<code>read_doc</code>、<code>write_doc</code>、<code>list_pages</code>、<code>read_page</code>、<code>write_page</code>、<code>create_page</code>、<code>build_page</code>、<code>open_page</code></td><td>已足以在对话中完成页面开发、构建和预览。</td></tr>
+        <tr><td>文档、页面与传统 CPT</td><td><code>list_docs</code>、<code>read_doc</code>、<code>write_doc</code>、<code>list_pages</code>、<code>read_page</code>、<code>write_page</code>、<code>create_page</code>、<code>update_page_paths</code>、<code>build_page</code>、<code>open_page</code>、<code>inspect_legacy_cpt</code></td><td>页面产物位置可安全调整；传统 CPT 仅能在当前项目内读取结构摘要。</td></tr>
         <tr><td>数据库</td><td><code>sql_query</code>、<code>sql_exec</code>、<code>list_tables</code>、<code>describe_table</code></td><td>读写通道受控，并限制为当前项目已绑定的连接；不接受任意跨库 database 参数。</td></tr>
       </tbody>
     </table>
@@ -103,7 +103,7 @@
   <section id="scope">
     <h2>项目隔离：当前事实与必须补的边界</h2>
     <div class="grid">
-      <div class="card"><span class="badge good">已有</span><h3>资源归属隔离</h3><p>数据集、过程、过程关联等 SQLite 记录有 <code>project_id</code>；项目目录按项目拆分；接口保存时也校验连接是否属于项目绑定清单。</p></div>
+      <div class="card"><span class="badge good">已有</span><h3>可迁移资源归属</h3><p>项目根的 <code>project.yaml</code> 保存受管页面/数据 CPT 与接口/过程契约；SQLite 仅维护本机注册、环境、连接与运行历史。传统 CPT 不进入清单。</p></div>
       <div class="card"><span class="badge good">本轮补齐</span><h3>Agent 访问隔离</h3><p>会话按项目创建；工具执行前由桥接层覆盖项目参数，SQL 连接只能是当前项目绑定连接，并禁止任意 database 参数。</p></div>
     </div>
     <div class="note ok"><b>本轮后的回答：</b>在 A 项目中启动的 Agent 只能调用 A 的项目资源及其绑定连接；工具桥接层会忽略模型传入的项目名，并拒绝不在 A 绑定清单内的连接。B 项目的资源不会被列出、读取或修改。</div>
@@ -126,7 +126,7 @@ executeTool(context, toolName, args)
       <li>SQL 的连接必须由当前项目的绑定连接集合验证；跨库访问另设明确授权，而不是让 <code>database</code> 任意切换。</li>
       <li>未来服务端应从登录身份推导 actor/workspace/project scope；不要把当前渲染层传入的 scope 当作多用户安全边界。</li>
     </ul>
-    <p class="source">附带发现：页面服务目前按全局 reportlets 根目录加项目名解析页面路径，而项目服务支持项目自定义目录。服务化前应统一为一个 <code>ProjectArtifactStore.resolve(projectId)</code>，否则“任意项目目录”与页面读写路径并不完全一致。</p>
+    <p class="source">路径收敛已完成：项目清单使用项目内相对路径，页面服务按受管清单解析 jsx/mjs/cpt；默认的 data/pages/meta 只是新建项目布局。服务化时仍建议抽出 <code>ProjectArtifactStore.resolve(projectId)</code>，让 IPC 与 HTTP 共用同一条授权和文件路径边界。</p>
   </section>
 
   <section id="workflow">
@@ -186,8 +186,8 @@ executeTool(context, toolName, args)
 
   <section id="roadmap">
     <h2>不推倒重来的实施路线</h2>
-    <div class="phase"><strong>Phase 0</strong><div><b>已完成首轮边界收敛，继续修路径一致性</b><br>桌面版 Agent 工具已强制当前项目与允许连接，并新增 <code>read_dataset</code>；下一步统一页面/文档/数据产物的项目目录解析。</div></div>
-    <div class="phase"><strong>Phase 1</strong><div><b>完成 Agent-first 工作台</b><br>右栏默认会话、详情临时覆盖、资源附加 chips、仅 <code>@</code> 联想、每项目会话、产品级危险操作确认。</div></div>
+    <div class="phase"><strong>Phase 0 · 完成</strong><div><b>边界、路径和清单已经收敛</b><br>Agent 强制当前项目与允许连接；<code>project.yaml</code> 管理受管产物与契约；页面路径可安全调整；传统 CPT 与受管产物被隔离。</div></div>
+    <div class="phase"><strong>Phase 1 · 完成主体</strong><div><b>Agent-first 工作台已落地</b><br>右栏默认会话、详情临时覆盖、资源附加、仅 <code>@</code> 联想和每项目作用域已完成。下一步可补产品级危险操作确认与更完整的会话草稿/滚动位置保持。</div></div>
     <div class="phase"><strong>Phase 2</strong><div><b>提取应用核心</b><br>从 <code>src/main</code> 中抽出 project/dataset/page/procedure/build/test use case；把 SQLite、文件、FineReport、MySQL 实现放到 adapter；保留 IPC adapter，行为不变。</div></div>
     <div class="phase"><strong>Phase 3</strong><div><b>增加服务 API</b><br>用同一 use case 增加 HTTP API 与 SSE Agent 事件流；React 改为 API client；会话、密钥、审批和 FineReport/数据库访问迁到服务端。Electron 壳连接该服务。</div></div>
     <div class="phase"><strong>Phase 4</strong><div><b>准备多人/远端</b><br>认证、workspace/tenant、RBAC、密钥托管、任务队列与部署健康检查；每个环境由服务端部署 FineReport 与应用服务。此阶段再决定 Postgres/对象存储等基础设施。</div></div>
@@ -199,8 +199,8 @@ executeTool(context, toolName, args)
     <ol>
       <li>确认“每项目一个默认 Agent scope；右栏默认 Agent；详情可关闭返回”的交互原则。</li>
       <li>跨项目策略固定为默认拒绝；关联外部过程仅由人工界面完成。</li>
-      <li>先实施 Phase 0 和 Phase 1；它们直接解决当前高频体验和越权风险。</li>
-      <li>Phase 2 开始抽服务边界，仍以 Electron 打包为主，不改变用户的安装与使用方式。</li>
+      <li>将已完成的 Phase 0/1 作为稳定基线，继续观察真实项目迁移与传统 CPT 查阅的使用体验。</li>
+      <li>从 Phase 2 开始抽服务边界，仍以 Electron 打包为主，不改变用户的安装与使用方式。</li>
       <li>只有在明确需要浏览器多人使用或远端部署时，再进入 Phase 3 以后的服务化投资。</li>
     </ol>
     <p class="source">审查依据：当前项目的 <code>src/main/agent/tools.ts</code>、<code>src/main/agent/piBridge.ts</code>、<code>src/renderer/src/agent/piAgent.ts</code>、<code>src/renderer/src/views/workbench/RightPanel.tsx</code>、项目/页面/连接服务实现，以及此前提供的界面截图。旧工作流参考：<a href="https://github.com/xiaomaomi-distinct/fr-flow-v3">fr-flow-v3</a>（其 README 将 PM、数据、展示、QA 划为顺序流水线）；本控制台适合保留这条质量顺序，但以项目资源与受控 Agent 工具替代难管理的产物和本地 Skill 上下文。</p>

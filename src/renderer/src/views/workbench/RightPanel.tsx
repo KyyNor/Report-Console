@@ -86,17 +86,18 @@ function connChip(c: string): React.ReactElement {
 
 // ── 主入口 ──────────────────────────────────────────────────────
 
-export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExitAgent, onResourcesChanged }: {
+export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExitAgent, onShowVersions, onResourcesChanged }: {
   ctx: SelCtx
   data: WBData
   acts: WBActs
   agentMode: boolean
   agentCtx: { project: string; resource?: string } | null
   onExitAgent: () => void
+  onShowVersions: () => void
   onResourcesChanged?: () => void
 }): React.ReactElement {
   // 项目切换必须卸载旧会话面板：附件、输入草稿和聊天快照都不能跨项目保留。
-  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onResourcesChanged={onResourcesChanged} />
+  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onShowVersions={onShowVersions} onResourcesChanged={onResourcesChanged} />
   const { sel } = ctx
   const r = sel ? sel : null
   if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
@@ -732,11 +733,12 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
-function AgentPanel({ ctx, project, data, onProjectSettings, onResourcesChanged }: {
+function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onResourcesChanged }: {
   ctx: { project: string; resource?: string } | null
   project: Project | null
   data: WBData
   onProjectSettings: () => void
+  onShowVersions: () => void
   onResourcesChanged?: () => void
 }): React.ReactElement {
   const [state, setState] = useState<{ handle?: PiAgentHandle; error?: string }>({})
@@ -782,6 +784,7 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onResourcesChanged 
       <div className="ag-head">
         <span className="ttl">Agent 会话</span>
         {state.handle && <span className="ctx-chip" title={`当前项目：${project?.name ?? '-'}；模型在「设置」页配置`}>{state.handle.modelId} · {project?.name}</span>}
+        {project && <button className="btn sm" title="查看本项目的开发检查点与源码变更" onClick={onShowVersions}><Icon n="clock" size={13} />版本</button>}
         {state.handle && <button className="btn sm" title="在当前项目中开始空白会话" onClick={newSession}><Icon n="plus" size={13} />新建会话</button>}
         {project && <button className="iconbtn" title="项目设置" onClick={onProjectSettings}><Icon n="set" /></button>}
       </div>

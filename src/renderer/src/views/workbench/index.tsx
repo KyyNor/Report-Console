@@ -403,10 +403,7 @@ export default function WorkbenchView(): React.ReactElement {
                 {/* 数据接口 */}
                 <Group
                   gk="ifs" title="数据接口" one="接口" count={datasets.length} collapsed={collapsed} onToggle={(g) => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
-                  extra={<>
-                    <span className="gact" onClick={() => acts.useAgent()}><Icon n="ai" size={12} />用 Agent 做</span>
-                    <span className="gact" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" size={12} />新建接口</span>
-                  </>}
+                  extra={<span className="gact" onClick={() => setModal({ k: 'dataset', init: { name: '', kind: 'list' } })}><Icon n="plus" size={12} />新建接口</span>}
                   empty={{ t: '还没有数据接口' }}
                 >
                   {datasets.filter((x) => match(x.name)).map((x) => {
@@ -475,6 +472,12 @@ export default function WorkbenchView(): React.ReactElement {
             agentMode={agentMode}
             agentCtx={agentCtx}
             onExitAgent={() => { setSel(null); setAgentCtx(cur ? { project: cur } : null); setAgentMode(true) }}
+            onShowVersions={() => {
+              if (!cur) return
+              setSel(null)
+              setAgentMode(false)
+              setTab(`project:${cur}`, 'versions')
+            }}
             onResourcesChanged={() => { void refresh() }}
           />
         </aside>

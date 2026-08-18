@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { generateDataCpt, buildTableDataXml } from '@main/cpt/dataWriter'
 import { removeComments, transformHooksDestructuring } from '@main/cpt/jsTransform'
 import { compileJsx, generatePageCpt } from '@main/cpt/displayWriter'
-import { checkDataCpt, checkPageCpt, extractJsFromCpt } from '@main/cpt/checker'
+import { checkApiDataParameters, checkDataCpt, checkPageCpt, extractJsFromCpt } from '@main/cpt/checker'
 import { XMLParser } from 'fast-xml-parser'
 
 const TPL_DIR = resolve(__dirname, '../src/main/templates')
@@ -171,6 +171,25 @@ describe('displayWriter + checker', () => {
     const cpt = generatePageCpt(pageTemplate, clean)
     const findings = checkPageCpt(cpt, pageTemplate)
     expect(findings.some((f) => f.rule === 'js_path_resolution' && f.message.includes('遮盖'))).toBe(true)
+  })
+
+  it('/api/data parameters 必须是数组，识别对象字面量和对象工厂透传', () => {
+    const valid = `$.ajax({ url: PATH.apiBase + '/api/data', data: JSON.stringify({
+      parameters: [{ name: 'p_page', type: 'Integer', value: 1 }]
+    }) });`
+    expect(checkApiDataParameters(valid)).toEqual([])
+
+    const directObject = `$.ajax({ url: PATH.apiBase + '/api/data', data: JSON.stringify({ parameters: {} }) });`
+    expect(checkApiDataParameters(directObject).some((f) => f.rule === 'api_data_parameters_shape')).toBe(true)
+
+    const forwardedObject = `
+      function callApi(dsName, parameters) {
+        return $.ajax({ url: PATH.apiBase + '/api/data', data: JSON.stringify({ datasource_name: dsName, parameters: parameters }) });
+      }
+      const mkParams = React.useCallback((page) => ({ p_page: String(page) }), []);
+      callApi('book_qry', mkParams(1));
+    `
+    expect(checkApiDataParameters(forwardedObject).some((f) => f.rule === 'api_data_parameters_shape')).toBe(true)
   })
 })
 

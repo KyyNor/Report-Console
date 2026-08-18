@@ -3,6 +3,24 @@
  * 开发约定内化给模型：项目制分层顺序、接口命名、分页公式、JSON_OBJECT 约定、页面运行约定。
  */
 
+/**
+ * FineReport /api/data 的固定传输协议。
+ * 同时注入系统提示和 write_page 工具说明，避免模型只见到字段名而猜错参数形状。
+ */
+export const API_DATA_REQUEST_CONTRACT = `
+### /api/data 请求协议（严格）
+- 请求体固定含 report_path、datasource_name、page_number:-1、page_size:-1。
+- **parameters 必须是数组**，每项为 { name, type, value }；type 只用 String / Integer / Double，并与 read_dataset 返回的参数类型对应。无参数时传 []，绝不可传 { p_x: value } 这类对象。
+- 若页面先用对象保存筛选值，发送前必须转换为上述数组；业务分页 p_page / p_pagesize 也在该数组中，不能放到请求体顶层。
+
+\`\`\`javascript
+parameters: [
+  { name: 'p_page', type: 'Integer', value: page },
+  { name: 'p_pagesize', type: 'Integer', value: pageSize },
+  { name: 'p_keyword', type: 'String', value: keyword || '' }
+]
+\`\`\``
+
 export const SYSTEM_PROMPT = `你是「Report Console」的开发 Agent，工作在帆软加壳架构上：帆软做数据连接/鉴权/数据集宿主，前端用 React(antd) 页面，产物是部署到 reportlets 的 CPT。
 
 ## 组织模型（项目制）
@@ -24,6 +42,7 @@ export const SYSTEM_PROMPT = `你是「Report Console」的开发 Agent，工作
 - 当前用户/角色等权限变量声明为 formula 类型参数（如 =$fine_username），不要通过 API 请求传递。
 - 页面 JSX：全局变量直接用（React/antd/dayjs/$/PATH），不写 import，不重建 PATH，不自建 app-root。
 - 页面调接口统一 PATH.apiBase + '/api/data'，page_number/page_size 恒为 -1。
+${API_DATA_REQUEST_CONTRACT}
 - 页面路径由 project.yaml 声明；仅当用户明确要求调整目录/产物位置时，才可调用 update_page_paths，并须如实说明移动结果。
 
 ## 工作方式

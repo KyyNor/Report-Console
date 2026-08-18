@@ -11,6 +11,7 @@ import * as projects from '../projectsService'
 import * as pages from '../pagesService'
 import * as sql from '../mysqlService'
 import * as legacyCpt from '../legacyCptService'
+import { API_DATA_REQUEST_CONTRACT } from '@shared/agentPrompt'
 
 export { SYSTEM_PROMPT } from '@shared/agentPrompt'
 
@@ -176,7 +177,7 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     write_page: tool({
       description: `写入/更新 project.yaml 已声明的页面 JSX 源码（具体项目内路径由清单决定）。
 页面运行约定：直接使用全局 React/ReactDOM/antd/dayjs/$/PATH（禁止 import、禁止重新声明 PATH、不要自行创建 app-root）。
-调接口统一走 PATH.apiBase + '/api/data'，body: {report_path: PATH.getDataTemplate('xx_data.cpt'), datasource_name, page_number:-1, page_size:-1, parameters}。`,
+调接口统一走 PATH.apiBase + '/api/data'，report_path 用 PATH.getDataTemplate('xx_data.cpt')。${API_DATA_REQUEST_CONTRACT}`,
       parameters: z.object({
         project: z.string(),
         page: z.string(),

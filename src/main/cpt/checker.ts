@@ -153,6 +153,145 @@ export function checkNoMjsPlaceholder(js: string): CheckerFinding[] {
   return []
 }
 
+/** 返回索引所在的 1-based 行号。 */
+function lineAt(source: string, index: number): number {
+  return source.slice(0, index).split('\n').length
+}
+
+/**
+ * 找到配对括号/花括号。这里只用于已定位到的普通函数调用，遇到字符串时跳过，
+ * 以免 JSON、选择器或正则里的括号影响范围判断。
+ */
+function matchingIndex(source: string, open: number, left: string, right: string): number {
+  let depth = 0
+  let quote = ''
+  let escaped = false
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i]
+    if (quote) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === quote) quote = ''
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue }
+    if (ch === left) depth++
+    else if (ch === right && --depth === 0) return i
+  }
+  return -1
+}
+
+/** 在函数调用参数层级按逗号切分，不误切函数调用或对象字面量。 */
+function splitTopLevelArgs(source: string): string[] {
+  const out: string[] = []
+  let start = 0
+  let quote = ''
+  let escaped = false
+  let parens = 0
+  let braces = 0
+  let brackets = 0
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+    if (quote) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === quote) quote = ''
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue }
+    if (ch === '(') parens++
+    else if (ch === ')') parens--
+    else if (ch === '{') braces++
+    else if (ch === '}') braces--
+    else if (ch === '[') brackets++
+    else if (ch === ']') brackets--
+    else if (ch === ',' && parens === 0 && braces === 0 && brackets === 0) {
+      out.push(source.slice(start, i).trim())
+      start = i + 1
+    }
+  }
+  out.push(source.slice(start).trim())
+  return out
+}
+
+/**
+ * 找出明确返回对象的参数工厂；保守识别，不尝试猜测复杂动态表达式。
+ * 例如：const makeParams = useCallback(() => ({ p_page: '1' }), [])。
+ */
+function objectParameterFactories(source: string): Set<string> {
+  const names = new Set<string>()
+  const arrow = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:(?:React\.)?useCallback\s*\(\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\(\s*\{/g
+  let match: RegExpExecArray | null
+  while ((match = arrow.exec(source)) !== null) names.add(match[1])
+
+  const fn = /\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/g
+  while ((match = fn.exec(source)) !== null) {
+    const close = matchingIndex(source, fn.lastIndex - 1, '{', '}')
+    if (close < 0) continue
+    if (/\breturn\s*\{/.test(source.slice(fn.lastIndex, close))) names.add(match[1])
+  }
+  return names
+}
+
+/**
+ * 检查确定无疑的 /api/data parameters 对象用法。
+ * 动态构造无法可靠静态归因时不报错，交由真实页面网络验收；但对象字面量和
+ * 对象工厂透传会在构建阶段直接阻断，避免把已知错误部署进 CPT。
+ */
+export function checkApiDataParameters(js: string): CheckerFinding[] {
+  const findings: CheckerFinding[] = []
+  const reported = new Set<number>()
+  const report = (index: number, detail: string) => {
+    if (reported.has(index)) return
+    reported.add(index)
+    findings.push({
+      rule: 'api_data_parameters_shape',
+      severity: 'error',
+      line: lineAt(js, index),
+      message: `/api/data 的 parameters 必须是 [{ name, type, value }] 数组；${detail}`
+    })
+  }
+  const factories = objectParameterFactories(js)
+
+  // 直接在请求体里传对象，最常见也最确定。
+  const directObject = /\bparameters\s*:\s*\{/g
+  let match: RegExpExecArray | null
+  while ((match = directObject.exec(js)) !== null) {
+    const near = js.slice(Math.max(0, match.index - 800), match.index + 80)
+    if (near.includes('/api/data')) report(match.index, '检测到对象字面量。')
+  }
+
+  // API 包装函数（function callApi(name, parameters) {... /api/data ... parameters: parameters }）
+  // 被对象工厂或对象字面量调用时同样可以确定为错误。
+  const fn = /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/g
+  while ((match = fn.exec(js)) !== null) {
+    const bodyOpen = fn.lastIndex - 1
+    const bodyClose = matchingIndex(js, bodyOpen, '{', '}')
+    if (bodyClose < 0) continue
+    const body = js.slice(bodyOpen + 1, bodyClose)
+    if (!body.includes('/api/data')) continue
+    const parameterMatch = /\bparameters\s*:\s*([A-Za-z_$][\w$]*)\b/.exec(body)
+    if (!parameterMatch) continue
+    const parameterIndex = match[2].split(',').map((item) => item.trim()).indexOf(parameterMatch[1])
+    if (parameterIndex < 0) continue
+
+    const call = new RegExp(`\\b${match[1]}\\s*\\(`, 'g')
+    let called: RegExpExecArray | null
+    while ((called = call.exec(js)) !== null) {
+      // 跳过函数声明自身。
+      if (/\bfunction\s+$/.test(js.slice(Math.max(0, called.index - 16), called.index))) continue
+      const open = call.lastIndex - 1
+      const close = matchingIndex(js, open, '(', ')')
+      if (close < 0) continue
+      const arg = splitTopLevelArgs(js.slice(open + 1, close))[parameterIndex] ?? ''
+      const objectCall = /^([A-Za-z_$][\w$]*)\s*\(/.exec(arg)?.[1]
+      if (arg.startsWith('{')) report(called.index, `调用 ${match[1]} 时传入了对象字面量。`)
+      else if (objectCall && factories.has(objectCall)) report(called.index, `参数工厂 ${objectCall}() 明确返回对象。`)
+    }
+  }
+  return findings
+}
+
 /** js_path_resolution：PATH 基础设施完整 + 未被业务区遮盖 */
 export function checkPathResolution(cptXml: string, baseTemplateXml: string): CheckerFinding[] {
   const findings: CheckerFinding[] = []

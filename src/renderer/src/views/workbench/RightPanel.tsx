@@ -448,7 +448,7 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
   }
   const restore = async () => {
     if (!selectedCheckpoint) return
-    const ok = confirm(`恢复到「${selectedCheckpoint.title}」？\n\n将覆盖受 RC 管理的源码，并自动留存“恢复前”检查点。\n不会回滚数据库，也不会覆盖传统 CPT；恢复后请重新构建受影响产物。`)
+    const ok = confirm(`恢复到「${selectedCheckpoint.title}」修改之后的状态？\n\n该版本是此对话/操作完成时的快照，恢复即回到它改动后的样子；如需改动之前，请选择上一条更早的版本。\n将覆盖受 RC 管理的源码，并自动留存“恢复前”检查点（可再次撤销）。\n不会回滚数据库，也不会覆盖传统 CPT；恢复后请重新构建受影响产物。`)
     if (!ok) return
     setBusy(true)
     try {
@@ -461,7 +461,7 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
   }
 
   return <div className="vp">
-    <div className="banner info"><Icon n="info" /><div><b>开发检查点</b>保存在 Report Console 本地，不创建 .git、不会修改 SVN。仅追踪 project.yaml、受管 JSX、过程定义与 meta/ 源文档；CPT 构建产物、传统 CPT 与数据库不会被回滚。</div></div>
+    <div className="banner info"><Icon n="info" /><div><b>开发检查点</b>保存在 Report Console 本地，不创建 .git、不会修改 SVN。每条版本是对话/操作<b>完成时</b>的快照，恢复即回到该次改动之后的状态（要改动之前，选上一条更早的版本）。仅追踪 project.yaml、受管 JSX、过程定义与 meta/ 源文档；CPT 构建产物、传统 CPT 与数据库不会被回滚。</div></div>
     <div className="vp-actions">
       <button className="btn" disabled={busy} onClick={() => void create()}><Icon n="plus" />创建检查点</button>
       {selectedCheckpoint && <button className="btn dgr" disabled={busy} onClick={() => void restore()}><Icon n="back" />恢复此版本</button>}

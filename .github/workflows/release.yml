@@ -1,0 +1,35 @@
+# 推送 v* 标签即在三平台云端编译，并把安装包自动挂到对应 Release。
+# 本地只跑 typecheck/test；selftest/smoke 依赖真实帆软 + MySQL 环境，不在 CI 执行。
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            files: dist/*.dmg
+          - os: windows-latest
+            files: dist/*.exe
+          - os: ubuntu-latest
+            files: dist/*.AppImage
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.files }}

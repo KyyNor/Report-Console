@@ -2,9 +2,29 @@ import { app, BrowserWindow, Menu } from 'electron'
 import { registerIpc } from './ipc'
 import { createMainWindow } from './windows'
 import { runSelftest } from './selftest'
+import { existsSync, mkdirSync, renameSync } from 'fs'
+import { homedir } from 'os'
+import { join } from 'path'
 
 // 禁用同源策略引起的 localhost 拉取问题不影响本应用；保持默认安全策略
 app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests')
+
+// 数据目录跨平台统一：macOS/Linux 用 ~/.config/report-console，Windows 走系统默认 %APPDATA%。
+// 必须在创建窗口与初始化 SQLite 之前设置；macOS 一次性迁移 Electron 旧默认目录，老数据（库、检查点、会话）原样保留。
+if (process.platform !== 'win32') {
+  const next = join(homedir(), '.config', 'report-console')
+  if (process.platform === 'darwin') {
+    const legacy = join(homedir(), 'Library', 'Application Support', 'report-console')
+    if (existsSync(legacy) && !existsSync(next)) {
+      try {
+        mkdirSync(join(homedir(), '.config'), { recursive: true })
+        renameSync(legacy, next)
+        console.log(`[main] 已迁移数据目录：${legacy} -> ${next}`)
+      } catch (e) { console.warn('[main] 数据目录迁移失败，将继续使用新目录：', e) }
+    }
+  }
+  app.setPath('userData', next)
+}
 
 function bootstrap(): void {
   registerIpc()

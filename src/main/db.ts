@@ -1,7 +1,7 @@
 /**
  * SQLite 存储（better-sqlite3）· v2 项目制
  * - 连接注册表 / 项目 / 接口契约（含连接绑定）/ 过程归属与关联 / 状态账本
- * - 库文件：~/Library/Application Support/report-console/data.sqlite3
+ * - 库文件：~/.config/report-console/data.sqlite3（macOS/Linux）；Windows 为 %APPDATA%/report-console/
  * - migrate() 负责 v2 建表与旧 modules 存量迁移（连接取自旧 settings 的 mysql* 值）
  */
 

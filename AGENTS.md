@@ -25,7 +25,9 @@ npm run typecheck    # tsc --noEmit
 npm run selftest     # 集成自检：构建后对真实帆软+MySQL 跑 27 步全链路（幂等，exit 0/1）
 npm run smoke        # 冒烟：构建后启动并截图 smoke.png（SMOKE_VIEW=agent|workbench|connections 深链；
                       #  SMOKE_AUTOSEND=1 自动发消息、SMOKE_WAIT_MS 控制截图前等待，探针输出聊天 DOM 统计与会话落库校验）
-npm run pack         # electron-builder 打包（dist/，不装 dmg）
+npm run pack         # electron-builder 打包（dist/，仅目录产物）
+npm run dist         # electron-builder 按当前平台出安装包（mac: dmg arm64/x64 · win: 单 exe portable · linux: AppImage）
+                      #  CI：推 v* 标签触发 .github/workflows/release.yml，三平台云端编译并自动挂到 GitHub Release
 ```
 
 `selftest` / `smoke` / `dev` 依赖真实环境：本机 FineReport（默认 `http://localhost:8075`）、注册表里至少一条可达连接、可写的 reportlets 目录。没有该环境时只跑 `npm test` + `npm run typecheck`。
@@ -35,7 +37,7 @@ npm run pack         # electron-builder 打包（dist/，不装 dmg）
 代码与文档中**禁止出现任何本机值**：绝对路径、数据库账号/密码、业务库名。机器相关配置只有两个合法去处：
 
 1. 应用 UI（「设置」页填帆软地址/reportlets/模型；「连接」页注册 MySQL 连接）；
-2. SQLite 持久层 `~/Library/Application Support/report-console/data.sqlite3`（`settings` 与 `connections` 表，列名见 `src/main/db.ts`）。
+2. SQLite 持久层 `~/.config/report-console/data.sqlite3`（macOS/Linux，路径统一在 `src/main/index.ts` 启动早期设置；Windows 走系统默认 `%APPDATA%/report-console`；macOS 首次启动自动迁移旧 `~/Library/Application Support/report-console`）（`settings` 与 `connections` 表，列名见 `src/main/db.ts`）。
 
 `db.ts` 的 `DEFAULT_SETTINGS` 保持中性（空密码/空路径）。新机器接入流程 = clone → install → 设置页填两项（帆软地址、reportlets 路径）→ 「连接」页注册连接（名字与帆软数据连接一致）→ selftest 验证。
 

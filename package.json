@@ -19,6 +19,22 @@
     "pack": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder"
   },
+  "build": {
+    "appId": "com.kyynor.report-console",
+    "productName": "Report Console",
+    "artifactName": "report-console-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
+    },
+    "win": {
+      "target": ["portable"]
+    },
+    "linux": {
+      "category": "Development",
+      "target": ["AppImage"]
+    }
+  },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.84.2",
     "@earendil-works/pi-ai": "^0.84.2",

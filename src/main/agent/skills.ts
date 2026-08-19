@@ -11,8 +11,9 @@ import tablePatterns from './skills/table_patterns.md?raw'
 import mobileDisplay from './skills/mobile_display.md?raw'
 import mobileQa from './skills/mobile_qa.md?raw'
 import requirementsPlanning from './skills/requirements_planning.md?raw'
+import cloudApi from './skills/cloud_api.md?raw'
 
-export type BuiltinSkillName = 'page_interaction' | 'file_transfer' | 'table_patterns' | 'mobile_display' | 'mobile_qa' | 'requirements_planning'
+export type BuiltinSkillName = 'page_interaction' | 'file_transfer' | 'table_patterns' | 'mobile_display' | 'mobile_qa' | 'requirements_planning' | 'cloud_api'
 
 export interface BuiltinSkill {
   name: BuiltinSkillName
@@ -50,6 +51,11 @@ const skills: Record<BuiltinSkillName, BuiltinSkill> = {
     name: 'requirements_planning',
     description: '讨论需求模式下的澄清维度、分层计划结构与验收清单。',
     content: requirementsPlanning
+  },
+  cloud_api: {
+    name: 'cloud_api',
+    description: '帆软云平台接口（myFR.callCloud）调用规范；写操作走云端调度 ID，需用户提供 prjId。',
+    content: cloudApi
   }
 }
 

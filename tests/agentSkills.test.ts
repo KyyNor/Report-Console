@@ -34,4 +34,13 @@ describe('内置 Agent Skill', () => {
     expect(discussion).toContain('最终答复只能给出开发计划')
     expect(promptScenarios()).toHaveLength(6)
   })
+
+  it('云平台接口 Skill 强调 prjId 由用户提供且不与只读通道混用', () => {
+    const skill = readBuiltinSkill('cloud_api')
+    expect(skill.content).toContain('myFR.callCloud')
+    expect(skill.content).toContain('prjId')
+    expect(skill.content).toContain('不要猜测')
+    expect(skill.content).toContain('/api/data')
+    expect(listBuiltinSkills().map((item) => item.name)).toContain('cloud_api')
+  })
 })

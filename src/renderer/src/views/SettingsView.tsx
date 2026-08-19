@@ -15,13 +15,15 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
     })()
   }, [])
 
-  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled' | 'llmContextWindow'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const setCtx = (v: string) => setForm((f) => (f ? { ...f, llmContextWindow: Number(v.replace(/\D/g, '')) || 0 } : f))
   const setThinkingEnabled = (v: boolean) => setForm((f) => (f ? { ...f, llmThinkingEnabled: v } : f))
 
   const save = async () => {
     if (!form) return
     if (!form.frServerUrl.trim()) { toast('帆软服务地址不能为空', 'err'); return }
     if (!form.reportletsPath.trim()) { toast('reportlets 目录不能为空', 'err'); return }
+    if (!Number.isInteger(form.llmContextWindow) || form.llmContextWindow < 4096) { toast('上下文窗口需为不小于 4096 的整数（token）', 'err'); return }
     setSaving(true)
     try {
       await call('config:save', form)
@@ -77,6 +79,11 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
             <div className="fld">
               <label>模型</label>
               <input type="text" value={form.llmModel} spellCheck={false} placeholder="gpt-4o-mini / claude-sonnet-4-5 / 自部署模型名" onChange={(e) => set('llmModel', e.target.value)} />
+            </div>
+            <div className="fld">
+              <label>上下文窗口（token）</label>
+              <input type="text" inputMode="numeric" value={form.llmContextWindow || ''} spellCheck={false} placeholder="128000" onChange={(e) => setCtx(e.target.value)} />
+              <div className="fh">按所用模型实际窗口填写（查模型文档）；聊天页的占用圆环与「超过 80% 自动压缩」阈值都以它为分母。</div>
             </div>
             <div className="fld">
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>

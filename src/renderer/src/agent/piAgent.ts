@@ -71,7 +71,8 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
     reasoning: isZaiCompatible || s.llmThinkingEnabled,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128000,
+    // 窗口来自设置页（getSettings 保证为正整数）：圆环分母与 80% 压缩阈值都按它算。
+    contextWindow: s.llmContextWindow,
     maxTokens: 8192
   }
 

@@ -252,6 +252,8 @@ export interface AppSettings {
   llmBaseUrl: string
   llmApiKey: string
   llmModel: string
+  /** 模型上下文窗口（token）：聊天页占用圆环分母与 80% 自动压缩阈值来源。 */
+  llmContextWindow: number
   /** 是否请求模型输出可见思考；关闭时 GLM/ZAI 会显式收到 thinking: disabled。 */
   llmThinkingEnabled: boolean
   llmThinkingLevel: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'

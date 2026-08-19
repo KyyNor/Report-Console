@@ -244,6 +244,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   llmBaseUrl: 'https://api.openai.com/v1',
   llmApiKey: '',
   llmModel: 'gpt-4o-mini',
+  llmContextWindow: 128000,
   llmThinkingEnabled: false,
   llmThinkingLevel: 'medium'
 }
@@ -258,9 +259,13 @@ export function getSettings(): AppSettings {
   const level = validThinkingLevels.has(rest.llmThinkingLevel as AppSettings['llmThinkingLevel'])
     ? rest.llmThinkingLevel as AppSettings['llmThinkingLevel']
     : DEFAULT_SETTINGS.llmThinkingLevel
+  // settings 表按字符串保存：上下文窗口读回时还原为正整数，旧库缺失时回落默认值。
+  const ctxRaw = Number(rest.llmContextWindow)
+  const contextWindow = Number.isInteger(ctxRaw) && ctxRaw > 0 ? ctxRaw : DEFAULT_SETTINGS.llmContextWindow
   return {
     ...DEFAULT_SETTINGS,
     ...rest,
+    llmContextWindow: contextWindow,
     // settings 表按字符串保存，读取时还原布尔值；旧库没有这些键则使用默认值。
     llmThinkingEnabled: rest.llmThinkingEnabled === undefined ? DEFAULT_SETTINGS.llmThinkingEnabled : rest.llmThinkingEnabled === 'true',
     llmThinkingLevel: level

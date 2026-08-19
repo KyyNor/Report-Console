@@ -170,7 +170,7 @@ function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; da
       <TabsBar tabs={[{ k: 'ov', n: '总览' }, { k: 'versions', n: '版本' }, { k: 'dataLogs', n: 'Data 日志' }]} cur={tab} onSelect={(next) => ctx.setTab(key, next)} />
       <div className="rp-body">
         {tab === 'versions' && <VersionPanel project={p} onRestored={onResourcesChanged} />}
-        {tab === 'dataLogs' && <DataLogPanel project={p} />}
+        {tab === 'dataLogs' && <DataLogPanel project={p} pages={data.pages} />}
         {tab === 'ov' && <>
         <div className="blk">
           <div className="blk-t"><Icon n="folder" />项目信息</div>
@@ -229,9 +229,13 @@ function dataCallState(item: PreviewDataCall): { label: string; cls: string } {
   return { label: `HTTP ${item.status}`, cls: 'ok' }
 }
 
-function DataLogPanel({ project }: { project: Project }): React.ReactElement {
+/** 展开一条调用后 SQL 的三个视图：契约原文 / 参数代入 / 公式求值（调试）。 */
+type SqlTabKey = 'template' | 'prepared' | 'resolved'
+
+function DataLogPanel({ project, pages }: { project: Project; pages: PageMeta[] }): React.ReactElement {
   const [report, setReport] = useState<PreviewDataReport | null>(null)
   const [open, setOpen] = useState<number | null>(null)
+  const [sqlTab, setSqlTab] = useState<SqlTabKey>('template')
   const [busy, setBusy] = useState<number | null>(null)
   const [note, setNote] = useState('')
 
@@ -255,11 +259,17 @@ function DataLogPanel({ project }: { project: Project }): React.ReactElement {
     setBusy(item.id)
     setNote('')
     try {
-      const next = await call<{ sql?: string; error?: string }>('preview:evaluateSql', { project: project.name, page: session.page, callId: item.id })
-      setNote(next.error || '已通过当前桌面预览窗口计算帆软公式。')
-      const updated = await call<PreviewDataReport>('preview:dataLogs', { project: project.name })
-      setReport(updated)
+      await call('preview:evaluateSql', { project: project.name, page: session.page, callId: item.id })
+      setReport(await call<PreviewDataReport>('preview:dataLogs', { project: project.name }))
     } catch (e) { setNote((e as Error).message) } finally { setBusy(null) }
+  }
+
+  /** 切到「公式求值」时自动求值：仅桌面页面且预览窗口仍开着；已求值或移动页不重复触发。 */
+  const selectSqlTab = (k: SqlTabKey, session: PreviewDataSession, item: PreviewDataCall) => {
+    setSqlTab(k)
+    const pageMobile = pages.find((x) => x.name === session.page)?.platform === 'mobile'
+    if (k === 'resolved' && !item.sqlResolved && !item.sqlResolutionError && !pageMobile
+      && !session.closedAt && busy !== item.id) void resolveSql(session, item)
   }
 
   return <div className="data-log-panel">
@@ -271,7 +281,7 @@ function DataLogPanel({ project }: { project: Project }): React.ReactElement {
         const state = dataCallState(item)
         const expanded = open === item.id
         return <div className="data-log-call" key={`${session.windowId}:${item.id}`}>
-          <button className="data-log-summary" onClick={() => setOpen(expanded ? null : item.id)}>
+          <button className="data-log-summary" onClick={() => { if (!expanded) setSqlTab('template'); setOpen(expanded ? null : item.id) }}>
             <span className={`data-log-status ${state.cls}`}>{state.label}</span>
             <span className="data-log-name">{item.datasourceName || '未识别数据集'}</span>
             <span className="data-log-page">{session.page}</span>
@@ -281,11 +291,26 @@ function DataLogPanel({ project }: { project: Project }): React.ReactElement {
           {expanded && <div className="data-log-detail">
             <div className="data-log-meta"><b>报告</b><span className="mono">{item.reportPath || '—'}</span><b>请求</b><span className="mono">{item.method} {item.url}</span></div>
             {item.sqlTemplate ? <>
-              <CodeBlk title="接口契约 SQL" body={item.sqlTemplate} />
-              {item.sqlPrepared && item.sqlPrepared !== item.sqlTemplate && <CodeBlk title="参数代入后的帆软公式" body={item.sqlPrepared} />}
-              {item.sqlResolved && <CodeBlk title="公式求值 SQL（调试）" body={item.sqlResolved} />}
-              {item.sqlResolutionError && <div className="banner warn"><Icon n="alert" /><div>{item.sqlResolutionError}</div></div>}
-              {!session.closedAt && <button className="btn sm" disabled={busy === item.id} onClick={() => void resolveSql(session, item)}><Icon n="term" />{busy === item.id ? '求值中…' : '解析公式 SQL'}</button>}
+              <div className="data-log-sqltabs">
+                <button className={sqlTab === 'template' ? 'on' : ''} onClick={() => setSqlTab('template')}>接口契约</button>
+                <button className={sqlTab === 'prepared' ? 'on' : ''} onClick={() => setSqlTab('prepared')}>参数代入</button>
+                <button className={sqlTab === 'resolved' ? 'on' : ''} onClick={() => selectSqlTab('resolved', session, item)}>公式求值{busy === item.id ? ' …' : ''}</button>
+              </div>
+              {sqlTab === 'template' && <CodeBlk title="接口契约 SQL" body={item.sqlTemplate} />}
+              {sqlTab === 'prepared' && (item.sqlPrepared && item.sqlPrepared !== item.sqlTemplate
+                ? <CodeBlk title="参数代入后的帆软公式" body={item.sqlPrepared} />
+                : <div className="nores">这条 SQL 没有可代入的公式参数，与接口契约一致。</div>)}
+              {sqlTab === 'resolved' && (item.sqlResolved
+                ? <CodeBlk title="公式求值 SQL（调试）" body={item.sqlResolved} />
+                : busy === item.id
+                  ? <div className="nores">正在通过当前桌面预览窗口执行 FR.remoteEvaluate 求值…</div>
+                  : item.sqlResolutionError
+                    ? <div className="banner warn"><Icon n="alert" /><div>{item.sqlResolutionError}</div></div>
+                    : pages.find((x) => x.name === session.page)?.platform === 'mobile'
+                      ? <div className="banner warn"><Icon n="alert" /><div>移动端页面不执行 FR.remoteEvaluate（同步求值在移动 SPA 可能挂起）；请查看「参数代入」页的公式表达式。</div></div>
+                      : session.closedAt
+                        ? <div className="nores">预览窗口已关闭，无法求值；重新打开页面并触发查询后再切到本页。</div>
+                        : <div className="nores">尚未求值。</div>)}
             </> : <div className="banner warn"><Icon n="alert" /><div>未在当前项目接口契约中找到 <span className="mono">{item.datasourceName || '该数据集'}</span>，因此只展示网络请求，不读取其他项目。</div></div>}
             <div className="data-log-pair">
               <div><CodeBlk title="请求体" body={prettyJson(item.requestBody)} /></div>

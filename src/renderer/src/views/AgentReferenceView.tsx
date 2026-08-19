@@ -5,7 +5,7 @@ import type { AgentMode, ProjectPlatform } from '@shared/types'
 import type { AgentPromptScenario } from '@shared/agentPrompt'
 
 interface SkillReference { name: string; description: string; content: string }
-interface ToolReference { name: string; description: string; modes: string[]; parameters: Record<string, unknown> }
+interface ToolReference { name: string; description: string; group: string; modes: string[]; parameters: Record<string, unknown> }
 interface Catalog { prompts: AgentPromptScenario[]; skills: SkillReference[]; tools: ToolReference[] }
 
 /** 模式可用性徽标：讨论模式白名单内 = 开发+讨论，否则仅开发。 */
@@ -37,6 +37,16 @@ export default function AgentReferenceView(): React.ReactElement {
   const prompt = useMemo(() => catalog.prompts.find((item) => item.platform === platform && item.mode === mode), [catalog.prompts, platform, mode])
   const currentSkill = useMemo(() => catalog.skills.find((item) => item.name === skill), [catalog.skills, skill])
   const currentTool = useMemo(() => catalog.tools.find((item) => item.name === tool), [catalog.tools, tool])
+  /** 分组保持主进程 TOOL_GROUPS 的先现次序；同组内保持注册顺序。 */
+  const toolGroups = useMemo(() => {
+    const order: string[] = []
+    const map = new Map<string, ToolReference[]>()
+    for (const item of catalog.tools) {
+      if (!map.has(item.group)) { map.set(item.group, []); order.push(item.group) }
+      map.get(item.group)!.push(item)
+    }
+    return order.map((label) => ({ label, tools: map.get(label)! }))
+  }, [catalog.tools])
 
   return (
     <div className="page reference-page">
@@ -73,10 +83,13 @@ export default function AgentReferenceView(): React.ReactElement {
       </div>}
       {!error && kind === 'tools' && <div className="reference-layout">
         <aside className="reference-side skill-list">
-          {catalog.tools.map((item) => <button key={item.name} className={tool === item.name ? 'on' : ''} onClick={() => setTool(item.name)}>
-            <b>{item.name}</b>
-            <span className="ref-mode-row"><ModeChip modes={item.modes} /></span>
-          </button>)}
+          {toolGroups.map((group) => <React.Fragment key={group.label}>
+            <label>{group.label}</label>
+            {group.tools.map((item) => <button key={item.name} className={tool === item.name ? 'on' : ''} onClick={() => setTool(item.name)}>
+              <b>{item.name}</b>
+              <span className="ref-mode-row"><ModeChip modes={item.modes} /></span>
+            </button>)}
+          </React.Fragment>)}
         </aside>
         <main className="reference-content">
           <div className="reference-title"><b>{currentTool?.name ?? '工具'}</b><ModeChip modes={currentTool?.modes ?? []} /></div>

@@ -243,17 +243,32 @@ export function registerIpc(): void {
 
   // ── pi Agent 桥（渲染层 Agent 的平台工具通道）──────────
   handle('pi:toolDefs', () => piToolDefs())
-  handle('agent:referenceCatalog', () => ({
-    prompts: promptScenarios(),
-    skills: listBuiltinSkills(),
-    tools: piToolDefs().map((t) => ({
-      name: t.name,
-      description: t.description,
-      parameters: t.schema,
-      // 模式可用性以 piBridge 的执行白名单为准（讨论模式只放行只读工具）。
-      modes: DISCUSSION_READ_ONLY_TOOLS.has(t.name) ? ['development', 'discussion'] : ['development']
-    }))
-  }))
+/** 规范页工具分组：与工作台资源类型对齐；未列出的工具落入「其他」。 */
+const TOOL_GROUPS: Array<{ label: string; names: string[] }> = [
+  { label: '通用', names: ['read_skill', 'search_design_lib'] },
+  { label: '数据接口', names: ['list_datasets', 'read_dataset', 'save_dataset', 'delete_dataset', 'build_data_cpt', 'test_dataset'] },
+  { label: '存储过程', names: ['list_procedures', 'read_procedure', 'save_procedure', 'apply_procedure'] },
+  { label: '文档', names: ['list_docs', 'read_doc', 'write_doc', 'patch_doc'] },
+  { label: '页面', names: ['list_pages', 'read_page', 'write_page', 'patch_page', 'create_page', 'update_page_paths', 'build_page', 'open_page', 'collect_page_errors'] },
+  { label: '传统 CPT', names: ['inspect_legacy_cpt'] },
+  { label: 'SQL', names: ['sql_query', 'sql_exec', 'list_tables', 'describe_table'] }
+]
+
+  handle('agent:referenceCatalog', () => {
+    const groupOf = new Map(TOOL_GROUPS.flatMap((g) => g.names.map((n) => [n, g.label] as const)))
+    return {
+      prompts: promptScenarios(),
+      skills: listBuiltinSkills(),
+      tools: piToolDefs().map((t) => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.schema,
+        group: groupOf.get(t.name) ?? '其他',
+        // 模式可用性以 piBridge 的执行白名单为准（讨论模式只放行只读工具）。
+        modes: DISCUSSION_READ_ONLY_TOOLS.has(t.name) ? ['development', 'discussion'] : ['development']
+      }))
+    }
+  })
   handle('pi:toolExec', (a) => piToolExec(
     (a as { name: string }).name,
     (a as { args: unknown }).args,

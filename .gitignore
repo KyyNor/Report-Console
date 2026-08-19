@@ -7,3 +7,4 @@ smoke-*.png
 smoke.png
 .env
 *.sqlite3-journal
+.design-lib-cache/

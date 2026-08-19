@@ -12,6 +12,7 @@ import * as pages from '../pagesService'
 import * as sql from '../mysqlService'
 import * as legacyCpt from '../legacyCptService'
 import { readBuiltinSkill } from './skills'
+import { searchDesignLib } from './designlib'
 import { API_DATA_REQUEST_CONTRACT } from '@shared/agentPrompt'
 
 export { SYSTEM_PROMPT } from '@shared/agentPrompt'
@@ -38,6 +39,20 @@ export function buildTools() {
         name: z.enum(['page_interaction', 'file_transfer', 'table_patterns', 'mobile_display', 'mobile_qa', 'requirements_planning'])
       }),
       execute: async ({ name }) => readBuiltinSkill(name)
+    }),
+
+    // ── 设计库（精简自 ui-ux-pro-max-skill，只读检索）──────
+    search_design_lib: tool({
+      description: `按关键词检索内置设计库，各检索范围独立打分后合并返回前 N 条。范围：product（产品类型）/ style（视觉风格）/ color（配色）/ reasoning（UI 推理规则）/ ux（UX 准则）/ chart（图表选型）/ web（Web 界面规则）/ react（React 性能）。
+做页面布局、视觉风格、图表选型或交互细节决策前先检索获取设计依据（常用组合 product+style+ux，图表选型用 chart）；条目正文为英文，关键词建议用英文（如 dashboard / table / empty states），中文常用词会自动扩展。`,
+      parameters: z.object({
+        query: z.string().min(1).describe('关键词，支持中英文，如 "dashboard minimal" / "金融看板"'),
+        scopes: z.array(z.enum(['product', 'style', 'color', 'reasoning', 'ux', 'chart', 'web', 'react']))
+          .min(1).describe('检索范围数组，如 ["product","style","ux"]'),
+        limit: z.number().int().min(1).max(10).default(3).describe('每个范围返回条数，缺省 3'),
+        full: z.boolean().default(false).describe('true 时不截断长字段（默认 300 字符截断）')
+      }),
+      execute: async ({ query, scopes, limit, full }) => searchDesignLib({ query, scopes, limit, full })
     }),
 
     // ── 接口契约 ──────────────────────────────────────────

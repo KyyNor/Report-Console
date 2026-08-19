@@ -22,6 +22,8 @@ npm install          # postinstall 自动 rebuild better-sqlite3（换 Node 版�
 npm run dev          # 开发模式（electron-vite，热更新）
 npm test             # vitest 单元测试（CPT 生成/变换/质量门，含 Python 黄金对照）
 npm run typecheck    # tsc --noEmit
+npm run design-lib:sync  # 设计库同步：克隆 ui-ux-pro-max-skill 上游 → 按剔除/精简清单转 jsonl 入库 + 差异报告
+                          #  （--inspect 看上游列名/条目名；--dry-run 只出报告；--json 机器可读）
 npm run selftest     # 集成自检：构建后对真实帆软+MySQL 跑 27 步全链路（幂等，exit 0/1）
 npm run smoke        # 冒烟：构建后启动并截图 smoke.png（SMOKE_VIEW=agent|workbench|connections 深链；
                       #  SMOKE_AUTOSEND=1 自动发消息、SMOKE_WAIT_MS 控制截图前等待，探针输出聊天 DOM 统计与会话落库校验）
@@ -56,8 +58,9 @@ src/main/               Electron 主进程
   frClient.ts           帆软 /api/data 封装 + 连通探测 + 预览 URL
   cpt/                  核心资产：dataWriter（支持每数据集 dbConnection）/ displayWriter / jsTransform / checker / legacyInspector
   legacyCptService.ts   传统 CPT 的当前项目、只读、结构摘要入口（5MB 上限）
-  agent/tools.ts        平台动作的模型侧暴露面（契约/过程/文档/页面/SQL/传统 CPT；SYSTEM_PROMPT 在 @shared/agentPrompt）
+  agent/tools.ts        平台动作的模型侧暴露面（契约/过程/文档/页面/SQL/传统 CPT/设计库；SYSTEM_PROMPT 在 @shared/agentPrompt）
   agent/piBridge.ts     工具 JSON Schema 导出 + 受控执行；强制注入当前项目和允许连接范围
+  agent/designlib.ts    内置设计库合并检索（BM25 + 中文二元组/中英扩展；数据在 agent/designlib/data/*.jsonl，?raw 内联打包）
   selftest.ts           27 步全链路自检（连接→建表→过程→项目→契约→构建→实测→页面→预览→文档）
   templates/            数据/页面 CPT 骨架（?raw 导入）+ 页面脚手架 blank/list/form
 src/renderer/           React 19 + CodeMirror，浅色 tech-utility 主题、深色代码块（样式移植 docs/prototypes/workbench.html）
@@ -101,6 +104,15 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 - 写操作必须走存储过程且 `SELECT JSON_OBJECT(...)` 返回结果（selftest 的 insert/delete 闭环依赖此约定）。
 - 接口测试 POST `/webroot/decision/api/data`，`page_number/page_size` 恒 `-1`，业务分页走 parameters；`err_code=0` 才算通过。
 - 顺序强约定：数据接口先行、实测通过再做页面（Agent 系统提示词同样要求）。
+
+## 设计库（精简自 ui-ux-pro-max-skill）
+
+给应用内 Agent 用的设计知识库：产品类型/视觉风格/配色/UI 推理/UX 准则/图表选型/Web 与 React 规则，八个检索范围。**`agent/designlib/`（data/ 与 references/）只能由同步脚本产出，禁止手改**——调整内容一律改 `scripts/design-lib/config.mjs` 后重跑 `npm run design-lib:sync`（对齐「CPT 只能由 build 产出」的精神）。
+
+- **同步模型**：脚本克隆上游最新代码到 `.design-lib-cache/`（已 gitignore）→ 按配置剔除/精简 → 转成 jsonl 落库 + manifest（记录来源 commit、条目数、sha256）。
+- **配置两级**：`exclude` 按文件名整份剔除（字体/落地页/图标/stacks/GSAP 动效等）；`domains` 按 **文件名 + 条目名白名单** 精简（`entries: '*'` 表示小文件全收）。上游对精简文件**新增条目不会自动入库**，同步报告的「未入清单条目」会列出并标注自上次新增的，决定收录就把它加进 config 再同步一次。
+- **上游结构变更防护**：缺文件/缺 key 列/缺配置列直接报错退出（提示先 `--inspect` 校准）；上游出现配置未覆盖的新文件会 WARNING 跳过，不静默入库。
+- **运行时检索**：`agent/designlib.ts` 是合并检索工具（Okapi BM25，英文分词 + 中文二元组 + 少量中英扩展；长字段默认 300 字符截断），Agent 侧入口是 `search_design_lib` 工具（只读、全局，讨论模式亦可用）。改检索核心或同步纯函数：跑 `npm test`（tests/designLib.test.ts）。
 
 ## 测试与验证要求
 

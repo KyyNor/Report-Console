@@ -53,7 +53,7 @@ const PROJECT_TOOLS = new Set([
 ])
 const SQL_TOOLS = new Set(['sql_query', 'sql_exec', 'list_tables', 'describe_table'])
 export const DISCUSSION_READ_ONLY_TOOLS = new Set([
-  'read_skill',
+  'read_skill', 'search_design_lib',
   'list_datasets', 'read_dataset',
   'list_procedures', 'read_procedure',
   'list_docs', 'read_doc',

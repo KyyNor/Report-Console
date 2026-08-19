@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "design-lib:sync": "node scripts/design-lib/sync.mjs",
     "selftest": "electron-vite build && electron . --selftest",
     "smoke": "electron-vite build && electron . --smoke smoke.png",
     "postinstall": "electron-builder install-app-deps",

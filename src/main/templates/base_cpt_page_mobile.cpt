@@ -130,8 +130,9 @@
     //    设计要点（针对企微 XWEB/WKWebView 加载卡死问题）：
     //      a. CDN 优先：jsDelivr 固定版本，本地兜底同源资源作 fallback
     //      b. 并行加载：CSS + 5 个 script 同时发起，总耗时 = max(单文件) 而非 sum
-    //      c. CDN 脚本用 XHR + (0,eval)：XHR 有内核级 ontimeout，比 <script> onload 可靠
-    //         本地脚本仍用 <script src>：同源事件可靠，UMD 全局挂载正确
+    //      c. CDN 脚本用 XHR 取回、到齐后按声明顺序 (0,eval)：XHR 有内核级 ontimeout，
+    //         比 <script> onload 可靠，且避免乱序求值破坏 UMD 依赖
+    //         本地脚本仍用 <script src async=false>：同源事件可靠且保序
     //      d. 全局看门狗 bootGuardDog：15s 后若 libSource 未设置，强制显示诊断面板
     //      e. bootBusiness 包 try/catch：React 渲染抛错也显示诊断面板，不留白屏
     //      f. 诊断面板（diag/showDiagPanel）：纯原生 JS，不依赖任何库加载成功
@@ -185,6 +186,9 @@
     // 重要：移动端 SPA（/url/mobile）环境下 window 自定义属性赋值会抛错/挂起，
     //       全部用闭包局部变量，不要写 window.__XXX
     var FRM_DIAG = [];
+    // 记录初始标题：加载期 diag() 会把 title 临时改成 DIAG: 前缀，boot 成功后还原
+    var initialDocTitle = '';
+    try { initialDocTitle = document.title; } catch(e) {}
     var libSource = null;        // 替代 window.__FRM_LIB_SOURCE
     var libSourceTrying = null;  // 替代 window.__FRM_LIB_SOURCE_TRYING
     function diag(msg) {
@@ -361,10 +365,13 @@
         document.head.appendChild(s);
     }
 
-    // 跨域 script（CDN）：XHR + (0,eval)。XHR 有内核级 ontimeout，比 <script> onload 可靠
-    function loadScriptXHR(item, timeoutMs, onComplete, onError) {
-        if (item.check && item.check()) { diag('▪ ' + item.name + ' 已存在,跳过'); onComplete(); return; }
-        diag('▶ loadScript(XHR): ' + item.name + ' ' + item.url.substring(0, 70));
+    // 跨域 script（CDN）：XHR 只取回文本，不在到达时立即求值。求值由 loadSourceParallel
+    // 等全部到齐后按 scripts[] 声明顺序统一 (0,eval)：UMD 工厂在求值时刻就要读全局
+    // React/dayjs，网络乱序先 eval antdMobile 会拿到 undefined 且 check() 仍通过，
+    // 形成运行期才爆的隐性坏状态。已存在的全局返回 null，由调用方跳过求值。
+    function fetchScriptXHR(item, timeoutMs, onComplete, onError) {
+        if (item.check && item.check()) { diag('▪ ' + item.name + ' 已存在,跳过取回'); onComplete(null); return; }
+        diag('▶ fetchScript(XHR): ' + item.name + ' ' + item.url.substring(0, 70));
         var done = false;
         try {
             var xhr = new XMLHttpRequest();
@@ -375,21 +382,7 @@
                 if (xhr.readyState !== 4) return;
                 done = true;
                 if (xhr.status >= 200 && xhr.status < 400) {
-                    try {
-                        // (0,eval) 间接调用 → 全局作用域，UMD 包正确挂载 window 全局变量
-                        (0, eval)(xhr.responseText);
-                    } catch (e) {
-                        diag('✗ ' + item.name + ' eval 失败: ' + e.message);
-                        onError(item.url + ' (eval error: ' + e.message + ')');
-                        return;
-                    }
-                    if (item.check && !item.check()) {
-                        diag('✗ ' + item.name + ' XHR完成但全局变量不存在');
-                        onError(item.url + ' (global missing: ' + item.name + ')');
-                        return;
-                    }
-                    diag('✓ ' + item.name + ' XHR+eval 完成');
-                    onComplete();
+                    onComplete(xhr.responseText);
                 } else {
                     diag('✗ ' + item.name + ' XHR HTTP ' + xhr.status);
                     onError(item.url + ' (HTTP ' + xhr.status + ')');
@@ -417,7 +410,10 @@
     }
 
     // 并行加载一个 source 的全部资源（CSS + 5 script 同时发起）
-    // 任一失败立即 onError（不等其他），全部成功才 onComplete
+    // 任一取回失败立即 onError（不等其他），全部成功才 onComplete。
+    // CDN 路径：脚本并行取回文本，全部到齐后按 scripts[] 声明顺序（jQuery→React→
+    // ReactDOM→dayjs→antdMobile）统一求值，保证 UMD 工厂求值时依赖全局已就绪；
+    // 本地路径 <script async=false> 本身保序，逐个加载即可。
     function loadSourceParallel(source, onComplete, onError) {
         libSourceTrying = source.name;
         setLoadingText('正在加载组件库（' + source.name + '）...');
@@ -426,16 +422,38 @@
         var total = 1 + source.scripts.length;   // CSS + scripts
         var remaining = total;
         var failed = false;
-        // CDN 跨域用 XHR；本地同源用 <script src>
+        // CDN 跨域用 XHR 取回；本地同源用 <script src>
         var useXHR = (source.name === 'CDN');
+        var fetchedTexts = [];                    // CDN：按声明顺序暂存脚本文本（null=全局已存在）
 
         function checkAllDone() {
             if (failed) return;
-            if (remaining === 0) {
-                libSource = source.name;
-                diag('=== ' + source.name + ' 全部完成 ===');
-                onComplete();
+            if (remaining !== 0) return;
+            if (useXHR) {
+                for (var j = 0; j < source.scripts.length; j++) {
+                    var item = source.scripts[j];
+                    if (fetchedTexts[j] === null) continue;
+                    try {
+                        // (0,eval) 间接调用 → 全局作用域，UMD 包正确挂载 window 全局变量
+                        (0, eval)(fetchedTexts[j]);
+                    } catch (e) {
+                        failed = true;
+                        diag('✗ ' + item.name + ' eval 失败: ' + e.message);
+                        onError(source.name, item.url + ' (eval error: ' + e.message + ')');
+                        return;
+                    }
+                    if (item.check && !item.check()) {
+                        failed = true;
+                        diag('✗ ' + item.name + ' 求值后全局变量不存在');
+                        onError(source.name, item.url + ' (global missing: ' + item.name + ')');
+                        return;
+                    }
+                    diag('✓ ' + item.name + ' 顺序求值完成');
+                }
             }
+            libSource = source.name;
+            diag('=== ' + source.name + ' 全部完成 ===');
+            onComplete();
         }
 
         // CSS
@@ -448,19 +466,30 @@
             onError(source.name, failedUrl);
         });
 
-        // Scripts（并行）
+        // Scripts（并行取回；CDN 求值延迟到全部到齐）
         for (var i = 0; i < source.scripts.length; i++) {
-            (function(item) {
-                var loader = useXHR ? loadScriptXHR : loadScriptLocal;
-                loader(item, source.timeoutMs, function() {
-                    remaining--; checkAllDone();
-                }, function(failedUrl) {
-                    if (failed) return;
-                    failed = true;
-                    diag('✗ ' + source.name + ' 脚本失败: ' + item.name + ',中止');
-                    onError(source.name, failedUrl);
-                });
-            })(source.scripts[i]);
+            (function(item, index) {
+                if (useXHR) {
+                    fetchScriptXHR(item, source.timeoutMs, function(text) {
+                        fetchedTexts[index] = text;
+                        remaining--; checkAllDone();
+                    }, function(failedUrl) {
+                        if (failed) return;
+                        failed = true;
+                        diag('✗ ' + source.name + ' 脚本取回失败: ' + item.name + ',中止');
+                        onError(source.name, failedUrl);
+                    });
+                } else {
+                    loadScriptLocal(item, source.timeoutMs, function() {
+                        remaining--; checkAllDone();
+                    }, function(failedUrl) {
+                        if (failed) return;
+                        failed = true;
+                        diag('✗ ' + source.name + ' 脚本失败: ' + item.name + ',中止');
+                        onError(source.name, failedUrl);
+                    });
+                }
+            })(source.scripts[i], i);
         }
     }
 
@@ -485,6 +514,8 @@
         clearTimeout(guardDogTimer);
         try {
             bootBusiness();
+            // 启动成功：还原被加载期诊断日志改写的标题
+            try { document.title = initialDocTitle; } catch(e) {}
         } catch (e) {
             diag('✗ bootBusiness 抛错: ' + (e && e.message || e));
             if (e && e.stack) diag(e.stack.toString().substring(0, 500));

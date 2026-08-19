@@ -240,6 +240,8 @@ svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px
 
 /* ---- 右栏 · 操作面板 ---- */
 .col-right{min-height:0;display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--border)}
+.rp-stack{position:relative;display:flex;flex-direction:column;flex:1;min-height:0}
+.rp-overlay{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;min-height:0;background:var(--bg)}
 .rp-detail{position:relative;height:100%;min-height:0}.rp-detail>.rp{height:100%}.rp-detail-close{position:absolute;z-index:2;right:12px;top:12px;background:var(--surface)}
 .rp{display:flex;flex-direction:column;height:100%;min-height:0}
 .rp-head{flex:none;padding:12px 16px 0;border-bottom:1px solid var(--border);background:var(--surface)}
@@ -583,6 +585,10 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 .rc-composer textarea::placeholder{color:var(--faint)}
 .rc-composer-bar{display:flex;align-items:center;gap:8px}
 .rc-hint{font:10.5px var(--font-mono);color:var(--faint)}
+.rc-ctx-gauge{display:inline-flex;align-items:center;gap:4px;color:var(--muted);cursor:help}
+.rc-ctx-gauge .rc-ctx-num{font:600 10px var(--font-mono)}
+.rc-ctx-gauge.warn{color:var(--warn)}
+.rc-ctx-gauge.bad{color:var(--bad)}
 
 @media (prefers-reduced-motion: reduce){
   *{animation:none !important; transition:none !important}

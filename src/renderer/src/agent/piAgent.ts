@@ -6,7 +6,7 @@
  * 模型接入：设置页的 OpenAI/Anthropic 兼容配置；未配置 Key 时初始化直接失败（界面明确提示）。
  */
 
-import { Agent, type AgentTool } from '@earendil-works/pi-agent-core'
+import { Agent, DEFAULT_COMPACTION_SETTINGS, estimateContextTokens, estimateTokens, generateSummaryWithUsage, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core'
 import {
   createModels, createProvider, Type,
   type Model, type Api
@@ -32,6 +32,9 @@ const DISCUSSION_READ_ONLY_TOOLS = new Set([
 
 const OPENAI_DEFAULT = 'https://api.openai.com/v1'
 const ANTHROPIC_DEFAULT = 'https://api.anthropic.com'
+
+/** 上下文占用超过窗口的该比例即自动压缩一次。 */
+const COMPACT_THRESHOLD = 0.8
 
 /** 主进程暴露的平台工具定义 → pi AgentTool（execute 经 IPC 桥回主进程） */
 async function buildPlatformTools(scope: AgentScope): Promise<AgentTool<any>[]> {
@@ -97,6 +100,8 @@ export interface PiAgentHandle {
   scope: AgentScope
   /** 当前生效模型 id（设置页配置） */
   modelId: string
+  /** 模型上下文窗口（token），供占用展示与压缩阈值计算 */
+  contextWindow: number
   setMode: (mode: AgentMode) => void
   setPlatform: (platform: ProjectPlatform) => void
 }
@@ -148,7 +153,46 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
       snapshot.title = titleFromMessages(agent.state.messages)
     }
     void saveSessionSnapshot(snapshot, agent.state)
+    if (ev.type === 'agent_end') void maybeAutoCompact()
   })
+
+  // ── 上下文自动压缩：占用超过窗口 80% 时把较早历史摘成一段总结。 ─────────
+  // 用 pi-agent-core 官方 compaction 原语（estimate/generateSummary），但切点与
+  // 保留策略按自研会话存储适配：尾部保留 DEFAULT_COMPACTION_SETTINGS.keepRecentTokens，
+  // 切点对齐到 user 回合边界（避免把 toolCall 与其 toolResult 切开）。
+  let compacting = false
+  async function maybeAutoCompact(): Promise<void> {
+    if (compacting || agent.state.isStreaming) return
+    if (estimateContextTokens(agent.state.messages).tokens < model.contextWindow * COMPACT_THRESHOLD) return
+    const messages = agent.state.messages
+    let kept = 0
+    let cut = messages.length
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const t = estimateTokens(messages[i])
+      if (kept + t > DEFAULT_COMPACTION_SETTINGS.keepRecentTokens && i < messages.length - 1) { cut = i + 1; break }
+      kept += t
+    }
+    while (cut < messages.length && messages[cut].role !== 'user') cut++
+    if (cut >= messages.length) return // 找不到可摘的完整回合（单回合超窗），留给模型侧截断
+    compacting = true
+    try {
+      const result = await generateSummaryWithUsage(
+        messages.slice(0, cut), models, model, DEFAULT_COMPACTION_SETTINGS.reserveTokens,
+        undefined, undefined, undefined, 'off'
+      )
+      // 摘要期间用户可能又发了新消息；只在 Agent 空闲时原子替换，避免覆盖运行中的转录。
+      if (!result.ok || agent.state.isStreaming) return
+      const summary: AgentMessage = {
+        role: 'user',
+        content: `[自动压缩 · 早前对话摘要（压缩前约 ${estimateContextTokens(messages).tokens} token）]\n${result.value.text}`,
+        timestamp: Date.now()
+      }
+      agent.state.messages = [summary, ...messages.slice(cut)]
+      void saveSessionSnapshot(snapshot, agent.state)
+    } finally {
+      compacting = false
+    }
+  }
 
   const applyScope = () => {
     agent.state.systemPrompt = buildSystemPrompt(scope.project, scope.platform ?? 'desktop', scope.mode ?? 'development')
@@ -159,6 +203,7 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
     sessionId: snapshot.id,
     scope,
     modelId: model.id,
+    contextWindow: model.contextWindow,
     setMode: (mode) => {
       if (agent.state.isStreaming) throw new Error('Agent 运行中不能切换模式')
       scope.mode = mode

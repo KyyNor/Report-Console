@@ -7,7 +7,7 @@
  * Agent 页与工作台右栏各挂一个实例，共享同一 Agent 单例（各自订阅，互不干扰）。
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { Agent, AgentMessage } from '@earendil-works/pi-agent-core'
+import { estimateContextTokens, type Agent, type AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AssistantMessage, TextContent, ToolCall, ToolResultMessage, Usage } from '@earendil-works/pi-ai'
 import { Icon } from '../../components/Icon'
 import { Markdown } from './Markdown'
@@ -30,6 +30,8 @@ interface ChatView {
   streaming?: AgentMessage
   pending: ReadonlySet<string>
   busy: boolean
+  /** 当前上下文 token 占用（最近一次请求的实际 usage + 之后新增消息的估算）。 */
+  ctxTokens: number
 }
 
 function snapshot(agent: Agent): ChatView {
@@ -37,7 +39,8 @@ function snapshot(agent: Agent): ChatView {
     messages: agent.state.messages,
     streaming: agent.state.streamingMessage,
     pending: agent.state.pendingToolCalls,
-    busy: agent.state.isStreaming
+    busy: agent.state.isStreaming,
+    ctxTokens: estimateContextTokens(agent.state.messages).tokens
   }
 }
 
@@ -54,6 +57,28 @@ function useChatView(agent: Agent): ChatView {
     return () => { unsub(); if (raf) cancelAnimationFrame(raf) }
   }, [agent])
   return view
+}
+
+// ── 上下文占用圆环（发送按钮旁；阈值色与自动压缩一致） ─────────────
+
+function fmtTokens(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
+function ContextGauge({ tokens, windowTokens }: { tokens: number; windowTokens: number }): React.ReactElement {
+  const pct = Math.max(0, Math.min(1, windowTokens > 0 ? tokens / windowTokens : 0))
+  const cls = pct >= 0.8 ? 'bad' : pct >= 0.6 ? 'warn' : ''
+  const r = 7
+  const c = 2 * Math.PI * r
+  return (
+    <span className={`rc-ctx-gauge${cls ? ` ${cls}` : ''}`} title={`上下文占用 ${fmtTokens(tokens)} / ${fmtTokens(windowTokens)}（约 ${Math.round(pct * 100)}%）；超过 80% 回合结束后自动压缩`}>
+      <svg viewBox="0 0 18 18" width="16" height="16" aria-hidden>
+        <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeOpacity=".18" strokeWidth="2.5" />
+        <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${c * pct} ${c}`} transform="rotate(-90 9 9)" />
+      </svg>
+      <span className="rc-ctx-num">{fmtTokens(tokens)}</span>
+    </span>
+  )
 }
 
 // ── 主组件 ──────────────────────────────────────────────────────
@@ -226,6 +251,7 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
         <div className="rc-composer-bar">
           <span className="rc-hint">{view.busy ? 'Agent 运行中…' : 'Enter 发送 · Shift+Enter 换行'}</span>
           <span className="grow" />
+          <ContextGauge tokens={view.ctxTokens} windowTokens={handle.contextWindow} />
           {view.busy && <button className="btn sm" onClick={() => agent.abort()}><Icon n="stop" />停止</button>}
           <button className="btn sm pri" disabled={!draft.trim() || view.busy} onClick={send}><Icon n="send" />发送</button>
         </div>
@@ -291,7 +317,7 @@ function AssistantCard({ msg, live, results, pending, toolLabels }: {
 }
 
 function AssistantMeta({ msg }: { msg: AssistantMessage }): React.ReactElement | null {
-  const tok = fmtTokens(msg.usage)
+  const tok = msg.usage.totalTokens ? `${fmtTokens(msg.usage.totalTokens)} tok` : ''
   if (!tok) return null
   return <div className="rc-meta">{msg.model}{tok ? ` · ${tok}` : ''}</div>
 }
@@ -377,9 +403,4 @@ function prettyJson(v: unknown): string {
     try { return JSON.stringify(JSON.parse(v), null, 2) } catch { return v }
   }
   try { return JSON.stringify(v, null, 2) ?? String(v) } catch { return String(v) }
-}
-
-function fmtTokens(u?: Usage): string {
-  if (!u || !u.totalTokens) return ''
-  return u.totalTokens >= 1000 ? `${(u.totalTokens / 1000).toFixed(1)}k tok` : `${u.totalTokens} tok`
 }

@@ -98,28 +98,46 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   onShowDataLogs: () => void
   onResourcesChanged?: () => void
 }): React.ReactElement {
-  // 项目切换必须卸载旧会话面板：附件、输入草稿和聊天快照都不能跨项目保留。
-  if (agentMode) return <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onShowVersions={onShowVersions} onShowDataLogs={onShowDataLogs} onResourcesChanged={onResourcesChanged} />
+  // Agent 会话面板常驻（key 仍是项目名：项目切换必须卸载，附件/草稿/聊天不跨项目保留）；
+  // 资源详情与项目面板改为覆盖层 —— 查看 jsx/接口再回来时输入草稿不丢。
+  const detail = !agentMode ? <ResourceOverlay ctx={ctx} data={data} acts={acts} onExitAgent={onExitAgent} onResourcesChanged={onResourcesChanged} /> : null
+  return (
+    <div className="rp-stack">
+      <AgentPanel key={ctx.project?.name ?? '__none__'} ctx={agentCtx} project={ctx.project} data={data} onProjectSettings={acts.openProjectSettings} onShowVersions={onShowVersions} onShowDataLogs={onShowDataLogs} onResourcesChanged={onResourcesChanged} />
+      {detail && <div className="rp-overlay">{detail}</div>}
+    </div>
+  )
+}
+
+/** 覆盖层内容：项目面板（未选资源）或资源详情，选择逻辑与旧互斥渲染一致。 */
+function ResourceOverlay({ ctx, data, acts, onExitAgent, onResourcesChanged }: {
+  ctx: SelCtx
+  data: WBData
+  acts: WBActs
+  onExitAgent: () => void
+  onResourcesChanged?: () => void
+}): React.ReactElement {
   const { sel } = ctx
   const r = sel ? sel : null
-  if (!r) return <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+  const project = () => <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+  if (!r) return project()
   if (r.startsWith('if:')) {
     const ds = data.datasets.find((x) => x.name === r.slice(3))
-    return ds ? <DetailShell onClose={onExitAgent}><IfPanel key={r} ctx={ctx} ds={ds} st={data.statuses[ds.name]} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+    return ds ? <DetailShell onClose={onExitAgent}><IfPanel key={r} ctx={ctx} ds={ds} st={data.statuses[ds.name]} acts={acts} /></DetailShell> : project()
   }
   if (r.startsWith('sp:')) {
     const sp = data.procs.find((x) => x.name === r.slice(3))
-    return sp ? <DetailShell onClose={onExitAgent}><SpPanel key={r} ctx={ctx} sp={sp} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+    return sp ? <DetailShell onClose={onExitAgent}><SpPanel key={r} ctx={ctx} sp={sp} acts={acts} /></DetailShell> : project()
   }
   if (r.startsWith('pg:')) {
     const pg = data.pages.find((x) => x.name === r.slice(3))
-    return pg ? <DetailShell onClose={onExitAgent}><PgPanel key={r} ctx={ctx} pg={pg} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+    return pg ? <DetailShell onClose={onExitAgent}><PgPanel key={r} ctx={ctx} pg={pg} acts={acts} /></DetailShell> : project()
   }
   if (r.startsWith('doc:')) {
     const doc = data.docs.find((x) => x.name === r.slice(4))
-    return doc ? <DetailShell onClose={onExitAgent}><DocPanel key={r} ctx={ctx} doc={doc} acts={acts} /></DetailShell> : <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+    return doc ? <DetailShell onClose={onExitAgent}><DocPanel key={r} ctx={ctx} doc={doc} acts={acts} /></DetailShell> : project()
   }
-  return <ProjectPanel ctx={ctx} data={data} acts={acts} onResourcesChanged={onResourcesChanged} />
+  return project()
 }
 
 function DetailShell({ children, onClose }: { children: React.ReactElement; onClose: () => void }): React.ReactElement {

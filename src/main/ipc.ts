@@ -8,7 +8,7 @@ import * as conns from './connectionsService'
 import * as mysql from './mysqlService'
 import * as projects from './projectsService'
 import * as pages from './pagesService'
-import { piToolDefs, piToolExec } from './agent/piBridge'
+import { DISCUSSION_READ_ONLY_TOOLS, piToolDefs, piToolExec } from './agent/piBridge'
 import { listBuiltinSkills } from './agent/skills'
 import { promptScenarios } from '@shared/agentPrompt'
 import { pingFrServer, callApiData } from './frClient'
@@ -245,7 +245,14 @@ export function registerIpc(): void {
   handle('pi:toolDefs', () => piToolDefs())
   handle('agent:referenceCatalog', () => ({
     prompts: promptScenarios(),
-    skills: listBuiltinSkills()
+    skills: listBuiltinSkills(),
+    tools: piToolDefs().map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.schema,
+      // 模式可用性以 piBridge 的执行白名单为准（讨论模式只放行只读工具）。
+      modes: DISCUSSION_READ_ONLY_TOOLS.has(t.name) ? ['development', 'discussion'] : ['development']
+    }))
   }))
   handle('pi:toolExec', (a) => piToolExec(
     (a as { name: string }).name,

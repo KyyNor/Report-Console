@@ -349,13 +349,12 @@ table.ptab{width:100%;border-collapse:collapse;font-size:11.5px}
 .data-log-detail{padding:10px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border)}
 .data-log-meta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 9px;font-size:10.5px;align-items:start}.data-log-meta b{color:var(--muted)}.data-log-meta span{overflow-wrap:anywhere}
 .data-log-code-title{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:10.5px;font-weight:700;margin-bottom:-3px}
-.data-log-sqltabs{display:flex;gap:5px;flex-wrap:wrap}
-.data-log-sqltabs button{padding:4px 11px;font-size:10.5px;font-weight:600;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer}
-.data-log-sqltabs button:hover{color:var(--fg);border-color:var(--accent)}
-.data-log-sqltabs button.on{color:var(--accent);border-color:var(--accent);background:var(--accent-s)}
+.data-log-tabs{display:flex;gap:5px;flex-wrap:wrap}
+.data-log-tabs button{padding:4px 11px;font-size:10.5px;font-weight:600;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer}
+.data-log-tabs button:hover{color:var(--fg);border-color:var(--accent)}
+.data-log-tabs button.on{color:var(--accent);border-color:var(--accent);background:var(--accent-s)}
 .data-log-detail .codeblk{max-height:240px;overflow:auto}
-.data-log-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}.data-log-pair>div{min-width:0;display:flex;flex-direction:column;gap:8px}
-@media (max-width:1100px){.data-log-summary{grid-template-columns:auto minmax(100px,1fr) auto auto}.data-log-page{display:none}.data-log-pair{grid-template-columns:1fr}}
+@media (max-width:1100px){.data-log-summary{grid-template-columns:auto minmax(100px,1fr) auto auto}.data-log-page{display:none}}
 .pipe{display:flex;align-items:center;gap:0;flex-wrap:nowrap;overflow-x:auto;padding:4px 0}
 .pstep{flex:none;display:flex;align-items:center}
 .pstep .nd{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:58px}

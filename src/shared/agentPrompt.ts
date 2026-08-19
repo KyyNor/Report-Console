@@ -113,7 +113,7 @@ export function buildSystemPrompt(project: string, platform: ProjectPlatform = '
 /** 兼容既有导入；默认场景仍是桌面端开发。 */
 export const SYSTEM_PROMPT = buildSystemPrompt('{{project}}', 'desktop', 'development')
 
-export function promptScenarios(project = '<当前项目>'): AgentPromptScenario[] {
+export function promptScenarios(project = '{{project}}'): AgentPromptScenario[] {
   const platforms: ProjectPlatform[] = ['desktop', 'mobile', 'dual']
   const modes: AgentMode[] = ['development', 'discussion']
   return platforms.flatMap((platform) => modes.map((mode) => ({

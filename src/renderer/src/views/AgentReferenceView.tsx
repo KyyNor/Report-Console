@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/Icon'
 import { call } from '../api'
-import type { AgentMode, Project, ProjectPlatform } from '@shared/types'
+import type { AgentMode, ProjectPlatform } from '@shared/types'
 import type { AgentPromptScenario } from '@shared/agentPrompt'
 
 interface SkillReference { name: string; description: string; content: string }
@@ -9,8 +9,6 @@ interface Catalog { prompts: AgentPromptScenario[]; skills: SkillReference[] }
 
 export default function AgentReferenceView(): React.ReactElement {
   const [catalog, setCatalog] = useState<Catalog>({ prompts: [], skills: [] })
-  const [projects, setProjects] = useState<Project[]>([])
-  const [project, setProject] = useState('')
   const [kind, setKind] = useState<'prompts' | 'skills'>('prompts')
   const [platform, setPlatform] = useState<ProjectPlatform>('desktop')
   const [mode, setMode] = useState<AgentMode>('development')
@@ -18,16 +16,11 @@ export default function AgentReferenceView(): React.ReactElement {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    void call<Project[]>('projects:list').then((items) => {
-      setProjects(items)
-      if (items[0]) { setProject(items[0].name); setPlatform(items[0].platform) }
-    }).catch((e) => setError((e as Error).message))
-  }, [])
-  useEffect(() => {
-    void call<Catalog>('agent:referenceCatalog', { project: project || '<当前项目>' })
+    void call<Catalog>('agent:referenceCatalog')
       .then((next) => { setCatalog(next); if (!next.skills.some((x) => x.name === skill) && next.skills[0]) setSkill(next.skills[0].name) })
       .catch((e) => setError((e as Error).message))
-  }, [project])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const prompt = useMemo(() => catalog.prompts.find((item) => item.platform === platform && item.mode === mode), [catalog.prompts, platform, mode])
   const currentSkill = useMemo(() => catalog.skills.find((item) => item.name === skill), [catalog.skills, skill])
@@ -37,16 +30,6 @@ export default function AgentReferenceView(): React.ReactElement {
       <div className="page-head">
         <Icon n="file" /><b>Agent 规范</b>
         <span className="sub">只读查看各端型、工作模式的系统提示词与应用内置 Skill</span>
-        <span className="grow" />
-        <select value={project} onChange={(e) => {
-          const value = e.target.value
-          setProject(value)
-          const selected = projects.find((item) => item.name === value)
-          if (selected) setPlatform(selected.platform)
-        }} aria-label="提示词示例项目">
-          {!projects.length && <option value="">&lt;当前项目&gt;</option>}
-          {projects.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-        </select>
       </div>
       <div className="reference-tabs">
         <button className={kind === 'prompts' ? 'on' : ''} onClick={() => setKind('prompts')}>系统提示词</button>
@@ -61,7 +44,7 @@ export default function AgentReferenceView(): React.ReactElement {
           {(['development', 'discussion'] as AgentMode[]).map((value) => <button key={value} className={mode === value ? 'on' : ''} onClick={() => setMode(value)}>{value === 'development' ? '开发模式' : '讨论需求模式'}</button>)}
         </aside>
         <main className="reference-content">
-          <div className="reference-title"><b>{prompt?.title ?? '系统提示词'}</b><span>运行时只替换当前项目与端型，不允许在此修改</span></div>
+          <div className="reference-title"><b>{prompt?.title ?? '系统提示词'}</b><span>{'{{project}}'} 占位符在会话启动时替换为实际项目名；本页只读</span></div>
           <pre>{prompt?.content ?? '加载中…'}</pre>
         </main>
       </div>}

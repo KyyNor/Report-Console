@@ -243,8 +243,8 @@ export function registerIpc(): void {
 
   // ── pi Agent 桥（渲染层 Agent 的平台工具通道）──────────
   handle('pi:toolDefs', () => piToolDefs())
-  handle('agent:referenceCatalog', (a) => ({
-    prompts: promptScenarios((a as { project?: string } | undefined)?.project || '<当前项目>'),
+  handle('agent:referenceCatalog', () => ({
+    prompts: promptScenarios(),
     skills: listBuiltinSkills()
   }))
   handle('pi:toolExec', (a) => piToolExec(

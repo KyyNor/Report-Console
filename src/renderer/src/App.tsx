@@ -49,7 +49,8 @@ export default function App(): React.ReactElement {
 
       <div className="app-body">
         {view === 'dashboard' && <DashboardView onNavigate={(v) => setView(v as ViewKey)} />}
-        {view === 'workbench' && <WorkbenchView />}
+        {/* 工作台常驻（隐藏不卸载）：切到其他视图再回来，项目选择、资源选中与 Agent 草稿都保留 */}
+        <div className={`view-holder${view === 'workbench' ? ' on' : ''}`}><WorkbenchView /></div>
         {view === 'connections' && <ConnectionsView />}
         {view === 'agent' && <AgentView onNavigate={(v) => setView(v as ViewKey)} />}
         {view === 'reference' && <AgentReferenceView />}

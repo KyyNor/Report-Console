@@ -12,11 +12,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # mac 双架构拆成独立任务：单次 electron-builder 多架构打会让 arm64 包带上
+          # 重编译成 x86_64 的 better-sqlite3（dlopen incompatible architecture）；
+          # 每 arch 一个 runner，node_modules 互不污染
           - os: macos-latest
+            dist_cmd: npm run dist -- --mac --arm64 --publish never
+            files: dist/*.dmg
+          - os: macos-latest
+            dist_cmd: npm run dist -- --mac --x64 --publish never
             files: dist/*.dmg
           - os: windows-latest
+            dist_cmd: npm run dist -- --publish never
             files: dist/*.exe
           - os: ubuntu-latest
+            dist_cmd: npm run dist -- --publish never
             files: dist/*.AppImage
     runs-on: ${{ matrix.os }}
     permissions:
@@ -30,8 +39,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       # CI + v* 标签下 electron-builder 会自动进发布模式要 GH_TOKEN（mac/linux 由此失败），
-      # 产物统一由下方 action-gh-release 上传，这里显式关掉它的自动发布
-      - run: npm run dist -- --publish never
+      # 产物统一由下方 action-gh-release 上传，dist_cmd 里显式关掉它的自动发布
+      - run: ${{ matrix.dist_cmd }}
       - uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.files }}

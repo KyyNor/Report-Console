@@ -132,6 +132,7 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 
 - better-sqlite3 是原生模块，Electron 版本变化后 `npm install`（postinstall 会 `electron-builder install-app-deps`）；报 ABI 不匹配先重装依赖。
 - 本机 `npm run dist` 打 mac x64 包时 electron-builder 会把 better-sqlite3 **就地重编译成 x86_64**，之后 arm64 的 dev 会报 dlopen「incompatible architecture」；跑一次 `npx electron-builder install-app-deps` 即可恢复 arm64。跨架构产物交给 CI 出，本地只打本机架构（`npx electron-builder --mac --arm64`）可避免。
+- 同源坑在 CI：**一次 electron-builder 同时打 mac arm64+x64 会让 arm64 包带上 x86_64 的 better-sqlite3**（安装后 dlopen 报 incompatible architecture）。release.yml 已把 mac 双架构拆成两个矩阵任务各打一个 arch，勿合并回单任务多架构。
 - 骨架模板用 Vite `?raw` 导入，改模板文件后 dev 模式会热更新，但 selftest/smoke 走的是构建产物，需要重新 build。
 - SQLite 时间列用 `datetime('now','localtime')`（本地时区），别混用 ISO UTC。
 - 帆软 `/api/data` 的参数 `type` 用 `String/Integer/Double`（首字母大写），与契约内小写类型是两套表示（`projectsService.ts` 的 typeMap 负责映射）。

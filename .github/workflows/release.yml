@@ -29,7 +29,9 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm test
-      - run: npm run dist
+      # CI + v* 标签下 electron-builder 会自动进发布模式要 GH_TOKEN（mac/linux 由此失败），
+      # 产物统一由下方 action-gh-release 上传，这里显式关掉它的自动发布
+      - run: npm run dist -- --publish never
       - uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.files }}

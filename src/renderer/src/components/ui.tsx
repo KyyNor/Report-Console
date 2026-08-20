@@ -131,39 +131,6 @@ export function CodeBlk({ title, body, extra }: { title: React.ReactNode; body: 
   )
 }
 
-// ── 极简 Markdown 渲染（meta 文档阅读模式） ─────────────────────
-
-export function mdToHtml(md: string): string {
-  const lines = md.split('\n')
-  const out: string[] = []
-  let inList = false
-  let inCode = false
-  const inline = (t: string) => escHtml(t)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-  for (const ln of lines) {
-    if (ln.trim().startsWith('```')) {
-      if (inCode) { out.push('</pre>'); inCode = false } else { out.push('<pre>'); inCode = true }
-      continue
-    }
-    if (inCode) { out.push(escHtml(ln)); continue }
-    const h1 = ln.match(/^# (.*)/), h2 = ln.match(/^## (.*)/), li = ln.match(/^[-*] (.*)/)
-    if (li) {
-      if (!inList) { out.push('<ul>'); inList = true }
-      out.push(`<li>${inline(li[1])}</li>`)
-      continue
-    }
-    if (inList) { out.push('</ul>'); inList = false }
-    if (h1) out.push(`<h1>${inline(h1[1])}</h1>`)
-    else if (h2) out.push(`<h2>${inline(h2[1])}</h2>`)
-    else if (ln.trim() === '') out.push('')
-    else out.push(`<p>${inline(ln)}</p>`)
-  }
-  if (inList) out.push('</ul>')
-  if (inCode) out.push('</pre>')
-  return out.join('\n')
-}
-
 // ── 时间格式（SQLite 本地时间 → 友好显示） ─────────────────────
 
 export function fmtTime(s?: string): string {

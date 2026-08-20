@@ -381,14 +381,7 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 .teststat .cell .l{font-size:10px;color:var(--muted);margin-top:1px}
 .teststat .cell.g .v{color:var(--ok)}
 .teststat .cell.r .v{color:var(--bad)}
-.md{font-size:12px;line-height:1.8;color:var(--fg)}
-.md h1{font-size:14px;margin:2px 0 10px;font-weight:700}
-.md h2{font-size:12.5px;margin:14px 0 6px;font-weight:700}
-.md p{margin:6px 0;color:var(--muted)}
-.md ul{margin:6px 0;padding-left:18px}
-.md li{margin:3px 0;color:var(--muted)}
-.md code{font:11px var(--font-mono);background:var(--accent-s);border:1px solid oklch(88% 0.03 259);border-radius:4px;padding:1px 5px;color:oklch(40% 0.1 259)}
-.md pre{font:11px/1.7 var(--font-mono);background:var(--cdbg);border-radius:8px;padding:10px 12px;overflow:auto;color:var(--cfg)}
+.html-frame{width:100%;height:460px;border:1px solid var(--border);border-radius:6px;background:#fff}
 .guide{border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;margin-bottom:15px;background:var(--surface)}
 .gstep{display:flex;gap:11px;padding:10px 13px;border-bottom:1px solid var(--border);align-items:flex-start}
 .gstep:last-child{border-bottom:0}

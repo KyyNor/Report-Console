@@ -3,10 +3,11 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
-import { CodeBlk, fmtBytes, fmtTime, mdToHtml } from '../../components/ui'
+import { CodeBlk, fmtBytes, fmtTime } from '../../components/ui'
 import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
+import { Markdown } from '../../agent/chat/Markdown'
 import { call } from '../../api'
 import type { AgentMode, Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, ConnectionHealth, BuildResult, CheckerFinding, DevelopmentCheckpoint, CheckpointDiff, CheckpointFileDiff, PreviewDataCall, PreviewDataReport, PreviewDataSession } from '@shared/types'
 import { buildUnifiedLineDiff } from '@shared/textDiff'
@@ -951,7 +952,9 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
   const isMd = doc.type === 'markdown'
   const isSql = doc.type === 'sql'
   const isText = doc.type === 'other'
-  const tab = ctx.tab[key] ?? (isMd ? 'view' : 'src')
+  const isHtml = /\.(html?)$/i.test(doc.name)
+  const viewable = isMd || isHtml
+  const tab = ctx.tab[key] ?? (viewable ? 'view' : 'src')
   const [content, setContent] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -965,7 +968,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
       <div className="rp-head">
         <div className="rp-r1"><span className="ttl reg">{doc.name}</span></div>
         <div className="rp-r2">
-          <span className="tag src">{isMd ? 'Markdown' : isSql ? 'SQL 源码' : /\.(js|jsx|mjs)$/i.test(doc.name) ? 'JavaScript' : /\.css$/i.test(doc.name) ? 'CSS' : '文本'}</span>
+          <span className="tag src">{isMd ? 'Markdown' : isSql ? 'SQL 源码' : isHtml ? 'HTML' : /\.(js|jsx|mjs)$/i.test(doc.name) ? 'JavaScript' : /\.css$/i.test(doc.name) ? 'CSS' : '文本'}</span>
           <span style={{ font: '10.5px/1 var(--mono)', color: 'var(--faint)' }}>meta/ · {fmtBytes(doc.size)} · {fmtTime(new Date(doc.mtime).toISOString())}</span>
         </div>
         <div className="rp-acts">
@@ -978,10 +981,15 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
           <button className="iconbtn" title="删除（需确认）" onClick={() => { if (confirm(`删除文档 ${doc.name}？`)) void acts.deleteDoc(doc.name) }}><Icon n="trash" /></button>
         </div>
       </div>
-      {isMd && <TabsBar tabs={[{ k: 'view', n: '阅读' }, { k: 'src', n: '源码' }]} cur={tab} onSelect={(k) => ctx.setTab(key, k)} />}
+      {viewable && <TabsBar tabs={[{ k: 'view', n: '阅读' }, { k: 'src', n: '源码' }]} cur={tab} onSelect={(k) => ctx.setTab(key, k)} />}
       <div className="rp-body">
         {content === null ? <div className="nores">读取中…</div> : tab === 'view'
-          ? <div className="md" dangerouslySetInnerHTML={{ __html: mdToHtml(content) }} />
+          ? isHtml
+            ? <>
+              <iframe className="html-frame" title={`预览 ${doc.name}`} sandbox="" srcDoc={content} />
+              <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div><b>沙箱预览</b>：HTML 在隔离 iframe 中渲染（禁脚本、禁同源），平台始终以源码文本为准</div></div>
+            </>
+            : <Markdown text={content} />
             : (isMd || isText)
             ? <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <MdEditor value={content} height="460px" onChange={(v) => { setContent(v); setDirty(true) }} />

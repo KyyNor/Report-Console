@@ -28,7 +28,7 @@ npm run selftest     # 集成自检：构建后对真实帆软+MySQL 跑 27 步�
 npm run smoke        # 冒烟：构建后启动并截图 smoke.png（SMOKE_VIEW=agent|workbench|connections 深链；
                       #  SMOKE_AUTOSEND=1 自动发消息、SMOKE_WAIT_MS 控制截图前等待，探针输出聊天 DOM 统计与会话落库校验）
 npm run pack         # electron-builder 打包（dist/，仅目录产物）
-npm run dist         # electron-builder 按当前平台出安装包（mac: dmg arm64/x64 · win: 单 exe portable · linux: AppImage）
+npm run dist         # electron-builder 按当前平台本机架构出安装包（mac: dmg · win: 单 exe portable · linux: AppImage）；
                       #  CI：推 v* 标签触发 .github/workflows/release.yml，三平台云端编译并自动挂到 GitHub Release
 ```
 
@@ -132,7 +132,7 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 
 - better-sqlite3 是原生模块，Electron 版本变化后 `npm install`（postinstall 会 `electron-builder install-app-deps`）；报 ABI 不匹配先重装依赖。
 - 本机 `npm run dist` 打 mac x64 包时 electron-builder 会把 better-sqlite3 **就地重编译成 x86_64**，之后 arm64 的 dev 会报 dlopen「incompatible architecture」；跑一次 `npx electron-builder install-app-deps` 即可恢复 arm64。跨架构产物交给 CI 出，本地只打本机架构（`npx electron-builder --mac --arm64`）可避免。
-- 同源坑在 CI：**一次 electron-builder 同时打 mac arm64+x64 会让 arm64 包带上 x86_64 的 better-sqlite3**（安装后 dlopen 报 incompatible architecture）。release.yml 已把 mac 双架构拆成两个矩阵任务各打一个 arch，勿合并回单任务多架构。
+- 同源坑在 CI：electron-builder 在 dist 期间对原生模块的架构重编决策**不可靠**（同配置两次运行结果不同）——曾让 arm64 包带 x86_64 模块、x64 包带 arm64 模块（安装即 dlopen incompatible architecture）。现行防线（勿拆）：package.json `npmRebuild:false` + mac target 不带多架构列表；release.yml 把 mac 双架构拆两个矩阵任务，各自在 dist 前用 `install-app-deps --arch <arch>` 显式重编。
 - 骨架模板用 Vite `?raw` 导入，改模板文件后 dev 模式会热更新，但 selftest/smoke 走的是构建产物，需要重新 build。
 - SQLite 时间列用 `datetime('now','localtime')`（本地时区），别混用 ISO UTC。
 - 帆软 `/api/data` 的参数 `type` 用 `String/Integer/Double`（首字母大写），与契约内小写类型是两套表示（`projectsService.ts` 的 typeMap 负责映射）。

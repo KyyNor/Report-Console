@@ -12,14 +12,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # mac 双架构拆成独立任务：单次 electron-builder 多架构打会让 arm64 包带上
-          # 重编译成 x86_64 的 better-sqlite3（dlopen incompatible architecture）；
-          # 每 arch 一个 runner，node_modules 互不污染。
-          # x64 在 arm64 runner 上交叉打包时 electron-builder 不会自行重编原生模块，
-          # 必须先 install-app-deps --arch x64，否则 x64 包里是 arm64 模块
+          # 原生模块架构完全由 install-app-deps --arch 显式控制（package.json 已 npmRebuild:false
+          # 且 mac target 不带多架构列表——electron-builder 在 dist 期间自行决定重编架构不可靠，
+          # 曾让 arm64 包带上 x86_64 模块 / x64 包带上 arm64 模块，且同配置两次运行结果不同）。
+          # mac 双架构拆独立任务，每 arch 一个 runner，node_modules 互不污染
           - os: macos-latest
             dist_cmd: npm run dist -- --mac --arm64 --publish never
-            prep_cmd: 'true'
+            prep_cmd: npx electron-builder install-app-deps --arch arm64
             files: dist/*.dmg
           - os: macos-latest
             dist_cmd: npm run dist -- --mac --x64 --publish never

@@ -24,28 +24,17 @@
     "appId": "com.kyynor.report-console",
     "productName": "Report Console",
     "artifactName": "report-console-${version}-${os}-${arch}.${ext}",
+    "npmRebuild": false,
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ]
+      "target": ["dmg"]
     },
     "win": {
-      "target": [
-        "portable"
-      ]
+      "target": ["portable"]
     },
     "linux": {
       "category": "Development",
-      "target": [
-        "AppImage"
-      ]
+      "target": ["AppImage"]
     }
   },
   "dependencies": {

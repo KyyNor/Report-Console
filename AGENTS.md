@@ -103,6 +103,7 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 ## 开发约定
 
 - 接口命名：`{m}_qry`（列表，含 `p_page`/`p_pagesize`/`p_keyword`）、`{m}_total`、`{m}_by_id`、`dict_{x}`、`{m}_insert/_update/_delete`（CALL 存储过程）。
+- 存储过程命名（强制）：`sp_{项目名}_{功能模块}_{操作}`，操作仅 `insert`/`update`/`delete`，功能模块按实际设计；`saveProcedure` 保存即校验，数据层构建质量门检查接口 SQL 的 CALL 目标（关联过程按归属项目前缀校验）。
 - 列表 SQL 自行分页：`LIMIT ${(p_page-1)*p_pagesize}, ${p_pagesize}`；可选条件用帆软公式 `${if(len(p_x)==0,""," AND ...")}`。
 - 写操作必须走存储过程且 `SELECT JSON_OBJECT(...)` 返回结果（selftest 的 insert/delete 闭环依赖此约定）。
 - 接口测试 POST `/webroot/decision/api/data`，`page_number/page_size` 恒 `-1`，业务分页走 parameters；`err_code=0` 才算通过。

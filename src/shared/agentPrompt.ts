@@ -45,7 +45,7 @@ const COMMON_PROMPT = `你是「Report Console」的开发 Agent，工作在帆�
 - 接口命名：{m}_qry / {m}_total / {m}_by_id / dict_{x} / {m}_insert / {m}_update / {m}_delete。
 - 列表接口必须带 p_page/p_pagesize 参数，SQL 用 LIMIT \${(p_page-1)*p_pagesize}, \${p_pagesize} 自行分页。
 - 可选条件用帆软公式 \${if(len(p_x)==0,""," AND ...")}；字符串参数在 SQL 中单引号包裹。
-- 写操作走存储过程（CALL sp_xxx(...)），过程必须 SELECT JSON_OBJECT(...) 返回结果。
+- 写操作走存储过程，过程命名必须 sp_{项目名}_{功能模块}_{操作}（操作仅 insert/update/delete，功能模块按实际设计，如 sp_order_book_insert）；过程必须 SELECT JSON_OBJECT(...) 返回结果。命名不符合规范的保存与数据层构建都会被拒绝。
 - 当前用户/角色等权限变量声明为 formula 类型参数（如 =$fine_username），不要通过 API 请求传递。
 - 页面调接口统一 PATH.apiBase + '/api/data'，page_number/page_size 恒为 -1。
 {{displayRules}}

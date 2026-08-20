@@ -15,6 +15,7 @@ import { buildZip, collectZipEntries } from './zipWriter'
 import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, resolveProjectFile, writeManifest, type ProjectManifest } from './projectManifest'
 import { inspectDocumentContent, type DocInspectOptions } from './docInspector'
 import { replaceUniqueText } from './textPatch'
+import { assertProcedureName, checkProcedureCalls } from './procedureNaming'
 import type {
   Project, ProjectPlatform, Dataset, DatasetKind, DatasetParam, DatasetStatus, ProcRecord, DocMeta,
   BuildResult, CheckerFinding, ConnectionHealth
@@ -406,6 +407,9 @@ export function buildDataCpt(project: string): BuildResult {
   log.push(`连接分布：${[...dist.entries()].map(([c, n]) => `${c} ×${n}`).join(' · ') || '（无数据集）'}`)
 
   const findings: CheckerFinding[] = checkDataCpt(xml)
+  // 过程命名规范检测：接口 SQL 的 CALL 目标必须 sp_{项目名}_{功能模块}_{操作}（登记的过程按归属项目前缀校验）
+  const procOwners = Object.fromEntries(listProcedures(project).map((r) => [r.name, r.srcProject ?? project]))
+  findings.push(...checkProcedureCalls(project, datasets.map((d) => ({ dataset: d.name, sql: d.sql })), procOwners))
   const errCount = findings.filter((f) => f.severity === 'error').length
   const warnCount = findings.filter((f) => f.severity === 'warning').length
   log.push(`质量门：${errCount} error / ${warnCount} warning`)
@@ -579,11 +583,12 @@ export async function procedureDefinition(project: string, name: string): Promis
   return getProcedureDefinition(name, undefined, { name: rec.connection })
 }
 
-/** 创建/更新过程契约（归属本项目）+ 定义存 meta/ */
+/** 创建/更新过程契约（归属本项目）+ 定义存 meta/；命名必须 sp_{项目名}_{功能模块}_{操作} */
 export function saveProcedure(project: string, input: { name: string; connection?: string; comment?: string; definition?: string }): ProcRecord {
   const p = getProjectByName(project)
   if (!p) throw new Error(`项目不存在：${project}`)
   if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(input.name)) throw new Error('过程名仅允许字母开头，字母/数字/下划线')
+  assertProcedureName(project, input.name)
   const d = getDb()
   const bound = projectConnections(p.id)
   let connName = input.connection ?? bound[0]

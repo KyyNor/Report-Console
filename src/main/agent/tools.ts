@@ -141,10 +141,10 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     }),
 
     save_procedure: tool({
-      description: '创建/更新项目的存储过程契约与定义（定义存 meta/{name}.sql）。写入类过程必须 SELECT JSON_OBJECT(...) 返回结果。要真正落到数据库需再调 apply_procedure',
+      description: '创建/更新项目的存储过程契约与定义（定义存 meta/{name}.sql）。命名必须 sp_{项目名}_{功能模块}_{操作}（操作仅 insert/update/delete），写入类过程必须 SELECT JSON_OBJECT(...) 返回结果。要真正落到数据库需再调 apply_procedure',
       parameters: z.object({
         project: z.string(),
-        name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/),
+        name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/).describe(`过程名，必须 sp_{项目名}_{功能模块}_{操作}（操作仅 insert/update/delete，功能模块按实际设计）`),
         connection: z.string().optional().describe('所属连接名（缺省用项目第一个绑定连接）'),
         comment: z.string().optional(),
         definition: z.string().min(10).describe('完整 CREATE PROCEDURE 语句（不含 DELIMITER）')

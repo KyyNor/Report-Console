@@ -25,19 +25,31 @@
     "productName": "Report Console",
     "artifactName": "report-console-${version}-${os}-${arch}.${ext}",
     "npmRebuild": false,
+    "directories": {
+      "buildResources": "build"
+    },
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "mac": {
       "category": "public.app-category.developer-tools",
+      "icon": "icon.icns",
       "target": [
         "dmg"
       ]
     },
     "win": {
+      "icon": "icon.ico",
       "target": [
         "portable"
       ]
     },
     "linux": {
       "category": "Development",
+      "icon": "icons",
       "target": [
         "AppImage"
       ]

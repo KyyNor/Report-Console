@@ -2,7 +2,7 @@
  * 窗口管理 — 主窗口 + 帆软页面预览窗口
  */
 
-import { BrowserWindow, shell, type Session } from 'electron'
+import { app, BrowserWindow, shell, type Session } from 'electron'
 import { join } from 'path'
 import {
   fineReportDataError, isFineReportDataUrl, previewDiagnostics,
@@ -19,6 +19,9 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 700,
     title: 'Report Console — 帆软加壳开发控制台',
+    icon: app.isPackaged
+      ? join(process.resourcesPath, 'icon.png')
+      : join(app.getAppPath(), 'build', 'icon.png'),
     // 深色自绘标题栏（设计稿）：macOS 藏原生栏保红绿灯，Windows/Linux 用 overlay
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 14, y: 13 },

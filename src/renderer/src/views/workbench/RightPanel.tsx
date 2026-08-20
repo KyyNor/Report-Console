@@ -984,10 +984,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
       <div className="rp-body">
         {content === null ? <div className="nores">读取中…</div> : tab === 'view'
           ? isHtml
-            ? <>
-              <iframe className="html-frame" title={`预览 ${doc.name}`} sandbox="" srcDoc={content} />
-              <div className="banner info" style={{ marginTop: 10 }}><Icon n="info" /><div><b>沙箱预览</b>：HTML 在隔离 iframe 中渲染（禁脚本、禁同源），平台始终以源码文本为准</div></div>
-            </>
+            ? <iframe className="html-frame" title={`预览 ${doc.name}`} sandbox="" srcDoc={content} />
             : <Markdown text={content} />
             : (isMd || isText)
             ? <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>

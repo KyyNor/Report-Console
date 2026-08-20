@@ -9,7 +9,7 @@ import { getDb } from './db'
 import { compileJsx, generateMobilePageCpt, generatePageCpt } from './cpt/displayWriter'
 import { checkApiDataParameters, checkFineReportAjaxCompatibility, checkMobilePageCpt, checkPageCpt, hasError } from './cpt/checker'
 import { previewMobilePageUrl, previewPageUrl } from './frClient'
-import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPagePaths, type ManagedPage } from './projectManifest'
+import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPage, type ManagedPage } from './projectManifest'
 import { replaceUniqueText } from './textPatch'
 import type { PageMeta, PagePlatform, BuildResult } from '@shared/types'
 import pageTemplateRaw from './templates/base_cpt_page.cpt?raw'
@@ -132,9 +132,12 @@ export function deletePage(projectName: string, pageName: string): void {
   removeManagedPage(projectName, pageName)
 }
 
-export function updatePagePaths(projectName: string, pageName: string, paths: Omit<ManagedPage, 'id'>): void {
+/** 调整受管页面的端型/三路径；newName 同时改页面主键（project.yaml 与工作台列表随之更新）。 */
+export function updatePagePaths(projectName: string, pageName: string, paths: Omit<ManagedPage, 'id'>, newName?: string): void {
   assertName(projectName); assertName(pageName)
-  updateManagedPagePaths(projectName, pageName, paths)
+  const id = newName ?? pageName
+  assertName(id)
+  updateManagedPage(projectName, pageName, { id, ...paths })
 }
 
 // ── 构建 ────────────────────────────────────────────────────────

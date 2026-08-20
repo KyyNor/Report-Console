@@ -289,20 +289,20 @@ export function removeManagedPage(project: string, id: string): void {
 }
 
 /**
- * 修改受管页面的三种路径，并将已存在的受管文件一并移动。
+ * 修改受管页面的标识（id）与三种路径，并将已存在的受管文件一并移动。
  * 未被清单声明的既有文件（特别是传统 CPT）绝不允许被覆盖。
+ * 导出供测试：直接在指定根目录上应用，不查 SQLite。
  */
-export function updateManagedPagePaths(project: string, id: string, next: Omit<ManagedPage, 'id'>): void {
-  const root = projectRoot(project)
-  const manifest = manifestForProject(project)
+export function applyManagedPageUpdate(root: string, manifest: ProjectManifest, id: string, next: ManagedPage): ProjectManifest {
   const index = manifest.managed.pages.findIndex((x) => x.id === id)
   if (index < 0) throw new Error(`页面不存在：${id}`)
+  if (next.id !== id && manifest.managed.pages.some((x) => x.id === next.id)) throw new Error(`页面已存在：${next.id}`)
   const current = manifest.managed.pages[index]
   const candidate: ProjectManifest = {
     ...manifest,
-    managed: { ...manifest.managed, pages: manifest.managed.pages.map((x) => x.id === id ? { id, ...next } : x) }
+    managed: { ...manifest.managed, pages: manifest.managed.pages.map((x) => x.id === id ? next : x) }
   }
-  // 复用清单校验（相对路径、扩展名、同一页面三路径不重复）。
+  // 复用清单校验（相对路径、扩展名、id 命名规则、同一页面三路径不重复）。
   const checked = normalize(candidate)
   const all = checked.managed.pages.flatMap((x) => [x.jsx, x.mjs, x.cpt])
   if (new Set(all).size !== all.length) throw new Error('受管页面之间的 JSX / MJS / CPT 路径不能重复')
@@ -324,7 +324,12 @@ export function updateManagedPagePaths(project: string, id: string, next: Omit<M
     mkdirSync(dirname(destination), { recursive: true })
     renameSync(source, destination)
   }
-  writeManifest(root, checked)
+  return checked
+}
+
+export function updateManagedPage(project: string, id: string, next: ManagedPage): void {
+  const root = projectRoot(project)
+  writeManifest(root, applyManagedPageUpdate(root, manifestForProject(project), id, next))
 }
 
 /** 未在 project.yaml 的 managed 产物中声明的 CPT，全部视为传统 CPT。 */

@@ -214,6 +214,20 @@ export default function WorkbenchView(): React.ReactElement {
         setSel(`pg:${page}`)
       } catch (e) { toast((e as Error).message, 'err') }
     },
+    updatePagePaths: async (page, paths, newName) => {
+      try {
+        await call('pages:updatePaths', { project: cur, page, paths, newName })
+        const renamed = !!newName && newName !== page
+        toast(renamed ? `页面已改名 ${page} → ${newName}（主键与受管文件已随迁）` : `已更新页面 ${page} 的路径与端型（受管文件已随迁）`, 'ok')
+        await refresh()
+        // 改名后选中态与右栏面板都要落到新主键上，中间栏列表随 refresh 更新
+        if (renamed) setSel(`pg:${newName}`)
+        return true
+      } catch (e) {
+        toast((e as Error).message, 'err')
+        return false
+      }
+    },
     saveProcDef: async (rec, def) => {
       try {
         await call('procs:save', { project: cur, name: rec.name, connection: rec.connection, comment: rec.comment, definition: def })
@@ -600,22 +614,10 @@ export default function WorkbenchView(): React.ReactElement {
       )}
       {modal?.k === 'projsettings' && curProject && (
         <ProjectSettingsModal
-          name={curProject.name} comment={curProject.comment} dir={curProject.dir} platform={curProject.platform} connections={curProject.connections} allConns={conns} pages={pages}
+          name={curProject.name} comment={curProject.comment} dir={curProject.dir} platform={curProject.platform} connections={curProject.connections} allConns={conns}
           onClose={() => setModal(null)}
-          onSave={async (comment, cs, dir, platform, pagePaths) => {
-            // 先用双端作为过渡态，确保从单端切换到另一端时页面端型调整可以原子完成。
-            if (curProject.platform !== platform && platform !== 'dual' && pagePaths.some((page) => page.platform !== platform)) {
-              throw new Error('单端项目中的所有页面必须与项目目标端一致；请先选择双端并调整页面端型')
-            }
-            if (curProject.platform !== 'dual' && platform !== curProject.platform) {
-              await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform: 'dual' })
-            } else {
-              await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform })
-            }
-            for (const page of pagePaths) {
-              await call('pages:updatePaths', { project: curProject.name, page: page.name, paths: { platform: page.platform, jsx: page.jsx, mjs: page.mjs, cpt: page.cpt } })
-            }
-            if (platform !== 'dual') await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform })
+          onSave={async (comment, cs, dir, platform) => {
+            await call('projects:update', { id: curProject.id, comment, connections: cs, dir, platform })
             toast('项目设置已保存', 'ok')
             setModal(null)
             await refresh()

@@ -214,8 +214,10 @@ export function registerIpc(): void {
   })
   handle('pages:updatePaths', (a) => {
     const project = (a as { project: string }).project
-    return checkpointed(project, `人工调整页面路径 ${(a as { page: string }).page}`, () => {
-      pages.updatePagePaths(project, (a as { page: string }).page, (a as { paths: { platform: import('@shared/types').PagePlatform; jsx: string; mjs: string; cpt: string } }).paths)
+    const page = (a as { page: string }).page
+    const newName = (a as { newName?: string }).newName
+    return checkpointed(project, `人工调整页面 ${page}${newName && newName !== page ? ` → ${newName}` : ''}`, () => {
+      pages.updatePagePaths(project, page, (a as { paths: { platform: import('@shared/types').PagePlatform; jsx: string; mjs: string; cpt: string } }).paths, newName)
       return true
     })
   })

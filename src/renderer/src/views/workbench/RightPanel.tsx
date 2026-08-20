@@ -31,6 +31,7 @@ export interface WBActs {
   openPage: (page: string) => Promise<void>
   deletePage: (page: string) => Promise<void>
   createPage: (page: string, starter: string, platform: PagePlatform) => Promise<void>
+  updatePagePaths: (page: string, paths: { platform: PagePlatform; jsx: string; mjs: string; cpt: string }, newName?: string) => Promise<boolean>
   saveProcDef: (rec: ProcRecord, def: string) => Promise<void>
   applyProc: (rec: ProcRecord) => void
   callProc: (rec: ProcRecord) => void
@@ -749,6 +750,16 @@ function SpAudit({ name }: { name: string }): React.ReactElement {
 
 // ── 页面面板 ────────────────────────────────────────────────────
 
+/** 「路径」页签的表单基准：清单当前声明（缺省回退默认 pages/ 布局）。 */
+function currentPaths(pg: PageMeta): { platform: PagePlatform; jsx: string; mjs: string; cpt: string } {
+  return {
+    platform: pg.platform,
+    jsx: pg.jsxPath ?? `pages/${pg.name}.jsx`,
+    mjs: pg.mjsPath ?? `pages/${pg.name}.mjs`,
+    cpt: pg.cptPath ?? `pages/${pg.name}.cpt`
+  }
+}
+
 function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs }): React.ReactElement {
   const key = `pg:${pg.name}`
   const tab = ctx.tab[key] ?? 'src'
@@ -757,13 +768,52 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
   const [lastBuild, setLastBuild] = useState<BuildResult | null>(null)
   const [busy, setBusy] = useState('')
   const [url, setUrl] = useState('')
+  const [pathForm, setPathForm] = useState(() => ({ id: pg.name, ...currentPaths(pg) }))
   const stale = pg.stale
+  const pathsDirty = pathForm.id !== pg.name || pathForm.platform !== pg.platform
+    || pathForm.jsx !== (pg.jsxPath ?? `pages/${pg.name}.jsx`) || pathForm.mjs !== (pg.mjsPath ?? `pages/${pg.name}.mjs`) || pathForm.cpt !== (pg.cptPath ?? `pages/${pg.name}.cpt`)
+  const nameOk = /^[a-z][a-z0-9_]*$/.test(pathForm.id)
 
   useEffect(() => {
     setSrc(null); setDirty(false)
     void call<string>('pages:read', { project: ctx.project?.name, page: pg.name }).then(setSrc).catch((e) => setSrc(`// 读取失败：${(e as Error).message}`))
-    void call<string>('pages:previewUrl', { project: ctx.project?.name, page: pg.name }).then(setUrl).catch(() => setUrl(''))
   }, [ctx.project?.name, pg.name])
+  // cpt 路径在「路径」页签调整后，预览 URL 需按新清单重新生成
+  useEffect(() => {
+    void call<string>('pages:previewUrl', { project: ctx.project?.name, page: pg.name }).then(setUrl).catch(() => setUrl(''))
+  }, [ctx.project?.name, pg.name, pg.cptPath])
+  useEffect(() => { setPathForm({ id: pg.name, ...currentPaths(pg) }) }, [ctx.project?.name, pg.name, pg.jsxPath, pg.mjsPath, pg.cptPath, pg.platform])
+
+  /** 改页面名（主键）；仍是默认 pages/ 同名布局的路径一并跟随，手动改过的路径不动。 */
+  const renameInForm = (name: string): void => {
+    setPathForm((f) => {
+      const next = { ...f, id: name }
+      for (const ext of ['jsx', 'mjs', 'cpt'] as const) {
+        if (f[ext] === `pages/${f.id}.${ext}`) next[ext] = `pages/${name}.${ext}`
+      }
+      return next
+    })
+  }
+
+  /**
+   * 默认布局下的纯文件名改动视作页面改名：jsx 仍是 pages/{合法名}.jsx 且另两个产物
+   * 未被手动偏离时，主键与 .mjs/.cpt 一并跟随；改到其他目录则只挪文件不改名。
+   */
+  const editPathField = (field: 'jsx' | 'mjs' | 'cpt', value: string): void => {
+    setPathForm((f) => {
+      const next = { ...f, [field]: value }
+      if (field === 'jsx') {
+        const stem = /^pages\/([a-z][a-z0-9_]*)\.jsx$/.exec(value)?.[1]
+        const othersDefault = f.mjs === `pages/${f.id}.mjs` && f.cpt === `pages/${f.id}.cpt`
+        if (stem && stem !== f.id && othersDefault) {
+          next.id = stem
+          next.mjs = `pages/${stem}.mjs`
+          next.cpt = `pages/${stem}.cpt`
+        }
+      }
+      return next
+    })
+  }
 
   const stepState = (i: number): string => {
     if (!lastBuild) return ''
@@ -774,7 +824,7 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
     <div className="rp">
       <div className="rp-head">
         <div className="rp-r1">
-          <span className="ttl">{pg.name}.jsx</span><span className="tag src">{pg.platform === 'mobile' ? '移动端' : '桌面端'}</span>
+          <span className="ttl">{pg.jsxPath ? pg.jsxPath.split('/').pop() : `${pg.name}.jsx`}</span><span className="tag src">{pg.platform === 'mobile' ? '移动端' : '桌面端'}</span>
           <span className={`stale ${stale ? 'old' : pg.cptExists ? 'new' : 'none'}`}>{stale ? 'cpt 落后 jsx · 待重建' : pg.cptExists ? '最新' : '从未构建'}</span>
         </div>
         <div className="rp-r2">
@@ -789,7 +839,7 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
           <button className="iconbtn" title="删除（连带 .mjs / .cpt，需确认）" onClick={() => { if (confirm(`删除页面 ${pg.name}？连带 .mjs / .cpt`)) void acts.deletePage(pg.name) }}><Icon n="trash" /></button>
         </div>
       </div>
-      <TabsBar tabs={[{ k: 'src', n: '源码' }, { k: 'build', n: '构建', bdg: lastBuild && !lastBuild.ok ? '!' : undefined }, { k: 'prev', n: '预览' }]} cur={tab} onSelect={(k) => ctx.setTab(key, k)} />
+      <TabsBar tabs={[{ k: 'src', n: '源码' }, { k: 'build', n: '构建', bdg: lastBuild && !lastBuild.ok ? '!' : undefined }, { k: 'prev', n: '预览' }, { k: 'path', n: '路径' }]} cur={tab} onSelect={(k) => ctx.setTab(key, k)} />
       <div className="rp-body">
         {tab === 'src' && (
           <div className="blk">
@@ -845,6 +895,46 @@ function PgPanel({ ctx, pg, acts }: { ctx: SelCtx; pg: PageMeta; acts: WBActs })
             <CodeBlk title="url" body={url || '（生成中…）'} extra={<span className="lnk" onClick={() => void acts.openPage(pg.name)}>打开预览</span>} />
             <div style={{ height: 10 }} />
             <button className="btn pri" onClick={() => void acts.openPage(pg.name)}><Icon n="ext" />打开预览</button>
+          </div>
+        )}
+        {tab === 'path' && (
+          <div className="blk">
+            <div className="blk-t"><Icon n="folderOpen" />页面名与路径（写入 project.yaml 受管声明）</div>
+            <div className="fld">
+              <label>页面名（主键 · 小写字母/数字/下划线）</label>
+              <input type="text" value={pathForm.id} spellCheck={false} onChange={(e) => renameInForm(e.target.value)} />
+              <div className="fh">改名会同步中间栏列表与 project.yaml 主键；仍是默认 pages/ 同名布局的路径会一并跟随。</div>
+            </div>
+            <div className="fld">
+              <label>页面端型</label>
+              <select value={pathForm.platform} disabled={ctx.project?.platform !== 'dual'} onChange={(e) => setPathForm((f) => ({ ...f, platform: e.target.value as PagePlatform }))}>
+                <option value="desktop">桌面端</option>
+                <option value="mobile">移动端</option>
+              </select>
+              <div className="fh">{ctx.project?.platform === 'dual' ? '双端项目可按页面切换端型，构建与预览会使用对应骨架。' : '端型需与项目目标端一致；如需调整，先在项目设置中把目标端改为双端。'}</div>
+            </div>
+            <div className="fld">
+              <label>受管文件路径（项目内相对路径）</label>
+              {(['jsx', 'mjs', 'cpt'] as const).map((field) => (
+                <label key={field} style={{ display: 'grid', gridTemplateColumns: '36px 1fr', alignItems: 'center', gap: 8, marginTop: 5, fontSize: 12, color: 'var(--muted)' }}>
+                  <span>.{field}</span>
+                  <input type="text" value={pathForm[field]} spellCheck={false} onChange={(e) => editPathField(field, e.target.value)} />
+                </label>
+              ))}
+              <div className="fh">默认布局下直接改 .jsx 文件名等同页面改名（主键与 .mjs/.cpt 一并跟随）；改到其他目录只移动文件不改名。目标已存在传统 CPT 或其他未受管文件时拒绝覆盖。</div>
+            </div>
+            <button className="btn pri" disabled={!!busy || !pathsDirty || !nameOk} onClick={async () => {
+              setBusy('path')
+              try {
+                await acts.updatePagePaths(
+                  pg.name,
+                  { platform: pathForm.platform, jsx: pathForm.jsx, mjs: pathForm.mjs, cpt: pathForm.cpt },
+                  pathForm.id !== pg.name ? pathForm.id : undefined
+                )
+              } finally { setBusy('') }
+            }}>
+              <Icon n="check" />{busy === 'path' ? '保存中…' : !nameOk ? '页面名不合法' : pathsDirty ? '保存*' : '保存'}
+            </button>
           </div>
         )}
       </div>

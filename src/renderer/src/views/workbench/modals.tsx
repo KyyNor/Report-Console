@@ -6,7 +6,7 @@ import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/ui'
 import { SqlEditor } from '../../components/CodeEditor'
 import { call } from '../../api'
-import type { Dataset, DatasetKind, DatasetParam, DbConnection, PageMeta, PagePlatform, ProjectPlatform } from '@shared/types'
+import type { Dataset, DatasetKind, DatasetParam, DbConnection, ProjectPlatform } from '@shared/types'
 
 // ── 新建项目向导（3.1 / D1 / D4） ───────────────────────────────
 
@@ -427,28 +427,20 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
 
 // ── 项目设置（改绑定连接 / 说明） ────────────────────────────────
 
-export function ProjectSettingsModal({ name, comment, dir, platform, connections, allConns, pages, onClose, onSave }: {
+export function ProjectSettingsModal({ name, comment, dir, platform, connections, allConns, onClose, onSave }: {
   name: string
   comment: string
   dir: string
   platform: ProjectPlatform
   connections: string[]
   allConns: DbConnection[]
-  pages: PageMeta[]
   onClose: () => void
-  onSave: (comment: string, conns: string[], dir: string, platform: ProjectPlatform, pages: Array<{ name: string; platform: PagePlatform; jsx: string; mjs: string; cpt: string }>) => Promise<void>
+  onSave: (comment: string, conns: string[], dir: string, platform: ProjectPlatform) => Promise<void>
 }): React.ReactElement {
   const [cm, setCm] = useState(comment)
   const [dv, setDv] = useState(dir)
   const [platformValue, setPlatformValue] = useState<ProjectPlatform>(platform)
   const [picked, setPicked] = useState<string[]>(connections)
-  const [pagePaths, setPagePaths] = useState(() => pages.map((p) => ({
-    name: p.name,
-    platform: p.platform,
-    jsx: p.jsxPath ?? `pages/${p.name}.jsx`,
-    mjs: p.mjsPath ?? `pages/${p.name}.mjs`,
-    cpt: p.cptPath ?? `pages/${p.name}.cpt`
-  })))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const browse = async () => {
@@ -463,7 +455,7 @@ export function ProjectSettingsModal({ name, comment, dir, platform, connections
       footer={<>
         <span className="m-note">解绑连接不影响已有契约，但新建接口只能从绑定清单选</span>
         <button className="btn" onClick={onClose}>取消</button>
-        <button className="btn pri" disabled={busy || picked.length === 0 || !dv.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(cm, picked, dv.trim(), platformValue, pagePaths) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
+        <button className="btn pri" disabled={busy || picked.length === 0 || !dv.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(cm, picked, dv.trim(), platformValue) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
           <Icon n="check" />保存
         </button>
       </>}
@@ -487,32 +479,11 @@ export function ProjectSettingsModal({ name, comment, dir, platform, connections
           <option value="mobile">移动端</option>
           <option value="dual">双端</option>
         </select>
-        <div className="fh">单端项目只能包含同端页面；切换端型前应先在双端模式中调整每个页面的端型。</div>
+        <div className="fh">单端项目只能包含同端页面；要在桌面端/移动端之间切换，先在此改为双端，再到各页面的「路径」页签调整页面端型。</div>
       </div>
       <div className="fld">
         <label>受管页面路径</label>
-        {pagePaths.length === 0
-          ? <div className="fh">还没有受管页面。新建页面后会默认写入 pages/，也可在这里调整。</div>
-          : <div style={{ display: 'grid', gap: 10 }}>
-            {pagePaths.map((page, index) => (
-              <div key={page.name} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
-                  <span style={{ fontWeight: 650 }}>{page.name}</span>
-                  <select value={page.platform} disabled={platformValue !== 'dual'} onChange={(e) => setPagePaths((all) => all.map((x, i) => i === index ? { ...x, platform: e.target.value as PagePlatform } : x))}>
-                    <option value="desktop">桌面端</option>
-                    <option value="mobile">移动端</option>
-                  </select>
-                </div>
-                {(['jsx', 'mjs', 'cpt'] as const).map((field) => (
-                  <label key={field} style={{ display: 'grid', gridTemplateColumns: '36px 1fr', alignItems: 'center', gap: 8, marginTop: 5, fontSize: 12, color: 'var(--muted)' }}>
-                    <span>.{field}</span>
-                    <input value={page[field]} spellCheck={false} onChange={(e) => setPagePaths((all) => all.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x))} />
-                  </label>
-                ))}
-              </div>
-            ))}
-            <div className="fh">路径必须在项目根目录内。保存时会移动已有受管文件；目标存在传统 CPT 或其他未受管文件时会拒绝覆盖。</div>
-          </div>}
+        <div className="fh">页面的 jsx / mjs / cpt 路径与端型在各页面面板的「路径」页签中编辑；保存时会移动受管文件并更新 project.yaml。</div>
       </div>
       <div className="fld">
         <label>绑定连接（多选）</label>

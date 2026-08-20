@@ -10,7 +10,7 @@ import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatfor
 import RightPanel, { type WBData, type WBActs } from './RightPanel'
 import {
   ProjectWizardModal, DatasetEditModal, ApplyProcModal, CallProcModal, LinkProcModal, NewProcModal,
-  DocNameModal, ProjectSettingsModal, type LinkableProc
+  DocNameModal, ProjectSettingsModal, PackProjectModal, type LinkableProc
 } from './modals'
 
 type ModalState =
@@ -23,6 +23,7 @@ type ModalState =
   | { k: 'newdoc' }
   | { k: 'docrename'; old: string }
   | { k: 'projsettings' }
+  | { k: 'pack'; project: string }
   | null
 
 import { KIND_TAG } from './kinds'
@@ -317,9 +318,9 @@ export default function WorkbenchView(): React.ReactElement {
               <div key={p.id} className={`pj${cur === p.name ? ' on' : ''}${p.missingDir ? ' missing' : ''}`} onClick={() => selectProject(p.name)} title={p.comment || p.name}>
                 <button
                   className="pj-act"
-                  title={p.missingDir ? '项目目录缺失，无法打包' : '打包为 zip：选目录后输出整个项目（含清单/受管产物/传统 CPT/meta 文档）'}
+                  title={p.missingDir ? '项目目录缺失，无法打包' : '打包项目：导出 zip 或打包并发送邮箱（含清单/受管产物/传统 CPT/meta 文档）'}
                   disabled={p.missingDir}
-                  onClick={(e) => { e.stopPropagation(); void acts.exportProjectZip(p.name) }}
+                  onClick={(e) => { e.stopPropagation(); setModal({ k: 'pack', project: p.name }) }}
                 ><Icon n="pkg" size={13} /></button>
                 <div className="nm">
                   {p.name}
@@ -635,6 +636,17 @@ export default function WorkbenchView(): React.ReactElement {
             toast('项目设置已保存', 'ok')
             setModal(null)
             await refresh()
+          }}
+        />
+      )}
+      {modal?.k === 'pack' && (
+        <PackProjectModal
+          project={modal.project}
+          onClose={() => setModal(null)}
+          onPackOnly={() => { const p = modal.project; setModal(null); void acts.exportProjectZip(p) }}
+          onSent={(r, to) => {
+            toast(`已发送 ${r.total} 卷（${fmtBytes(r.bytes)}）→ ${to}`, 'ok')
+            setModal(null)
           }}
         />
       )}

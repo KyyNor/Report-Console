@@ -257,6 +257,17 @@ export interface AppSettings {
   /** 是否请求模型输出可见思考；关闭时 GLM/ZAI 会显式收到 thinking: disabled。 */
   llmThinkingEnabled: boolean
   llmThinkingLevel: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+  /** 打包邮件发送（独立配置，不与 looop-studio 共享）：SMTP 发件账号与分卷参数 */
+  mailSmtpHost: string
+  mailSmtpPort: number
+  /** 隐式 TLS（465）；关闭时明文连接，服务器通告 STARTTLS 则自动升级 */
+  mailSmtpTls: boolean
+  mailFrom: string
+  mailPassword: string
+  /** 默认收件邮箱（打包弹窗中可改） */
+  mailTo: string
+  /** 分卷大小（MiB），超限才切分 */
+  mailChunkMiB: number
 }
 
 export interface StatusPayload {

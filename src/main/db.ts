@@ -246,7 +246,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   llmModel: 'gpt-4o-mini',
   llmContextWindow: 128000,
   llmThinkingEnabled: false,
-  llmThinkingLevel: 'medium'
+  llmThinkingLevel: 'medium',
+  // 打包邮件发送：账号类默认空（设置页填写）；端口/加密/分卷是协议约定，给通用默认值
+  mailSmtpHost: '',
+  mailSmtpPort: 465,
+  mailSmtpTls: true,
+  mailFrom: '',
+  mailPassword: '',
+  mailTo: '',
+  mailChunkMiB: 30
 }
 
 export function getSettings(): AppSettings {
@@ -262,13 +270,21 @@ export function getSettings(): AppSettings {
   // settings 表按字符串保存：上下文窗口读回时还原为正整数，旧库缺失时回落默认值。
   const ctxRaw = Number(rest.llmContextWindow)
   const contextWindow = Number.isInteger(ctxRaw) && ctxRaw > 0 ? ctxRaw : DEFAULT_SETTINGS.llmContextWindow
+  // 邮件发送的端口/分卷大小同理还原为正整数；加密开关还原布尔值
+  const portRaw = Number(rest.mailSmtpPort)
+  const mailSmtpPort = Number.isInteger(portRaw) && portRaw > 0 ? portRaw : DEFAULT_SETTINGS.mailSmtpPort
+  const chunkRaw = Number(rest.mailChunkMiB)
+  const mailChunkMiB = Number.isInteger(chunkRaw) && chunkRaw >= 1 ? chunkRaw : DEFAULT_SETTINGS.mailChunkMiB
   return {
     ...DEFAULT_SETTINGS,
     ...rest,
     llmContextWindow: contextWindow,
     // settings 表按字符串保存，读取时还原布尔值；旧库没有这些键则使用默认值。
     llmThinkingEnabled: rest.llmThinkingEnabled === undefined ? DEFAULT_SETTINGS.llmThinkingEnabled : rest.llmThinkingEnabled === 'true',
-    llmThinkingLevel: level
+    llmThinkingLevel: level,
+    mailSmtpPort,
+    mailChunkMiB,
+    mailSmtpTls: rest.mailSmtpTls === undefined ? DEFAULT_SETTINGS.mailSmtpTls : rest.mailSmtpTls === 'true'
   }
 }
 

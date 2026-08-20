@@ -1,12 +1,12 @@
 /**
  * 工作台弹层 — 新建项目向导（名/目录分离）/ 接口契约编辑 / 过程确认 / CALL 试执行 / 关联过程 / 新建过程 / 文档
  */
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/ui'
 import { SqlEditor } from '../../components/CodeEditor'
 import { call } from '../../api'
-import type { Dataset, DatasetKind, DatasetParam, DbConnection, ProjectPlatform } from '@shared/types'
+import type { AppSettings, Dataset, DatasetKind, DatasetParam, DbConnection, ProjectPlatform } from '@shared/types'
 
 // ── 新建项目向导（3.1 / D1 / D4） ───────────────────────────────
 
@@ -496,6 +496,84 @@ export function ProjectSettingsModal({ name, comment, dir, platform, connections
           {allConns.length === 0 && <div className="ck">注册表为空（「连接」页注册）</div>}
         </div>
       </div>
+      {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
+    </Modal>
+  )
+}
+
+// ── 打包项目（三选一：打包并发送邮箱 / 仅打包 / 取消） ────────────
+
+export function PackProjectModal({ project, onPackOnly, onSent, onClose }: {
+  project: string
+  /** 仅打包：父层走原「选目录 → 导出 zip」流程 */
+  onPackOnly: () => void
+  /** 发送成功：弹窗自行关闭，toast 由父层统一弹出 */
+  onSent: (r: { total: number; bytes: number; fileNames: string[] }, to: string) => void
+  onClose: () => void
+}): React.ReactElement {
+  const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [to, setTo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<{ number: number; total: number; fileName: string } | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const s = await call<AppSettings>('config:get')
+        setSettings(s)
+        setTo(s.mailTo)
+      } catch { /* 配置读取失败由发送动作兜底报错 */ }
+    })()
+  }, [])
+
+  const cfgReady = !!settings && !!settings.mailSmtpHost.trim() && !!settings.mailFrom.trim() && !!settings.mailPassword
+
+  const send = async () => {
+    if (!to.trim()) { setErr('收件邮箱不能为空'); return }
+    setBusy(true)
+    setErr(null)
+    setProgress(null)
+    const off = window.api.onMailProgress(setProgress)
+    try {
+      const r = await call<{ total: number; bytes: number; fileNames: string[] }>('projects:sendZip', { project, to: to.trim() })
+      onSent(r, to.trim())
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      off()
+      setBusy(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <Modal
+      title={`打包项目 — ${project}`} icon="pkg" onClose={busy ? () => { /* 发送中不允许关闭 */ } : onClose}
+      footer={<>
+        <span className="m-note">{settings ? `超过 ${settings.mailChunkMiB} MiB 自动分卷` : '分卷大小见设置页'}</span>
+        <button className="btn" onClick={onClose} disabled={busy}>取消</button>
+        <button className="btn" onClick={onPackOnly} disabled={busy}><Icon n="folderOpen" />仅打包</button>
+        <button className="btn pri" onClick={() => void send()} disabled={busy || !cfgReady}>
+          <Icon n={busy ? 'spin' : 'send'} />{busy ? (progress ? `发送中 ${progress.number}/${progress.total}…` : '打包发送中…') : '打包并发送邮箱'}
+        </button>
+      </>}
+    >
+      <div className="fld">
+        <label>打包内容</label>
+        <div className="fh">project.yaml · 受管 jsx/mjs/cpt · 传统 CPT · meta 文档（跳过 .git / node_modules / 系统杂项）</div>
+      </div>
+      <div className="fld">
+        <label>收件邮箱</label>
+        <input type="text" value={to} spellCheck={false} placeholder="内网/公司邮箱（默认值在设置页配置）" onChange={(e) => setTo(e.target.value)} disabled={busy} />
+        <div className="fh">按分卷逐封发送，主题「文件传输 - 分卷名 - 第 n/total 部分」；zip 不在本机留存</div>
+      </div>
+      {progress && (
+        <div className="banner info"><Icon n="spin" /><div>正在发送第 {progress.number}/{progress.total} 卷：{progress.fileName}</div></div>
+      )}
+      {settings && !cfgReady && (
+        <div className="banner warn"><Icon n="alert" /><div>发件邮箱未配置：请到「设置 → 打包邮件发送」填写 SMTP 发件账号后再使用邮件发送</div></div>
+      )}
       {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
     </Modal>
   )

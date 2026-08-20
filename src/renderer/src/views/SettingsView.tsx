@@ -15,9 +15,25 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
     })()
   }, [])
 
-  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled' | 'llmContextWindow'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled' | 'llmContextWindow' | 'mailSmtpTls' | 'mailSmtpPort' | 'mailChunkMiB'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
   const setCtx = (v: string) => setForm((f) => (f ? { ...f, llmContextWindow: Number(v.replace(/\D/g, '')) || 0 } : f))
   const setThinkingEnabled = (v: boolean) => setForm((f) => (f ? { ...f, llmThinkingEnabled: v } : f))
+  const setMailTls = (v: boolean) => setForm((f) => (f ? { ...f, mailSmtpTls: v } : f))
+  const setMailPort = (v: string) => setForm((f) => (f ? { ...f, mailSmtpPort: Number(v.replace(/\D/g, '')) || 0 } : f))
+  const setMailChunk = (v: string) => setForm((f) => (f ? { ...f, mailChunkMiB: Number(v.replace(/\D/g, '')) || 0 } : f))
+  const [testing, setTesting] = useState(false)
+  const testMail = async () => {
+    if (!form) return
+    setTesting(true)
+    try {
+      await call('mail:test', { host: form.mailSmtpHost, port: form.mailSmtpPort, tls: form.mailSmtpTls, from: form.mailFrom, password: form.mailPassword })
+      toast('SMTP 连接与认证通过', 'ok')
+    } catch (e) {
+      toast((e as Error).message, 'err')
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const save = async () => {
     if (!form) return
@@ -42,7 +58,7 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
     <div className="page">
       <div className="page-head">
         <b>设置</b>
-        <span className="sub">帆软环境 · Agent 模型（MySQL 连接在「连接」页管理）</span>
+        <span className="sub">帆软环境 · Agent 模型 · 打包邮件发送（MySQL 连接在「连接」页管理）</span>
       </div>
       <div className="page-body" style={{ maxWidth: 640 }}>
         <div className="pcard-row" style={{ marginBottom: 16 }}>
@@ -107,6 +123,55 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
               <label>API Key</label>
               <input type="password" value={form.llmApiKey} autoComplete="new-password" onChange={(e) => set('llmApiKey', e.target.value)} />
               <div className="fh">必填；留空时 Agent 初始化失败（协议 / 地址 / 模型 / 密钥都在本页配置）</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pcard-row" style={{ marginTop: 16 }}>
+          <div className="pcard-h"><Icon n="send" />打包邮件发送（独立配置）</div>
+          <div style={{ padding: '14px 16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="fld">
+                <label>发件邮箱</label>
+                <input type="text" value={form.mailFrom} spellCheck={false} placeholder="you@company.com" onChange={(e) => set('mailFrom', e.target.value)} />
+              </div>
+              <div className="fld">
+                <label>密码 / 授权码</label>
+                <input type="password" value={form.mailPassword} autoComplete="new-password" onChange={(e) => set('mailPassword', e.target.value)} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10 }}>
+              <div className="fld">
+                <label>SMTP 服务器</label>
+                <input type="text" value={form.mailSmtpHost} spellCheck={false} placeholder="smtp.company.com" onChange={(e) => set('mailSmtpHost', e.target.value)} />
+              </div>
+              <div className="fld">
+                <label>端口</label>
+                <input type="text" inputMode="numeric" value={form.mailSmtpPort || ''} spellCheck={false} placeholder="465" onChange={(e) => setMailPort(e.target.value)} />
+              </div>
+            </div>
+            <div className="fld">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.mailSmtpTls} onChange={(e) => setMailTls(e.target.checked)} style={{ width: 'auto' }} />
+                隐式 TLS（465 常用）
+              </label>
+              <div className="fh">关闭时明文连接（25/587），服务器通告 STARTTLS 时自动升级加密</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10 }}>
+              <div className="fld">
+                <label>默认收件邮箱</label>
+                <input type="text" value={form.mailTo} spellCheck={false} placeholder="内网/公司邮箱" onChange={(e) => set('mailTo', e.target.value)} />
+                <div className="fh">工作台「打包」弹窗的预填值，发送时可临时修改</div>
+              </div>
+              <div className="fld">
+                <label>分卷大小（MiB）</label>
+                <input type="text" inputMode="numeric" value={form.mailChunkMiB || ''} spellCheck={false} placeholder="30" onChange={(e) => setMailChunk(e.target.value)} />
+                <div className="fh">超限才切分</div>
+              </div>
+            </div>
+            <div className="fld">
+              <button className="btn" onClick={() => void testMail()} disabled={testing}><Icon n="play" />{testing ? '测试中…' : '测试连接'}</button>
+              <div className="fh">按当前表单值连接并认证（未保存也可测）；配置仅存本机，与 looop-studio 不共享</div>
             </div>
           </div>
         </div>

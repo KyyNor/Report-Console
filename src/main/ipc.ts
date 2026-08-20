@@ -12,6 +12,7 @@ import { DISCUSSION_READ_ONLY_TOOLS, piToolDefs, piToolExec } from './agent/piBr
 import { listBuiltinSkills } from './agent/skills'
 import { promptScenarios } from '@shared/agentPrompt'
 import { pingFrServer, callApiData } from './frClient'
+import { sendZipAsMailParts, testSmtp, type SmtpConfig } from './mailSender'
 import { collectPreviewDataLogs, evaluatePreviewSql, openPreviewWindow } from './windows'
 import * as checkpoints from './checkpointService'
 import type { AppSettings, StatusPayload } from '@shared/types'
@@ -124,6 +125,18 @@ export function registerIpc(): void {
   })
   handle('projects:open', (a) => projects.openProject((a as { dir: string }).dir))
   handle('projects:exportZip', (a) => projects.exportProjectZip((a as { project: string }).project, (a as { dir: string }).dir))
+  // 打包 + 邮件分卷发送：进度经 mail:progress 推送（发送大附件耗时长，弹窗需实时反馈）
+  handle('projects:sendZip', async (a) => {
+    const project = (a as { project: string }).project
+    const to = (a as { to: string }).to
+    const s = getSettings()
+    const cfg: SmtpConfig = { host: s.mailSmtpHost, port: s.mailSmtpPort, tls: s.mailSmtpTls, from: s.mailFrom, password: s.mailPassword }
+    const { zip } = projects.buildProjectZip(project)
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    return sendZipAsMailParts({ zip, baseName: project, to, cfg, chunkBytes: s.mailChunkMiB * 1024 * 1024, onProgress: (p) => win?.webContents.send('mail:progress', p) })
+  })
+  // 设置页「测试连接」：按表单当前值（未保存也可测）连接 + 认证，不发信
+  handle('mail:test', (a) => testSmtp(a as SmtpConfig))
   handle('projects:update', (a) => {
     const id = (a as { id: number }).id
     const project = projects.listProjects().find((item) => item.id === id)

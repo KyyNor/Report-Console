@@ -19,5 +19,6 @@ interface Window {
   api: {
     invoke: (channel: string, args?: unknown) => Promise<{ ok: boolean; data?: unknown; error?: string }>
     onAgentEvent: (cb: (ev: unknown) => void) => () => void
+    onMailProgress: (cb: (p: { number: number; total: number; fileName: string }) => void) => () => void
   }
 }

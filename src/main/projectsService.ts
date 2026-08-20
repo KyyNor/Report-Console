@@ -809,11 +809,11 @@ export function importProject(json: string, overwrite = false): Project {
 // ── 项目打包（整目录 zip 交付） ─────────────────────────────────
 
 /**
- * 把项目目录整体打包为 zip：project.yaml、受管 jsx/mjs/cpt、传统 CPT、meta 文档全部收入，
+ * 构建项目 zip 字节流（exportProjectZip 落盘与邮件分卷发送共用）：
+ * project.yaml、受管 jsx/mjs/cpt、传统 CPT、meta 文档全部收入，
  * 跳过 .git/node_modules/系统杂项；zip 顶层带项目名目录，解压后可直接「打开项目」。
- * 目标已存在同名 zip 时自动加 -1/-2 后缀，不覆盖任何已有文件。
  */
-export function exportProjectZip(project: string, destDir: string): { path: string; entries: number; bytes: number } {
+export function buildProjectZip(project: string): { zip: Buffer; entries: number } {
   assertProjectName(project)
   const root = projectDir(project)
   if (!existsSync(root)) throw new Error(`项目目录不存在：${root}`)
@@ -822,11 +822,18 @@ export function exportProjectZip(project: string, destDir: string): { path: stri
     { name: `${project}/`, data: Buffer.alloc(0), mtime: new Date() },
     ...collectZipEntries(root).map((e) => ({ ...e, name: `${project}/${e.name}` }))
   ]
-  const zip = buildZip(entries)
+  return { zip: buildZip(entries), entries: entries.length }
+}
+
+/**
+ * 项目整体打包落盘。目标已存在同名 zip 时自动加 -1/-2 后缀，不覆盖任何已有文件。
+ */
+export function exportProjectZip(project: string, destDir: string): { path: string; entries: number; bytes: number } {
+  const { zip, entries } = buildProjectZip(project)
   mkdirSync(destDir, { recursive: true })
   let out = join(destDir, `${project}.zip`)
   let i = 1
   while (existsSync(out)) out = join(destDir, `${project}-${i++}.zip`)
   writeFileSync(out, zip)
-  return { path: out, entries: entries.length, bytes: zip.length }
+  return { path: out, entries, bytes: zip.length }
 }

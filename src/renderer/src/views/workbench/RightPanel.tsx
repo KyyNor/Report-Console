@@ -41,7 +41,7 @@ export interface WBActs {
   saveDoc: (name: string, content: string) => Promise<void>
   deleteDoc: (name: string) => Promise<void>
   openProjectSettings: () => void
-  exportProjectZip: () => Promise<void>
+  exportProjectZip: (project: string) => Promise<void>
   deleteProject: () => void
   useAgent: (resource?: string) => void
 }
@@ -183,7 +183,6 @@ function ProjectPanel({ ctx, data, acts, onResourcesChanged }: { ctx: SelCtx; da
         </div>
         <div className="rp-acts">
           <button className="btn" onClick={() => void acts.verify()} disabled={empty} title="构建 + 实测项目内全部接口"><Icon n="shield" />一键验收</button>
-          <button className="btn" onClick={() => void acts.exportProjectZip()} disabled={p.missingDir} title={p.missingDir ? '项目目录缺失，无法打包' : '把项目目录打包为 zip（project.yaml + 受管产物 + 传统 CPT + meta 文档），选目录后输出'}><Icon n="pkg" />打包</button>
           <button className="btn pri" onClick={() => acts.useAgent()}><Icon n="ai" />{empty ? '让 Agent 从需求开始' : '返回 Agent'}</button>
           <button className="iconbtn" title="项目设置" onClick={acts.openProjectSettings}><Icon n="set" /></button>
           <button className="iconbtn" title="删除项目（需确认）" onClick={acts.deleteProject}><Icon n="trash" /></button>

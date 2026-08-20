@@ -250,11 +250,11 @@ export default function WorkbenchView(): React.ReactElement {
       try { await call('docs:delete', { project: cur, name }); toast(`已删除 ${name}`, 'ok'); setSel(null); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
     openProjectSettings: () => setModal({ k: 'projsettings' }),
-    exportProjectZip: async () => {
+    exportProjectZip: async (project) => {
       try {
-        const dir = await call<string | null>('dialog:pickDir', { title: `选择打包输出目录（项目 ${cur}）` })
+        const dir = await call<string | null>('dialog:pickDir', { title: `选择打包输出目录（项目 ${project}）` })
         if (!dir) return // 取消选择不提示
-        const r = await call<{ path: string; entries: number; bytes: number }>('projects:exportZip', { project: cur, dir })
+        const r = await call<{ path: string; entries: number; bytes: number }>('projects:exportZip', { project, dir })
         toast(`已打包 ${r.entries} 个条目 · ${fmtBytes(r.bytes)} → ${r.path}`, 'ok')
       } catch (e) { toast((e as Error).message, 'err') }
     },
@@ -315,6 +315,12 @@ export default function WorkbenchView(): React.ReactElement {
             )}
             {projects.map((p) => (
               <div key={p.id} className={`pj${cur === p.name ? ' on' : ''}${p.missingDir ? ' missing' : ''}`} onClick={() => selectProject(p.name)} title={p.comment || p.name}>
+                <button
+                  className="pj-act"
+                  title={p.missingDir ? '项目目录缺失，无法打包' : '打包为 zip：选目录后输出整个项目（含清单/受管产物/传统 CPT/meta 文档）'}
+                  disabled={p.missingDir}
+                  onClick={(e) => { e.stopPropagation(); void acts.exportProjectZip(p.name) }}
+                ><Icon n="pkg" size={13} /></button>
                 <div className="nm">
                   {p.name}
                   <span className="tag src" style={{ marginLeft: 7 }}>{p.platform === 'desktop' ? '桌面' : p.platform === 'mobile' ? '移动' : '双端'}</span>

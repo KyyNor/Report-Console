@@ -146,6 +146,11 @@ svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px
 .pj.on{background:var(--accent-s)}
 .pj.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
 .pj.missing{background:var(--warn-s)}
+.pj .pj-act{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:24px;height:24px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--faint);cursor:pointer;opacity:0;transition:opacity .12s}
+.pj:hover .pj-act,.pj:focus-within .pj-act{opacity:1}
+.pj .pj-act:hover{border-color:oklch(84% .04 259);background:var(--accent-s);color:var(--accent)}
+.pj .pj-act:disabled{opacity:0;cursor:default}
+.pj .nm{padding-right:34px}
 .pj .nm{display:flex;align-items:center;gap:7px;font-weight:600;font-size:13px}
 .pj .nm .pc-warn{color:var(--warn);display:inline-flex}
 .pj .dir{font-family:var(--font-mono);font-size:10px;color:var(--faint);margin:2px 0 6px;word-break:break-all;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

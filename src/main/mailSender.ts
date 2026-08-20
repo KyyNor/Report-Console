@@ -1,9 +1,9 @@
 /**
  * 打包外发邮件 — 工作台「打包并发送邮箱」的主进程实现（移植自 looopsend 的发送约定，传输层用 nodemailer）
- * - 配置独立存 settings（不与 looop-studio 共享），发送格式与 looopsend 一致，便于接收方按既有习惯识别
+ * - 配置独立存 settings（不与 looop-studio 共享），分卷命名与正文格式沿用 looopsend 约定
  * - zip 分卷：{项目名}-{YYYYMMDD}-{hash4}.zip.001…（字节级切分，接收方按序拼接即还原 zip）
- * - 邮件：主题「文件传输 - {分卷名} - 第{n}/{total}部分」，base64 zip 附件；隐式 TLS（465）或
- *   明文连接（nodemailer 在服务器通告 STARTTLS 时自动升级）
+ * - 邮件：主题「[ReportConsole] 文件传输 - {分卷名} - 第{n}/{total}部分」，base64 zip 附件；
+ *   隐式 TLS（465）或明文连接（nodemailer 在服务器通告 STARTTLS 时自动升级）
  * - 任一卷发送失败：全部分卷保留到系统临时目录后报错（带路径），供检查后手动补发
  * - 不设整体超时：大附件 base64 传输耗时长，硬超时会误杀合法传输（与 looopsend 行为一致）
  */
@@ -119,7 +119,7 @@ export async function sendZipAsMailParts(opts: {
       await transport.sendMail({
         from: opts.cfg.from.trim(),
         to: opts.to,
-        subject: `文件传输 - ${part.fileName} - 第${part.number}/${total}部分`,
+        subject: `[ReportConsole] 文件传输 - ${part.fileName} - 第${part.number}/${total}部分`,
         text: `文件名: ${part.fileName}\n第 ${part.number} 部分，共 ${total} 部分。`,
         attachments: [{ filename: part.fileName, content: part.data, contentType: 'application/zip' }]
       })

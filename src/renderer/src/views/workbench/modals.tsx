@@ -3,7 +3,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
-import { Modal } from '../../components/ui'
+import { fmtBytes, Modal } from '../../components/ui'
 import { SqlEditor } from '../../components/CodeEditor'
 import { call } from '../../api'
 import type { AppSettings, Dataset, DatasetKind, DatasetParam, DbConnection, ProjectPlatform } from '@shared/types'
@@ -513,6 +513,8 @@ export function PackProjectModal({ project, onPackOnly, onSent, onClose }: {
 }): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [to, setTo] = useState('')
+  const [chunkKB, setChunkKB] = useState('')
+  const [info, setInfo] = useState<{ entries: number; rawBytes: number; zipBytes: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<{ number: number; total: number; fileName: string } | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -520,12 +522,25 @@ export function PackProjectModal({ project, onPackOnly, onSent, onClose }: {
   useEffect(() => {
     void (async () => {
       try {
-        const s = await call<AppSettings>('config:get')
+        const [s, i] = await Promise.all([
+          call<AppSettings>('config:get'),
+          call<{ entries: number; rawBytes: number; zipBytes: number }>('projects:zipInfo', { project }).catch(() => null)
+        ])
         setSettings(s)
         setTo(s.mailTo)
+        setChunkKB(String(s.mailChunkMiB * 1024))
+        setInfo(i)
       } catch { /* 配置读取失败由发送动作兜底报错 */ }
     })()
-  }, [])
+  }, [project])
+
+  // 预计分卷数随分卷 KB 输入实时变化
+  const estParts = useMemo(() => {
+    if (!info) return null
+    const kb = Number(chunkKB.replace(/\D/g, '')) || 0
+    const bytes = kb > 0 ? kb * 1024 : (settings?.mailChunkMiB ?? 30) * 1024 * 1024
+    return Math.max(1, Math.ceil(info.zipBytes / bytes))
+  }, [info, chunkKB, settings])
 
   const cfgReady = !!settings && !!settings.mailSmtpHost.trim() && !!settings.mailFrom.trim() && !!settings.mailPassword
 
@@ -534,9 +549,12 @@ export function PackProjectModal({ project, onPackOnly, onSent, onClose }: {
     setBusy(true)
     setErr(null)
     setProgress(null)
+    const kb = Number(chunkKB.replace(/\D/g, '')) || 0
     const off = window.api.onMailProgress(setProgress)
     try {
-      const r = await call<{ total: number; bytes: number; fileNames: string[] }>('projects:sendZip', { project, to: to.trim() })
+      const r = await call<{ total: number; bytes: number; fileNames: string[] }>('projects:sendZip', {
+        project, to: to.trim(), ...(kb > 0 ? { chunkKB: kb } : {})
+      })
       onSent(r, to.trim())
     } catch (e) {
       setErr((e as Error).message)
@@ -551,7 +569,6 @@ export function PackProjectModal({ project, onPackOnly, onSent, onClose }: {
     <Modal
       title={`打包项目 — ${project}`} icon="pkg" onClose={busy ? () => { /* 发送中不允许关闭 */ } : onClose}
       footer={<>
-        <span className="m-note">{settings ? `超过 ${settings.mailChunkMiB} MiB 自动分卷` : '分卷大小见设置页'}</span>
         <button className="btn" onClick={onClose} disabled={busy}>取消</button>
         <button className="btn" onClick={onPackOnly} disabled={busy}><Icon n="folderOpen" />仅打包</button>
         <button className="btn pri" onClick={() => void send()} disabled={busy || !cfgReady}>
@@ -559,15 +576,21 @@ export function PackProjectModal({ project, onPackOnly, onSent, onClose }: {
         </button>
       </>}
     >
-      <div className="fld">
-        <label>打包内容</label>
-        <div className="fh">project.yaml · 受管 jsx/mjs/cpt · 传统 CPT · meta 文档（跳过 .git / node_modules / 系统杂项）</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10 }}>
+        <div className="fld">
+          <label>收件邮箱</label>
+          <input type="text" value={to} spellCheck={false} placeholder="内网/公司邮箱（默认值在设置页配置）" onChange={(e) => setTo(e.target.value)} disabled={busy} />
+        </div>
+        <div className="fld">
+          <label>分卷大小（KB）</label>
+          <input type="text" inputMode="numeric" value={chunkKB} spellCheck={false} placeholder="30720" onChange={(e) => setChunkKB(e.target.value)} disabled={busy} />
+        </div>
       </div>
-      <div className="fld">
-        <label>收件邮箱</label>
-        <input type="text" value={to} spellCheck={false} placeholder="内网/公司邮箱（默认值在设置页配置）" onChange={(e) => setTo(e.target.value)} disabled={busy} />
-        <div className="fh">按分卷逐封发送，主题「文件传输 - 分卷名 - 第 n/total 部分」；zip 不在本机留存</div>
-      </div>
+      {info && (
+        <div className="fh">
+          原目录 {fmtBytes(info.rawBytes)} · 预计 zip {fmtBytes(info.zipBytes)}（{info.entries} 个条目）· 按当前分卷约 {estParts} 卷
+        </div>
+      )}
       {progress && (
         <div className="banner info"><Icon n="spin" /><div>正在发送第 {progress.number}/{progress.total} 卷：{progress.fileName}</div></div>
       )}

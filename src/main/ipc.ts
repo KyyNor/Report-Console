@@ -125,15 +125,23 @@ export function registerIpc(): void {
   })
   handle('projects:open', (a) => projects.openProject((a as { dir: string }).dir))
   handle('projects:exportZip', (a) => projects.exportProjectZip((a as { project: string }).project, (a as { dir: string }).dir))
-  // 打包 + 邮件分卷发送：进度经 mail:progress 推送（发送大附件耗时长，弹窗需实时反馈）
+  // 打包弹窗的体量预估：直接构建一次 zip 拿真实大小（项目为源码级内容，构建毫秒级）
+  handle('projects:zipInfo', (a) => {
+    const r = projects.buildProjectZip((a as { project: string }).project)
+    return { entries: r.entries, rawBytes: r.rawBytes, zipBytes: r.zip.length }
+  })
+  // 打包 + 邮件分卷发送：进度经 mail:progress 推送（发送大附件耗时长，弹窗需实时反馈）；
+  // 弹窗可临时改分卷大小（KB），不传则用设置页默认（MiB）
   handle('projects:sendZip', async (a) => {
     const project = (a as { project: string }).project
     const to = (a as { to: string }).to
+    const chunkKB = Number((a as { chunkKB?: number }).chunkKB)
     const s = getSettings()
     const cfg: SmtpConfig = { host: s.mailSmtpHost, port: s.mailSmtpPort, tls: s.mailSmtpTls, from: s.mailFrom, password: s.mailPassword }
+    const chunkBytes = Number.isInteger(chunkKB) && chunkKB > 0 ? chunkKB * 1024 : s.mailChunkMiB * 1024 * 1024
     const { zip } = projects.buildProjectZip(project)
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-    return sendZipAsMailParts({ zip, baseName: project, to, cfg, chunkBytes: s.mailChunkMiB * 1024 * 1024, onProgress: (p) => win?.webContents.send('mail:progress', p) })
+    return sendZipAsMailParts({ zip, baseName: project, to, cfg, chunkBytes, onProgress: (p) => win?.webContents.send('mail:progress', p) })
   })
   // 设置页「测试连接」：按表单当前值（未保存也可测）连接 + 认证，不发信
   handle('mail:test', (a) => testSmtp(a as SmtpConfig))

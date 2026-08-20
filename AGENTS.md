@@ -56,8 +56,9 @@ src/main/               Electron 主进程
   pagesService.ts       页面读写 + 原地构建（jsx → mjs + cpt）+ 安全调整受管路径 + 预览 URL（按项目过滤）
   mysqlService.ts       按连接路由的多连接池 + 只读守卫 + 受控写（审计落 ddl_log，带连接名）
   frClient.ts           帆软 /api/data 封装 + 连通探测 + 预览 URL
-  mailSender.ts         打包外发：zip 字节级分卷 + 逐卷邮件发送（nodemailer，主题格式对齐 looopsend；SMTP 配置
-                        独立存设置页，不与 looop-studio 共享）。失败时全部分卷保留在系统临时目录供手动补发
+  mailSender.ts         打包外发：zip 字节级分卷 + 逐卷邮件发送（nodemailer，主题「[ReportConsole] 文件传输 - …」，
+                        分卷命名沿用 looopsend；SMTP 配置独立存设置页，不与 looop-studio 共享）。
+                        失败时全部分卷保留在系统临时目录供手动补发
   cpt/                  核心资产：dataWriter（支持每数据集 dbConnection）/ displayWriter / jsTransform / checker / legacyInspector
   legacyCptService.ts   传统 CPT 的当前项目、只读、结构摘要入口（5MB 上限）
   agent/tools.ts        平台动作的模型侧暴露面（契约/过程/文档/页面/SQL/传统 CPT/设计库；SYSTEM_PROMPT 在 @shared/agentPrompt）

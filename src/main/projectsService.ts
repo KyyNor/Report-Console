@@ -812,8 +812,9 @@ export function importProject(json: string, overwrite = false): Project {
  * 构建项目 zip 字节流（exportProjectZip 落盘与邮件分卷发送共用）：
  * project.yaml、受管 jsx/mjs/cpt、传统 CPT、meta 文档全部收入，
  * 跳过 .git/node_modules/系统杂项；zip 顶层带项目名目录，解压后可直接「打开项目」。
+ * rawBytes 为条目未压缩字节合计（打包弹窗展示「原目录大小」用）。
  */
-export function buildProjectZip(project: string): { zip: Buffer; entries: number } {
+export function buildProjectZip(project: string): { zip: Buffer; entries: number; rawBytes: number } {
   assertProjectName(project)
   const root = projectDir(project)
   if (!existsSync(root)) throw new Error(`项目目录不存在：${root}`)
@@ -822,7 +823,8 @@ export function buildProjectZip(project: string): { zip: Buffer; entries: number
     { name: `${project}/`, data: Buffer.alloc(0), mtime: new Date() },
     ...collectZipEntries(root).map((e) => ({ ...e, name: `${project}/${e.name}` }))
   ]
-  return { zip: buildZip(entries), entries: entries.length }
+  const rawBytes = entries.reduce((sum, e) => sum + e.data.length, 0)
+  return { zip: buildZip(entries), entries: entries.length, rawBytes }
 }
 
 /**

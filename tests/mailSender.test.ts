@@ -38,7 +38,9 @@ function decodeSubject(msg: string): string {
     return lines
   }, []).join('\r\n')
   const subjectLine = /^Subject: (.*)$/m.exec(unfolded)?.[1] ?? ''
-  return subjectLine.replace(/=\?utf-8\?([bq])\?([\s\S]*?)\?=/gi, (_s, enc: string, word: string) =>
+  // RFC 2047：相邻编码字之间的空白解码时忽略（只删空白，保留前字结尾 ?= 与后字开头 =?）
+  const joined = subjectLine.replace(/\?=\s+=\?/g, '?==?')
+  return joined.replace(/=\?utf-8\?([bq])\?([\s\S]*?)\?=/gi, (_s, enc: string, word: string) =>
     enc.toLowerCase() === 'b'
       ? Buffer.from(word, 'base64').toString('utf-8')
       : Buffer.from(word.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})/g, (_m, h: string) => String.fromCharCode(parseInt(h, 16))), 'binary').toString('utf-8')
@@ -103,8 +105,8 @@ describe('SMTP 发送（本地 mock 服务器）', () => {
       for (const [i, m] of messages.entries()) {
         expect(m).toContain('From: snd@corp.com')
         expect(m).toContain('To: rcv@corp.com')
-        // 主题 RFC 2047 编码（B 或 Q、可能折行），解码后与 looopsend 的分卷主题一致
-        expect(decodeSubject(m)).toBe(`文件传输 - ${r.fileNames[i]} - 第${i + 1}/3部分`)
+        // 主题 RFC 2047 编码（B 或 Q、可能折行），解码后为带 ReportConsole 标题的分卷主题
+        expect(decodeSubject(m)).toBe(`[ReportConsole] 文件传输 - ${r.fileNames[i]} - 第${i + 1}/3部分`)
         // 附件 base64 还原为该卷字节
         const attach = /Content-Disposition: attachment; filename=[^\r\n]*\r\n\r\n([\s\S]*)$/.exec(m)?.[1]?.replace(/\r\n/g, '') ?? ''
         expect(Buffer.from(attach, 'base64')).toEqual(Buffer.alloc(i < 2 ? 40 : 20, 3))

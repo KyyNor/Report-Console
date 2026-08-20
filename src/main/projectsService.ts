@@ -11,6 +11,7 @@ import { checkDataCpt, hasError } from './cpt/checker'
 import { callApiData, type ApiDataRequest } from './frClient'
 import { getConnection, requireConnection } from './connectionsService'
 import { applyProcedureMysql, guardedExec, pingConnection } from './mysqlService'
+import { buildZip, collectZipEntries } from './zipWriter'
 import { PROJECT_MANIFEST, createManifest, dataCptForProject, listTraditionalCpts as scanTraditionalCpts, manifestForProject, readManifest, reportletFile, resolveProjectFile, writeManifest, type ProjectManifest } from './projectManifest'
 import { inspectDocumentContent, type DocInspectOptions } from './docInspector'
 import { replaceUniqueText } from './textPatch'
@@ -803,4 +804,29 @@ export function importProject(json: string, overwrite = false): Project {
   for (const ds of parsed.datasets ?? []) saveDataset(proj.name, ds)
   for (const sp of parsed.procedures ?? []) saveProcedure(proj.name, { name: sp.name, connection: sp.connection, comment: sp.comment })
   return listProjects().find((x) => x.id === proj.id)!
+}
+
+// ── 项目打包（整目录 zip 交付） ─────────────────────────────────
+
+/**
+ * 把项目目录整体打包为 zip：project.yaml、受管 jsx/mjs/cpt、传统 CPT、meta 文档全部收入，
+ * 跳过 .git/node_modules/系统杂项；zip 顶层带项目名目录，解压后可直接「打开项目」。
+ * 目标已存在同名 zip 时自动加 -1/-2 后缀，不覆盖任何已有文件。
+ */
+export function exportProjectZip(project: string, destDir: string): { path: string; entries: number; bytes: number } {
+  assertProjectName(project)
+  const root = projectDir(project)
+  if (!existsSync(root)) throw new Error(`项目目录不存在：${root}`)
+  // 顶层目录条目显式写入，即使项目为空结构，解压后也有以项目名命名的文件夹
+  const entries = [
+    { name: `${project}/`, data: Buffer.alloc(0), mtime: new Date() },
+    ...collectZipEntries(root).map((e) => ({ ...e, name: `${project}/${e.name}` }))
+  ]
+  const zip = buildZip(entries)
+  mkdirSync(destDir, { recursive: true })
+  let out = join(destDir, `${project}.zip`)
+  let i = 1
+  while (existsSync(out)) out = join(destDir, `${project}-${i++}.zip`)
+  writeFileSync(out, zip)
+  return { path: out, entries: entries.length, bytes: zip.length }
 }

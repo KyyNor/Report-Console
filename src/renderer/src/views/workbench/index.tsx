@@ -250,6 +250,14 @@ export default function WorkbenchView(): React.ReactElement {
       try { await call('docs:delete', { project: cur, name }); toast(`已删除 ${name}`, 'ok'); setSel(null); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
     openProjectSettings: () => setModal({ k: 'projsettings' }),
+    exportProjectZip: async () => {
+      try {
+        const dir = await call<string | null>('dialog:pickDir', { title: `选择打包输出目录（项目 ${cur}）` })
+        if (!dir) return // 取消选择不提示
+        const r = await call<{ path: string; entries: number; bytes: number }>('projects:exportZip', { project: cur, dir })
+        toast(`已打包 ${r.entries} 个条目 · ${fmtBytes(r.bytes)} → ${r.path}`, 'ok')
+      } catch (e) { toast((e as Error).message, 'err') }
+    },
     deleteProject: () => {
       if (!cur) return
       const input = prompt(`删除项目 ${cur}？仅解除管理（契约/关联清空），reportlets 产物保留。\n输入项目名确认：`)

@@ -123,6 +123,7 @@ export function registerIpc(): void {
     return project
   })
   handle('projects:open', (a) => projects.openProject((a as { dir: string }).dir))
+  handle('projects:exportZip', (a) => projects.exportProjectZip((a as { project: string }).project, (a as { dir: string }).dir))
   handle('projects:update', (a) => {
     const id = (a as { id: number }).id
     const project = projects.listProjects().find((item) => item.id === id)

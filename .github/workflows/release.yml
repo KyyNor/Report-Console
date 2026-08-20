@@ -14,18 +14,24 @@ jobs:
         include:
           # mac 双架构拆成独立任务：单次 electron-builder 多架构打会让 arm64 包带上
           # 重编译成 x86_64 的 better-sqlite3（dlopen incompatible architecture）；
-          # 每 arch 一个 runner，node_modules 互不污染
+          # 每 arch 一个 runner，node_modules 互不污染。
+          # x64 在 arm64 runner 上交叉打包时 electron-builder 不会自行重编原生模块，
+          # 必须先 install-app-deps --arch x64，否则 x64 包里是 arm64 模块
           - os: macos-latest
             dist_cmd: npm run dist -- --mac --arm64 --publish never
+            prep_cmd: 'true'
             files: dist/*.dmg
           - os: macos-latest
             dist_cmd: npm run dist -- --mac --x64 --publish never
+            prep_cmd: npx electron-builder install-app-deps --arch x64
             files: dist/*.dmg
           - os: windows-latest
             dist_cmd: npm run dist -- --publish never
+            prep_cmd: 'true'
             files: dist/*.exe
           - os: ubuntu-latest
             dist_cmd: npm run dist -- --publish never
+            prep_cmd: 'true'
             files: dist/*.AppImage
     runs-on: ${{ matrix.os }}
     permissions:
@@ -38,6 +44,7 @@ jobs:
       - run: npm install
       - run: npm run typecheck
       - run: npm test
+      - run: ${{ matrix.prep_cmd }}
       # CI + v* 标签下 electron-builder 会自动进发布模式要 GH_TOKEN（mac/linux 由此失败），
       # 产物统一由下方 action-gh-release 上传，dist_cmd 里显式关掉它的自动发布
       - run: ${{ matrix.dist_cmd }}

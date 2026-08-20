@@ -82,7 +82,7 @@ export default function AgentReferenceView(): React.ReactElement {
         </main>
       </div>}
       {!error && kind === 'tools' && <div className="reference-layout">
-        <aside className="reference-side skill-list">
+        <aside className="reference-side skill-list tool-list">
           {toolGroups.map((group) => <React.Fragment key={group.label}>
             <label>{group.label}</label>
             {group.tools.map((item) => <button key={item.name} className={tool === item.name ? 'on' : ''} onClick={() => setTool(item.name)}>

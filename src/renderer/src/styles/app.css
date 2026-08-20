@@ -424,6 +424,7 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 .reference-side.skill-list button{display:flex;flex-direction:column;gap:3px}
 .reference-side.skill-list button b{font:600 11px/1.3 var(--font-mono)}
 .reference-side.skill-list button span{font-size:10px;line-height:1.4;color:var(--faint);font-weight:400}
+.reference-side.tool-list label:not(:first-child){margin-top:10px;padding-top:13px;border-top:1px solid var(--border)}
 .reference-content{display:flex;flex-direction:column}
 .reference-title{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2)}
 .reference-title b{font:650 12px/1.4 var(--font-ui)}

@@ -143,7 +143,13 @@ if (!app.requestSingleInstanceLock()) {
       w.focus()
     }
   })
-  app.whenReady().then(bootstrap)
+  app.whenReady().then(() => {
+    // 开发态没有应用包可提供 Dock 图标，显式使用与正式包一致的资源。
+    if (process.platform === 'darwin' && !app.isPackaged) {
+      app.dock.setIcon(join(app.getAppPath(), 'build', 'icon.png'))
+    }
+    bootstrap()
+  })
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })

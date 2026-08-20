@@ -2,6 +2,7 @@ appId: com.kyynor.reportconsole
 productName: Report Console
 directories:
   output: dist
+  buildResources: build
 files:
   - out/**
   - package.json
@@ -9,9 +10,17 @@ files:
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
   - "**/node_modules/esbuild/**"
+extraResources:
+  - from: build/icon.png
+    to: icon.png
 mac:
   category: public.app-category.developer-tools
+  icon: icon.icns
   target:
     - dir
   artifactName: Report-Console-${version}-${arch}.${ext}
+win:
+  icon: icon.ico
+linux:
+  icon: icons
 npmRebuild: true

@@ -386,7 +386,7 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 .teststat .cell .l{font-size:10px;color:var(--muted);margin-top:1px}
 .teststat .cell.g .v{color:var(--ok)}
 .teststat .cell.r .v{color:var(--bad)}
-.html-frame{width:100%;height:460px;border:1px solid var(--border);border-radius:6px;background:#fff}
+.html-frame{width:100%;height:100%;border:1px solid var(--border);border-radius:6px;background:#fff}
 .guide{border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;margin-bottom:15px;background:var(--surface)}
 .gstep{display:flex;gap:11px;padding:10px 13px;border-bottom:1px solid var(--border);align-items:flex-start}
 .gstep:last-child{border-bottom:0}

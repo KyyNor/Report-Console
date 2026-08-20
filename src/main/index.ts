@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron'
 import { registerIpc } from './ipc'
 import { createMainWindow } from './windows'
 import { runSelftest } from './selftest'
+import { autoCheckOnStartup } from './updateChecker'
 import { existsSync, mkdirSync, renameSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
@@ -120,6 +121,12 @@ function bootstrap(): void {
       console.log('[selftest] ' + JSON.stringify(r, null, 2))
       app.exit(r.ok ? 0 : 1)
     })()
+  }
+
+  // 版本更新检查（半自动）：启动 5 秒后静默检查，仅打包后生效；
+  // 有新版且未被用户忽略才弹原生对话框（自检模式不弹，避免干扰无人值守链路）
+  if (!process.argv.includes('--selftest')) {
+    setTimeout(() => void autoCheckOnStartup(), 5000)
   }
 }
 

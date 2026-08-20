@@ -268,6 +268,8 @@ export interface AppSettings {
   mailTo: string
   /** 分卷大小（MiB），超限才切分 */
   mailChunkMiB: number
+  /** 更新检查：用户忽略的版本号，该版本不再提示，更新版本发布后自然失效 */
+  updateIgnoredVersion: string
 }
 
 export interface StatusPayload {

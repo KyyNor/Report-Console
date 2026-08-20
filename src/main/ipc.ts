@@ -13,6 +13,7 @@ import { listBuiltinSkills } from './agent/skills'
 import { promptScenarios } from '@shared/agentPrompt'
 import { pingFrServer, callApiData } from './frClient'
 import { sendZipAsMailParts, testSmtp, type SmtpConfig } from './mailSender'
+import { checkForUpdate, notifyUpdate } from './updateChecker'
 import { collectPreviewDataLogs, evaluatePreviewSql, openPreviewWindow } from './windows'
 import * as checkpoints from './checkpointService'
 import type { AppSettings, StatusPayload } from '@shared/types'
@@ -145,6 +146,13 @@ export function registerIpc(): void {
   })
   // 设置页「测试连接」：按表单当前值（未保存也可测）连接 + 认证，不发信
   handle('mail:test', (a) => testSmtp(a as SmtpConfig))
+
+  // 设置页「检查更新」：手动触发不受「忽略此版本」影响；有更新时主进程直接弹原生对话框
+  handle('update:check', async () => {
+    const info = await checkForUpdate(true)
+    if (info.hasUpdate) await notifyUpdate(info)
+    return info
+  })
   handle('projects:update', (a) => {
     const id = (a as { id: number }).id
     const project = projects.listProjects().find((item) => item.id === id)

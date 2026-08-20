@@ -59,6 +59,8 @@ src/main/               Electron 主进程
   mailSender.ts         打包外发：zip 字节级分卷 + 逐卷邮件发送（nodemailer，主题「[ReportConsole] 文件传输 - …」，
                         分卷命名沿用 looopsend；SMTP 配置独立存设置页，不与 looop-studio 共享）。
                         失败时全部分卷保留在系统临时目录供手动补发
+  updateChecker.ts      版本更新检查（半自动）：拉 GitHub Releases latest 比对版本，弹原生对话框展示更新内容；
+                        「忽略此版本」存 settings（updateIgnoredVersion），更新版本发布后自然恢复提示。不下载安装包
   cpt/                  核心资产：dataWriter（支持每数据集 dbConnection）/ displayWriter / jsTransform / checker / legacyInspector
   legacyCptService.ts   传统 CPT 的当前项目、只读、结构摘要入口（5MB 上限）
   agent/tools.ts        平台动作的模型侧暴露面（契约/过程/文档/页面/SQL/传统 CPT/设计库；SYSTEM_PROMPT 在 @shared/agentPrompt）

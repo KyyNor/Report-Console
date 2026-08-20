@@ -22,6 +22,19 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
   const setMailPort = (v: string) => setForm((f) => (f ? { ...f, mailSmtpPort: Number(v.replace(/\D/g, '')) || 0 } : f))
   const setMailChunk = (v: string) => setForm((f) => (f ? { ...f, mailChunkMiB: Number(v.replace(/\D/g, '')) || 0 } : f))
   const [testing, setTesting] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const checkUpdate = async () => {
+    setChecking(true)
+    try {
+      const r = await call<{ hasUpdate: boolean; current: string; latest: string }>('update:check')
+      // 有更新时主进程已弹原生对话框（更新内容/去下载/忽略此版本），这里只提示无更新的情况
+      if (!r.hasUpdate) toast(`已是最新版本（v${r.current}）`, 'ok')
+    } catch (e) {
+      toast(`检查更新失败：${(e as Error).message}`, 'err')
+    } finally {
+      setChecking(false)
+    }
+  }
   const testMail = async () => {
     if (!form) return
     setTesting(true)
@@ -178,6 +191,8 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <button className="btn pri" onClick={save} disabled={saving}><Icon n="check" />{saving ? '保存中…' : '保存全部'}</button>
+          <button className="btn" onClick={() => void checkUpdate()} disabled={checking}><Icon n="scan" />{checking ? '检查中…' : '检查更新'}</button>
+          <span className="fh" style={{ alignSelf: 'center' }}>启动时自动检查（新版本弹窗可忽略，直到更新的版本发布）</span>
         </div>
       </div>
     </div>

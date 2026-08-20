@@ -254,7 +254,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   mailFrom: '',
   mailPassword: '',
   mailTo: '',
-  mailChunkMiB: 30
+  mailChunkMiB: 30,
+  updateIgnoredVersion: ''
 }
 
 export function getSettings(): AppSettings {

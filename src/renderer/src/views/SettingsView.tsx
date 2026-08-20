@@ -7,11 +7,13 @@ import type { AppSettings } from '@shared/types'
 export default function SettingsView({ onSaved }: { onSaved?: () => void }): React.ReactElement {
   const toast = useToast()
   const [form, setForm] = useState<AppSettings | null>(null)
+  const [version, setVersion] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     void (async () => {
       try { setForm(await call<AppSettings>('config:get')) } catch (e) { toast((e as Error).message, 'err') }
+      try { setVersion(await call<string>('app:version')) } catch { /* 版本展示可缺省 */ }
     })()
   }, [])
 
@@ -189,10 +191,10 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems: 'center' }}>
           <button className="btn pri" onClick={save} disabled={saving}><Icon n="check" />{saving ? '保存中…' : '保存全部'}</button>
-          <button className="btn" onClick={() => void checkUpdate()} disabled={checking}><Icon n="scan" />{checking ? '检查中…' : '检查更新'}</button>
-          <span className="fh" style={{ alignSelf: 'center' }}>启动时自动检查（新版本弹窗可忽略，直到更新的版本发布）</span>
+          <button className="btn" onClick={() => void checkUpdate()} disabled={checking}><Icon n="refresh" />{checking ? '检查中…' : '检查更新'}</button>
+          {version && <span className="fh">当前版本 v{version}</span>}
         </div>
       </div>
     </div>

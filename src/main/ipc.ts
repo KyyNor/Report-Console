@@ -2,7 +2,7 @@
  * IPC 注册 — 渲染层 ↔ 主进程的唯一通道（v2 项目制）
  */
 
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, app } from 'electron'
 import { getSettings, saveSettings } from './db'
 import * as conns from './connectionsService'
 import * as mysql from './mysqlService'
@@ -42,6 +42,7 @@ export function registerIpc(): void {
   // ── 配置 ──────────────────────────────────────────────
   handle('config:get', () => getSettings())
   handle('config:save', (a) => saveSettings(a as Partial<AppSettings>))
+  handle('app:version', () => app.getVersion())
 
   // ── 状态（总览 + 工作台左栏） ──────────────────────────
   handle('status:get', async (): Promise<StatusPayload> => {

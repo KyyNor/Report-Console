@@ -107,12 +107,15 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
   const agent = handle.agent
   const view = useChatView(agent)
 
+  // agent.state.messages 在回合内是原地 push（数组引用不变），useMemo 只依赖
+  // 引用不会重建；补 length 作为内容变更信号，流式期间配对数据才能跟上。
+  const messageCount = view.messages.length
   // 结果配对：toolCallId → ToolResultMessage（工具块的状态与内容来源）
   const results = useMemo(() => {
     const m = new Map<string, ToolResultMessage>()
     for (const msg of view.messages) if (msg.role === 'toolResult') m.set(msg.toolCallId, msg)
     return m
-  }, [view.messages])
+  }, [view.messages, messageCount])
   // toolResult 已由其 assistant toolCall 内的 ToolBlock 渲染；只有确实找不到
   // 对应调用时才走下方的孤儿兜底，避免同一次工具执行出现一个正确块和一个 {} 块。
   const calledToolIds = useMemo(() => {
@@ -122,7 +125,7 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
       for (const block of msg.content) if (block.type === 'toolCall') ids.add(block.id)
     }
     return ids
-  }, [view.messages])
+  }, [view.messages, messageCount])
   // 工具显示名：AgentTool 的 label 优先（与工具注册名一致时无差别）
   const toolLabels = useMemo(() => {
     const m = new Map<string, string>()

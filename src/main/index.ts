@@ -68,6 +68,19 @@ function bootstrap(): void {
             if (!clicked) console.warn('[smoke] project settings button not found')
             await new Promise((resolve) => setTimeout(resolve, 250))
           }
+          // 仅供界面验收：规范页（SMOKE_VIEW=reference）切到指定 tab 后再截图，如 SMOKE_REF_TAB=tools
+          if (process.env.SMOKE_REF_TAB) {
+            const tabClicked = await win.webContents.executeJavaScript(`(() => {
+              const labels = { prompts: '系统提示词', skills: '内置 Skills', tools: '平台工具' }
+              const want = labels[${JSON.stringify(process.env.SMOKE_REF_TAB)}]
+              const button = Array.from(document.querySelectorAll('.reference-tabs button')).find((node) => node.textContent === want)
+              if (!button) return false
+              button.click()
+              return true
+            })()`) as boolean
+            if (!tabClicked) console.warn('[smoke] reference tab button not found')
+            await new Promise((resolve) => setTimeout(resolve, 250))
+          }
           const info = await win.webContents.executeJavaScript(`(async () => {
             const p = document.querySelector('.rc-chat')
             const text = p ? (p.textContent || '') : ''

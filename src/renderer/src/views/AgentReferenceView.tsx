@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon'
 import { call } from '../api'
 import type { AgentMode, ProjectPlatform } from '@shared/types'
 import type { AgentPromptScenario } from '@shared/agentPrompt'
+import { flattenToolSchema, type SchemaRow } from './toolSchema'
 
 interface SkillReference { name: string; description: string; content: string }
 interface ToolReference { name: string; description: string; group: string; modes: string[]; parameters: Record<string, unknown> }
@@ -14,6 +15,32 @@ function ModeChip({ modes }: { modes: string[] }): React.ReactElement {
   return <span className={`ref-mode${both ? ' both' : ''}`}>{both ? '开发 + 讨论' : '仅开发'}</span>
 }
 
+/** 平台工具参数表：catalog 的 JSON Schema 拍平为 API 文档风格的行，嵌套子行缩进。 */
+function SchemaTable({ rows }: { rows: SchemaRow[] }): React.ReactElement {
+  return (
+    <div className="ref-schema">
+      {rows.length === 0
+        ? <div className="ref-schema-empty">无参数</div>
+        : <table className="ptab">
+            <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>默认值</th><th>说明</th></tr></thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={`${row.name}-${i}`}>
+                  <td className="f">{row.depth > 0 ? <span className="ind">{row.name}</span> : row.name}</td>
+                  <td className="f">{row.type}</td>
+                  <td>{row.required ? <span className="req">必填</span> : <span className="opt">-</span>}</td>
+                  <td className="f">{row.def ?? <span className="opt">-</span>}</td>
+                  <td>{row.notes.length === 0 ? <span className="opt">-</span> : row.notes.map((note, j) => (
+                    j === 0 ? <span key={j}>{note}</span> : <span key={j} className="note-sub">{note}</span>
+                  ))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>}
+    </div>
+  )
+}
+
 export default function AgentReferenceView(): React.ReactElement {
   const [catalog, setCatalog] = useState<Catalog>({ prompts: [], skills: [], tools: [] })
   const [kind, setKind] = useState<'prompts' | 'skills' | 'tools'>('prompts')
@@ -21,6 +48,7 @@ export default function AgentReferenceView(): React.ReactElement {
   const [mode, setMode] = useState<AgentMode>('development')
   const [skill, setSkill] = useState('page_interaction')
   const [tool, setTool] = useState('')
+  const [toolView, setToolView] = useState<'table' | 'json'>('table')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -37,6 +65,7 @@ export default function AgentReferenceView(): React.ReactElement {
   const prompt = useMemo(() => catalog.prompts.find((item) => item.platform === platform && item.mode === mode), [catalog.prompts, platform, mode])
   const currentSkill = useMemo(() => catalog.skills.find((item) => item.name === skill), [catalog.skills, skill])
   const currentTool = useMemo(() => catalog.tools.find((item) => item.name === tool), [catalog.tools, tool])
+  const toolRows = useMemo(() => flattenToolSchema(currentTool?.parameters), [currentTool])
   /** 分组保持主进程 TOOL_GROUPS 的先现次序；同组内保持注册顺序。 */
   const toolGroups = useMemo(() => {
     const order: string[] = []
@@ -92,9 +121,20 @@ export default function AgentReferenceView(): React.ReactElement {
           </React.Fragment>)}
         </aside>
         <main className="reference-content">
-          <div className="reference-title"><b>{currentTool?.name ?? '工具'}</b><ModeChip modes={currentTool?.modes ?? []} /></div>
+          <div className="reference-title">
+            <b>{currentTool?.name ?? '工具'}</b>
+            <div className="ref-title-right">
+              <span className="agent-mode-switch">
+                <button className={toolView === 'table' ? 'on' : ''} onClick={() => setToolView('table')}>表格</button>
+                <button className={toolView === 'json' ? 'on' : ''} onClick={() => setToolView('json')}>JSON</button>
+              </span>
+              <ModeChip modes={currentTool?.modes ?? []} />
+            </div>
+          </div>
           <div className="ref-tool-desc">{currentTool?.description ?? ''}</div>
-          <pre>{currentTool ? JSON.stringify(currentTool.parameters, null, 2) : '加载中…'}</pre>
+          {!currentTool ? <pre>加载中…</pre>
+            : toolView === 'table' ? <SchemaTable rows={toolRows} />
+            : <pre>{JSON.stringify(currentTool.parameters, null, 2)}</pre>}
         </main>
       </div>}
     </div>

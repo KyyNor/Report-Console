@@ -1,6 +1,6 @@
 {
   "name": "report-console",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "帆软加壳开发控制台 — 接口/存储过程/页面统一管理 + AI Agent",
   "main": "out/main/index.js",
   "author": "kyynor",

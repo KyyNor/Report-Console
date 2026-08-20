@@ -30,7 +30,7 @@ function SchemaTable({ rows }: { rows: SchemaRow[] }): React.ReactElement {
                   <td className="f">{row.type}</td>
                   <td>{row.required ? <span className="req">必填</span> : <span className="opt">-</span>}</td>
                   <td className="f">{row.def ?? <span className="opt">-</span>}</td>
-                  <td>{row.notes.length === 0 ? <span className="opt">-</span> : row.notes.map((note, j) => (
+                  <td className="desc">{row.notes.length === 0 ? <span className="opt">-</span> : row.notes.map((note, j) => (
                     j === 0 ? <span key={j}>{note}</span> : <span key={j} className="note-sub">{note}</span>
                   ))}</td>
                 </tr>

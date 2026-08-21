@@ -48,6 +48,10 @@ export interface PreviewDiagnosticReport {
 const MAX_ERRORS = 80
 const MAX_SESSIONS = 80
 const MAX_TEXT = 2_000
+const FINE_REPORT_FRAMEWORK_NOISE = [
+  /(?:Uncaught\s+)?ReferenceError:\s*BI is not defined\b/i,
+  /(?:Uncaught\s+)?ReferenceError:\s*CryptoJS is not defined\b/i
+]
 
 function scopeKey(scope: PreviewScope): string {
   return JSON.stringify([scope.project, scope.page])
@@ -60,6 +64,11 @@ function clip(text: string | undefined, max = MAX_TEXT): string | undefined {
 
 export function isFineReportDataUrl(url: string): boolean {
   try { return new URL(url).pathname.endsWith('/webroot/decision/api/data') } catch { return false }
+}
+
+/** 帆软页面框架自身偶发的全局依赖告警，不能作为业务页面故障交给 Agent。 */
+export function isFineReportFrameworkNoise(message: string): boolean {
+  return FINE_REPORT_FRAMEWORK_NOISE.some((pattern) => pattern.test(message))
 }
 
 /** HTTP 失败或帆软业务错误（即使 HTTP 200）均归为 data_error。 */
@@ -132,7 +141,13 @@ export class PreviewDiagnosticStore {
     const windows = [...this.sessions.values()]
       .filter((session) => session.project === project && (!page || session.page === page))
       .sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))
-      .map((session) => ({ ...session, errors: session.errors.map((error) => ({ ...error })) }))
+      .map((session) => ({
+        ...session,
+        // 防御性过滤旧记录：升级前已经入账的同类框架噪声也不交给 Agent。
+        errors: session.errors
+          .filter((error) => error.kind !== 'js_error' || !isFineReportFrameworkNoise(error.message))
+          .map((error) => ({ ...error }))
+      }))
     return {
       project,
       page,

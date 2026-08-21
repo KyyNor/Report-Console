@@ -268,7 +268,7 @@ export function getSettings(): AppSettings {
   // 旧库可能残留 mysql* 键，读时过滤掉（迁移已转入 connections）
   const { mysqlHost: _h, mysqlPort: _p, mysqlUser: _u, mysqlPassword: _w, mysqlDatabase: _d, ...rest } = map as Record<string, string>
   const validThinkingLevels = new Set<AppSettings['llmThinkingLevel']>(['minimal', 'low', 'medium', 'high', 'xhigh'])
-  const validPresets = new Set<LlmPresetId>(['zhipu_cn', 'volcengine_coding_plan', 'deepseek_cn', 'siliconflow_cn', 'mimo_cn', 'minimax_cn', 'kimi_cn', 'custom'])
+  const validPresets = new Set<LlmPresetId>(['zhipu_cn', 'volcengine_coding_plan', 'deepseek_cn', 'siliconflow_cn', 'mimo_cn', 'minimax_cn', 'kimi_cn', 'openrouter', 'custom'])
   const level = validThinkingLevels.has(rest.llmThinkingLevel as AppSettings['llmThinkingLevel'])
     ? rest.llmThinkingLevel as AppSettings['llmThinkingLevel']
     : DEFAULT_SETTINGS.llmThinkingLevel

@@ -15,9 +15,10 @@ export type LlmPresetId =
   | 'mimo_cn'
   | 'minimax_cn'
   | 'kimi_cn'
+  | 'openrouter'
   | 'custom'
 
-export type ThinkingFormat = 'qwen' | 'zai' | 'deepseek'
+export type ThinkingFormat = 'qwen' | 'zai' | 'deepseek' | 'openrouter'
 
 export interface LlmCompatProfile {
   thinkingFormat?: ThinkingFormat
@@ -99,6 +100,43 @@ export const LLM_PROVIDER_PROFILES: readonly LlmProviderProfile[] = [
     id: 'kimi_cn', label: 'Kimi（月之暗面）', api: 'openai', baseUrl: 'https://api.moonshot.cn/v1',
     help: '使用 Moonshot 中国站 OpenAI 兼容端点。',
     models: [{ id: 'kimi-k2.5', label: 'Kimi K2.5', contextWindow: 262144, reasoning: false }]
+  },
+  {
+    id: 'openrouter', label: 'OpenRouter', api: 'openai', baseUrl: 'https://openrouter.ai/api/v1',
+    help: '统一 OpenAI 兼容端点；下列是常用开发模型。目录变化快，未列模型请用「自定义模型 ID」。已列模型按 OpenRouter reasoning 格式发送思考请求。',
+    models: [
+      // Qwen：每个大版本各保留快/均衡/旗舰代表；避免把同系列所有尺寸塞进默认下拉框。
+      { id: 'qwen/qwen3.5-9b', label: 'Qwen3.5-9B', contextWindow: 262144, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.5-35b-a3b', label: 'Qwen3.5-35B-A3B', contextWindow: 262144, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.5-plus-20260420', label: 'Qwen3.5 Plus', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.6-flash', label: 'Qwen3.6 Flash', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.6-plus', label: 'Qwen3.6 Plus', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.7-flash', label: 'Qwen3.7 Flash', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.7-plus', label: 'Qwen3.7 Plus', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.8-27b', label: 'Qwen3.8-27B', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'qwen/qwen3.8-max', label: 'Qwen3.8 Max', contextWindow: 1000000, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+
+      // 用户指定的国内主力模型。
+      { id: 'moonshotai/kimi-k2.7-code', label: 'Kimi K2.7 Code', contextWindow: 262144, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'moonshotai/kimi-k3', label: 'Kimi K3', contextWindow: 1048576, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'z-ai/glm-4.7', label: 'GLM-4.7', contextWindow: 204800, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'z-ai/glm-5.3', label: 'GLM-5.3', contextWindow: 1048576, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'deepseek/deepseek-v4-flash', label: 'DeepSeek V4 Flash', contextWindow: 1048576, reasoning: true, thinkingLevelMap: { minimal: null, low: null, medium: null, high: 'high', xhigh: 'xhigh' }, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false, requiresReasoningContentOnAssistantMessages: true } },
+      { id: 'deepseek/deepseek-v4-pro', label: 'DeepSeek V4 Pro', contextWindow: 1048576, reasoning: true, thinkingLevelMap: { minimal: null, low: null, medium: null, high: 'high', xhigh: 'xhigh' }, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false, requiresReasoningContentOnAssistantMessages: true } },
+      { id: 'minimax/minimax-m2.7', label: 'MiniMax M2.7', contextWindow: 204800, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'minimax/minimax-m3', label: 'MiniMax M3', contextWindow: 1048576, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'tencent/hy3', label: '腾讯 HY3', contextWindow: 262144, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna', contextWindow: 1050000, reasoning: true, thinkingLevelMap: { xhigh: 'xhigh' }, compat: { thinkingFormat: 'openrouter' } },
+      { id: 'google/gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1048576, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+
+      // 考察后保留的开发向补充：代码、速度/成本与长上下文各有一个可选项。
+      { id: 'qwen/qwen3-coder-next', label: 'Qwen3 Coder Next', contextWindow: 262144, reasoning: false, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'bytedance-seed/seed-2.0-code', label: '豆包 Seed 2.0 Code', contextWindow: 262144, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'xiaomi/mimo-v2.5', label: 'MiMo V2.5', contextWindow: 1048576, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'xiaomi/mimo-v2.5-pro', label: 'MiMo V2.5 Pro', contextWindow: 1048576, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'deepseek/deepseek-v3.2', label: 'DeepSeek V3.2', contextWindow: 163840, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },
+      { id: 'z-ai/glm-4.7-flash', label: 'GLM-4.7 Flash', contextWindow: 202752, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } }
+    ]
   }
 ] as const
 

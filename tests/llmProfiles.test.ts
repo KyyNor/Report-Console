@@ -28,5 +28,26 @@ describe('国内模型 Provider 档案', () => {
       baseUrl: 'https://api.xiaomimimo.com/anthropic'
     })
     expect(getLlmProviderProfile('deepseek_cn')?.api).toBe('openai')
+    expect(getLlmProviderProfile('openrouter')).toMatchObject({
+      api: 'openai',
+      baseUrl: 'https://openrouter.ai/api/v1'
+    })
+  })
+
+  it('OpenRouter 模型逐条使用其 reasoning 兼容格式，不误用硅基流动的 Qwen 参数', () => {
+    expect(getLlmModelProfile('openrouter', 'qwen/qwen3.5-9b')).toMatchObject({
+      reasoning: true,
+      compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false }
+    })
+    expect(getLlmModelProfile('openrouter', 'deepseek/deepseek-v4-pro')?.thinkingLevelMap).toMatchObject({
+      high: 'high',
+      xhigh: 'xhigh',
+      low: null
+    })
+    expect(getLlmModelProfile('openrouter', 'google/gemini-3.7-flash')).toMatchObject({
+      contextWindow: 1048576,
+      reasoning: true,
+      compat: { thinkingFormat: 'openrouter' }
+    })
   })
 })

@@ -6,7 +6,7 @@
  * 工具调用与结果配对渲染为单个可折叠块（运行中自动展开，结束自动收起，可手动展开）。
  * Agent 页与工作台右栏各挂一个实例，共享同一 Agent 单例（各自订阅，互不干扰）。
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { estimateContextTokens, type Agent, type AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AssistantMessage, TextContent, ToolCall, ToolResultMessage, Usage } from '@earendil-works/pi-ai'
 import { Icon } from '../../components/Icon'
@@ -144,14 +144,26 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
 
   // 贴底滚动：用户上翻阅历史时不打扰，新内容到达时若原本贴底则继续贴底
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const threadRef = useRef<HTMLDivElement | null>(null)
   const stick = useRef(true)
   const onScroll = () => {
     const el = scrollRef.current
     if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = scrollRef.current
-    if (el && stick.current) el.scrollTop = el.scrollHeight
+    const thread = threadRef.current
+    if (!el || !thread || !stick.current) return
+
+    const scrollToBottom = () => {
+      if (stick.current) el.scrollTop = el.scrollHeight
+    }
+    // 同步处理本次 React 渲染；再观察消息内容高度，覆盖流式增量、换行和图片
+    // 等发生在首次滚动之后的布局变化。
+    scrollToBottom()
+    const observer = new ResizeObserver(scrollToBottom)
+    observer.observe(thread)
+    return () => observer.disconnect()
   }, [view])
 
   // 输入区：Enter 发送 / Shift+Enter 换行；运行中可停止
@@ -209,7 +221,7 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
   return (
     <div className="rc-chat">
       <div className="rc-scroll" ref={scrollRef} onScroll={onScroll}>
-        <div className="rc-thread">
+        <div className="rc-thread" ref={threadRef}>
           {empty && (
             <div className="rc-empty">
               <Icon n="ai" />

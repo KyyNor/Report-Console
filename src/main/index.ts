@@ -32,18 +32,26 @@ function bootstrap(): void {
   const win = createMainWindow()
 
   // 无系统菜单栏的桌面壳默认不会为网页输入控件提供编辑右键菜单。
-  // 只对可编辑控件弹出，避免覆盖工作台其他区域的原生交互。
+  // 编辑菜单文案由应用明确提供，避免 Electron 随启动 locale 回退为英文。
+  // 非编辑区域只在已有文本选中时提供复制，避免覆盖工作台其他区域的原生交互。
   win.webContents.on('context-menu', (_event, params) => {
-    if (!params.isEditable) return
+    if (params.isEditable) {
+      Menu.buildFromTemplate([
+        { label: '撤销', role: 'undo' },
+        { label: '重做', role: 'redo' },
+        { type: 'separator' },
+        { label: '剪切', role: 'cut' },
+        { label: '复制', role: 'copy' },
+        { label: '粘贴', role: 'paste' },
+        { type: 'separator' },
+        { label: '全选', role: 'selectAll' }
+      ]).popup({ window: win })
+      return
+    }
+
+    if (!params.selectionText.trim()) return
     Menu.buildFromTemplate([
-      { role: 'undo' },
-      { role: 'redo' },
-      { type: 'separator' },
-      { role: 'cut' },
-      { role: 'copy' },
-      { role: 'paste' },
-      { type: 'separator' },
-      { role: 'selectAll' }
+      { label: '复制', role: 'copy' }
     ]).popup({ window: win })
   })
 

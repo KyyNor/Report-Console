@@ -5,7 +5,7 @@
 import { app, BrowserWindow, shell, type Session } from 'electron'
 import { join } from 'path'
 import {
-  fineReportDataError, isFineReportDataUrl, previewDiagnostics,
+  fineReportDataError, isFineReportDataUrl, isFineReportFrameworkNoise, previewDiagnostics,
   type PreviewDiagnosticReport, type PreviewScope
 } from './previewDiagnostics'
 import { applyFormulaResults, fineReportFormulaExpressions, previewDataLogs } from './previewDataLogs'
@@ -203,6 +203,7 @@ function attachPreviewListeners(entry: PreviewEntry): void {
   previewByWebContents.set(win.webContents.id, entry)
   win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
     if (level < 3) return
+    if (isFineReportFrameworkNoise(message)) return
     previewDiagnostics.record(entry.scope, win.webContents.id, {
       kind: 'js_error', message, line, source: sourceId
     })

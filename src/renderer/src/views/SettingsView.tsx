@@ -112,9 +112,14 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
       <div className="page-head">
         <b>设置</b>
         <span className="sub">帆软环境 · Agent 模型 · 打包邮件发送（MySQL 连接在「连接」页管理）</span>
+        <span className="grow" />
+        {version && <span className="fh">当前版本 v{version}</span>}
+        <button className="btn" onClick={() => void checkUpdate()} disabled={checking}><Icon n="refresh" />{checking ? '检查中…' : '检查更新'}</button>
+        <button className="btn pri" onClick={save} disabled={saving}><Icon n="check" />{saving ? '保存中…' : '保存全部'}</button>
       </div>
-      <div className="page-body" style={{ maxWidth: 640 }}>
-        <div className="pcard-row" style={{ marginBottom: 16 }}>
+      <div className="page-body">
+        <div className="settings-grid">
+        <div className="pcard-row sg-fr">
           <div className="pcard-h"><Icon n="ext" />帆软环境</div>
           <div style={{ padding: '14px 16px' }}>
             <div className="fld">
@@ -130,7 +135,7 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
           </div>
         </div>
 
-        <div className="pcard-row">
+        <div className="pcard-row sg-agent">
           <div className="pcard-h"><Icon n="ai" />Agent 模型（国内服务预设 / 高级自定义）</div>
           <div style={{ padding: '14px 16px' }}>
             <div className="fld">
@@ -196,7 +201,7 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
                 <div className="fh">只显示/允许模型档案支持的档位；保存后新建 Agent 会话即可应用。</div>
               </div>
             </> : <div className="fh" style={{ marginBottom: 14 }}>当前预设模型未声明可控思考能力，因此不会发送思考专有字段。</div>}
-            {preset && <div className="fh" style={{ marginBottom: 14 }}>{preset.help}</div>}
+            {preset?.help && <div className="fh" style={{ marginBottom: 14 }}>{preset.help}</div>}
             <div className="fld">
               <label>API Key</label>
               <input type="password" value={form.llmApiKey} autoComplete="new-password" onChange={(e) => set('llmApiKey', e.target.value)} />
@@ -205,18 +210,16 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
           </div>
         </div>
 
-        <div className="pcard-row" style={{ marginTop: 16 }}>
+        <div className="pcard-row sg-mail">
           <div className="pcard-h"><Icon n="send" />打包邮件发送（独立配置）</div>
           <div style={{ padding: '14px 16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div className="fld">
-                <label>发件邮箱</label>
-                <input type="text" value={form.mailFrom} spellCheck={false} placeholder="you@company.com" onChange={(e) => set('mailFrom', e.target.value)} />
-              </div>
-              <div className="fld">
-                <label>密码 / 授权码</label>
-                <input type="password" value={form.mailPassword} autoComplete="new-password" onChange={(e) => set('mailPassword', e.target.value)} />
-              </div>
+            <div className="fld">
+              <label>发件邮箱</label>
+              <input type="text" value={form.mailFrom} spellCheck={false} placeholder="you@company.com" onChange={(e) => set('mailFrom', e.target.value)} />
+            </div>
+            <div className="fld">
+              <label>密码 / 授权码</label>
+              <input type="password" value={form.mailPassword} autoComplete="new-password" onChange={(e) => set('mailPassword', e.target.value)} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10 }}>
               <div className="fld">
@@ -235,29 +238,21 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
               </label>
               <div className="fh">关闭时明文连接（25/587），服务器通告 STARTTLS 时自动升级加密</div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 10 }}>
-              <div className="fld">
-                <label>默认收件邮箱</label>
-                <input type="text" value={form.mailTo} spellCheck={false} placeholder="内网/公司邮箱" onChange={(e) => set('mailTo', e.target.value)} />
-                <div className="fh">工作台「打包」弹窗的预填值，发送时可临时修改</div>
-              </div>
-              <div className="fld">
-                <label>分卷大小（MiB）</label>
-                <input type="text" inputMode="numeric" value={form.mailChunkMiB || ''} spellCheck={false} placeholder="30" onChange={(e) => setMailChunk(e.target.value)} />
-                <div className="fh">超限才切分</div>
-              </div>
+            <div className="fld">
+              <label>默认收件邮箱</label>
+              <input type="text" value={form.mailTo} spellCheck={false} placeholder="内网/公司邮箱" onChange={(e) => set('mailTo', e.target.value)} />
+              <div className="fh">工作台「打包」弹窗的预填值，发送时可临时修改</div>
+            </div>
+            <div className="fld">
+              <label>分卷大小（MiB）</label>
+              <input type="text" inputMode="numeric" value={form.mailChunkMiB || ''} spellCheck={false} placeholder="30" onChange={(e) => setMailChunk(e.target.value)} />
+              <div className="fh">超限才切分</div>
             </div>
             <div className="fld">
               <button className="btn" onClick={() => void testMail()} disabled={testing}><Icon n="play" />{testing ? '测试中…' : '测试连接'}</button>
-              <div className="fh">按当前表单值连接并认证（未保存也可测）；配置仅存本机，与 looop-studio 不共享</div>
             </div>
           </div>
         </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 16, alignItems: 'center' }}>
-          <button className="btn pri" onClick={save} disabled={saving}><Icon n="check" />{saving ? '保存中…' : '保存全部'}</button>
-          <button className="btn" onClick={() => void checkUpdate()} disabled={checking}><Icon n="refresh" />{checking ? '检查中…' : '检查更新'}</button>
-          {version && <span className="fh">当前版本 v{version}</span>}
         </div>
       </div>
     </div>

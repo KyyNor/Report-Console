@@ -95,6 +95,21 @@ svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px
 .statcard .st-m{font:10.5px/1.6 var(--font-mono);color:var(--faint);margin-top:4px}
 .pcard-row{border:1px solid var(--border);border-radius:var(--r3);overflow:hidden;background:var(--surface)}
 .pcard-h{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;background:var(--surface2)}
+/* 设置页三栏：左=帆软环境 中=Agent 模型（最高卡） 右=邮件，动作按钮在页头右端；窄窗回落两栏/单栏 */
+.settings-grid{display:grid;gap:14px;align-items:start;max-width:1340px;margin:0 auto;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.14fr) minmax(0,1fr);
+  grid-template-areas:"fr agent mail"}
+.settings-grid .sg-fr{grid-area:fr}
+.settings-grid .sg-agent{grid-area:agent}
+.settings-grid .sg-mail{grid-area:mail}
+.settings-grid .fld{margin-bottom:10px}
+.settings-grid .fld:last-child{margin-bottom:0}
+@media (max-width:1180px){
+  .settings-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.14fr);grid-template-areas:"fr agent" "mail agent"}
+}
+@media (max-width:800px){
+  .settings-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"fr" "agent" "mail"}
+}
 .plain-table{width:100%;border-collapse:collapse;font-size:12px}
 .plain-table th{text-align:left;font-weight:600;color:var(--muted);font-size:10.5px;letter-spacing:.04em;
   padding:6px 12px;border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}

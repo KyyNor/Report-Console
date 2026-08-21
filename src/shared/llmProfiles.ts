@@ -103,7 +103,7 @@ export const LLM_PROVIDER_PROFILES: readonly LlmProviderProfile[] = [
   },
   {
     id: 'openrouter', label: 'OpenRouter', api: 'openai', baseUrl: 'https://openrouter.ai/api/v1',
-    help: '统一 OpenAI 兼容端点；下列是常用开发模型。目录变化快，未列模型请用「自定义模型 ID」。已列模型按 OpenRouter reasoning 格式发送思考请求。',
+    help: '',
     models: [
       // Qwen：每个大版本各保留快/均衡/旗舰代表；避免把同系列所有尺寸塞进默认下拉框。
       { id: 'qwen/qwen3.5-9b', label: 'Qwen3.5-9B', contextWindow: 262144, reasoning: true, compat: { thinkingFormat: 'openrouter', supportsDeveloperRole: false } },

@@ -88,11 +88,15 @@ export interface ChatAttachment {
   label: string
 }
 
-export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, attachments = [], mentionOptions = [], onAttach, onDetach, onPromptSent, onToolCompleted, onCheckpointCreated }: {
+export function PiChat({ handle, placeholder = '描述要做的开发任务，例如：给 demo 项目加一个分页查询接口并实测…', contextPrefix, initialDraft, autoSendInitialDraft = false, attachments = [], mentionOptions = [], onAttach, onDetach, onPromptSent, onToolCompleted, onCheckpointCreated }: {
   handle: PiAgentHandle
   placeholder?: string
   /** 每次任务发送时附带的轻量资源引用，不含资源正文。 */
   contextPrefix?: string
+  /** 宿主发起的任务建议（如迁移向导完成后）；默认只预填，可由显式确认的工作流自动发送。 */
+  initialDraft?: string
+  /** 仅用于已由用户在宿主明确确认的工作流（例如「导入并进入 Agent」）。 */
+  autoSendInitialDraft?: boolean
   attachments?: ChatAttachment[]
   mentionOptions?: ChatAttachment[]
   onAttach?: (attachment: ChatAttachment) => void
@@ -157,12 +161,19 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
   // 输入区：Enter 发送 / Shift+Enter 换行；运行中可停止
   const [draft, setDraft] = useState('')
   const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const receivedInitialDraft = useRef<string | undefined>(undefined)
+  const autoSentInitialDraft = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!initialDraft || initialDraft === receivedInitialDraft.current) return
+    receivedInitialDraft.current = initialDraft
+    setDraft((current) => current.trim() ? current : initialDraft)
+  }, [initialDraft])
   const autoSize = () => {
     const ta = taRef.current
     if (ta) { ta.style.height = 'auto'; ta.style.height = `${Math.min(ta.scrollHeight, 130)}px` }
   }
-  const send = () => {
-    const text = draft.trim()
+  const send = (provided?: string) => {
+    const text = (provided ?? draft).trim()
     if (!text || view.busy) return
     setDraft('')
     requestAnimationFrame(autoSize)
@@ -191,6 +202,13 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
       }
     })()
   }
+  useEffect(() => {
+    if (!autoSendInitialDraft || !initialDraft || autoSentInitialDraft.current === initialDraft) return
+    autoSentInitialDraft.current = initialDraft
+    send(initialDraft)
+    // `initialDraft` 只在迁移确认后由宿主写入一次；ref 防止渲染刷新重复提交。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSendInitialDraft, initialDraft])
 
   const mention = /(?:^|\s)@([^\s@]*)$/.exec(draft)
   const mentionQuery = mention?.[1].toLowerCase() ?? ''
@@ -256,7 +274,7 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
           <span className="grow" />
           <ContextGauge tokens={view.ctxTokens} windowTokens={handle.contextWindow} />
           {view.busy && <button className="btn sm" onClick={() => agent.abort()}><Icon n="stop" />停止</button>}
-          <button className="btn sm pri" disabled={!draft.trim() || view.busy} onClick={send}><Icon n="send" />发送</button>
+          <button className="btn sm pri" disabled={!draft.trim() || view.busy} onClick={() => send()}><Icon n="send" />发送</button>
         </div>
       </div>
     </div>

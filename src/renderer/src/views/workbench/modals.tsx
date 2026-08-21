@@ -6,7 +6,7 @@ import { Icon } from '../../components/Icon'
 import { fmtBytes, Modal } from '../../components/ui'
 import { SqlEditor } from '../../components/CodeEditor'
 import { call } from '../../api'
-import type { AppSettings, Dataset, DatasetKind, DatasetParam, DbConnection, ProjectPlatform } from '@shared/types'
+import type { AppSettings, Dataset, DatasetKind, DatasetParam, DbConnection, LegacyMigrationPlan, LegacyMigrationResult, ProjectPlatform } from '@shared/types'
 
 // ── 新建项目向导（3.1 / D1 / D4） ───────────────────────────────
 
@@ -106,6 +106,89 @@ export function ProjectWizardModal({ connections, reportletsPath, onClose, onCre
       {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
     </Modal>
   )
+}
+
+// ── fr-flow v3 历史项目迁移 ─────────────────────────────────────
+
+export function LegacyMigrationModal({ connections, reportletsPath, onClose, onMigrated }: {
+  connections: DbConnection[]
+  reportletsPath: string
+  onClose: () => void
+  onMigrated: (result: LegacyMigrationResult) => Promise<void>
+}): React.ReactElement {
+  const [source, setSource] = useState('')
+  const [plan, setPlan] = useState<LegacyMigrationPlan | null>(null)
+  const [name, setName] = useState('')
+  const [comment, setComment] = useState('从 fr-flow v3 历史目录迁移')
+  const [dir, setDir] = useState('')
+  const [picked, setPicked] = useState<string[]>(connections.length === 1 ? [connections[0].name] : [])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const effDir = dir || (reportletsPath && name ? `${reportletsPath.replace(/\/+$/, '')}/${name}` : '')
+
+  const inspect = async (path: string) => {
+    setBusy(true); setErr(null)
+    try {
+      const result = await call<LegacyMigrationPlan>('projects:inspectLegacy', { source: path })
+      setSource(path); setPlan(result); setName(result.suggestedName)
+    } catch (e) { setPlan(null); setErr((e as Error).message) } finally { setBusy(false) }
+  }
+  const browse = async () => {
+    try {
+      const path = await call<string | null>('dialog:pickDir', { title: '选择 fr-flow v3 历史项目目录（只读扫描）' })
+      if (path) await inspect(path)
+    } catch (e) { setErr((e as Error).message) }
+  }
+  const migrate = async () => {
+    if (!plan || !source) { setErr('请先选择并扫描历史项目目录'); return }
+    if (!/^[a-z][a-z0-9_]*$/.test(name)) { setErr('项目名仅允许小写字母/数字/下划线'); return }
+    if (!effDir) { setErr('请填写新的 RC 项目目录'); return }
+    if (!picked.length) { setErr('至少选择一个连接，用于导入数据集契约'); return }
+    setBusy(true); setErr(null)
+    try {
+      const result = await call<LegacyMigrationResult>('projects:migrateLegacy', { source, name, dir: effDir, connections: picked, comment })
+      await onMigrated(result)
+    } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+  }
+  const count = (items: string[]) => items.length ? `${items.length} 个` : '无'
+
+  return <Modal wide title="迁移 fr-flow v3 历史项目" icon="scan" onClose={onClose}
+    footer={<>
+      <span className="m-note">旧目录只读；导入到新的 RC 目录，生成物由 RC 重新 build</span>
+      <button className="btn" onClick={onClose}>取消</button>
+      <button className="btn pri" disabled={!plan || busy} onClick={() => void migrate()}><Icon n="ai" />{busy ? '处理中…' : '导入并进入 Agent'}</button>
+    </>}>
+    <div className="fld">
+      <label>1. 历史项目目录</label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input value={source} readOnly placeholder="选择包含 JSX / _data.cpt / .cpt 的旧目录" style={{ flex: 1 }} />
+        <button className="btn" disabled={busy} onClick={() => void browse()}><Icon n="folderOpen" />选择并扫描</button>
+      </div>
+      <div className="fh">扫描不会修改旧 fr-flow v3 目录，也不会把旧 MJS/CPT 标成 RC 受管产物。</div>
+    </div>
+    {plan && <>
+      <div className={`banner ${plan.mode === 'lossless' ? 'info' : 'warn'}`}>
+        <Icon n={plan.mode === 'lossless' ? 'cck' : 'alert'} /><div>
+          <b>{plan.mode === 'lossless' ? '源文件齐全：可无损迁入 JSX、数据契约与 SQL 证据' : '需要尽力复原：将由 Agent 从传统 CPT / MJS 重写 JSX'}</b><br />
+          JSX {count(plan.jsx)} · 数据 CPT {plan.dataCpt || '无'} · 传统 CPT {count(plan.legacyCpts)} · MJS {count(plan.mjs)} · SQL {count(plan.sql)} · 可导入接口 {plan.datasets.length}
+        </div>
+      </div>
+      {plan.warnings.length > 0 && <div className="effects" style={{ marginTop: 10 }}>{plan.warnings.map((warning) => <div key={warning}>• {warning}</div>)}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 10, marginTop: 12 }}>
+        <div className="fld"><label>2. 新 RC 项目名</label><input value={name} spellCheck={false} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="fld"><label>新的 RC 项目目录</label><input value={effDir} spellCheck={false} onChange={(e) => setDir(e.target.value)} placeholder="必须是新目录，旧目录不会被改写" /></div>
+      </div>
+      <div className="fld"><label>迁移说明</label><input value={comment} onChange={(e) => setComment(e.target.value)} /></div>
+      <div className="fld">
+        <label>绑定连接（数据 CPT 内的同名连接自动保留；其余映射至第一个勾选项）</label>
+        <div className="cklist">{connections.map((connection) => <div key={connection.name} className={`ck${picked.includes(connection.name) ? ' on' : ''}`} onClick={() => setPicked((items) => items.includes(connection.name) ? items.filter((item) => item !== connection.name) : [...items, connection.name])}>
+          <span className="cbx" /><b>{connection.name}</b><span className="ck-m">{connection.comment || '已注册连接'}</span>
+        </div>)}</div>
+      </div>
+      <div className="tree">迁移后：<br />├─ <span className="d">project.yaml</span>　新的可迁移事实来源<br />├─ <span className="d">pages/*.jsx</span>　仅导入已有 JSX；随后由 RC build 产生 MJS/CPT<br />├─ <span className="d">legacy/*.cpt</span>　只读复原证据，供 Agent inspect<br />└─ <span className="d">meta/migration__*.sql / .mjs</span>　可审查证据；SQL 不会自动执行</div>
+    </>}
+    {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
+  </Modal>
 }
 
 // ── 接口契约编辑（新建 / 编辑） ─────────────────────────────────

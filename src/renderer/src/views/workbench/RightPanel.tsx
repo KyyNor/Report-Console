@@ -95,7 +95,7 @@ export default function RightPanel({ ctx, data, acts, agentMode, agentCtx, onExi
   data: WBData
   acts: WBActs
   agentMode: boolean
-  agentCtx: { project: string; resource?: string; nonce?: number } | null
+  agentCtx: { project: string; resource?: string; nonce?: number; seed?: string } | null
   onExitAgent: () => void
   onShowVersions: () => void
   onShowDataLogs: () => void
@@ -1002,7 +1002,7 @@ function DocPanel({ ctx, doc, acts }: { ctx: SelCtx; doc: DocMeta; acts: WBActs 
 // ── Agent 面板（工作台右栏 · D7） ───────────────────────────────
 
 function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onShowDataLogs, onResourcesChanged }: {
-  ctx: { project: string; resource?: string; nonce?: number } | null
+  ctx: { project: string; resource?: string; nonce?: number; seed?: string } | null
   project: Project | null
   data: WBData
   onProjectSettings: () => void
@@ -1076,6 +1076,8 @@ function AgentPanel({ ctx, project, data, onProjectSettings, onShowVersions, onS
         {state.handle && <PiChat key={state.handle.sessionId}
           handle={state.handle}
           contextPrefix={digest}
+          initialDraft={ctx?.seed}
+          autoSendInitialDraft={Boolean(ctx?.seed)}
           attachments={attachments}
           mentionOptions={options}
           onAttach={(a) => setAttachments((prev) => prev.some((x) => x.key === a.key) ? prev : [...prev, a])}

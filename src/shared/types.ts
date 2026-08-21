@@ -45,6 +45,33 @@ export interface Project {
   counts: { ifs: number; sps: number; pgs: number; docs: number }
 }
 
+// ── fr-flow v3 历史项目迁移 ────────────────────────────────────
+
+export type LegacyMigrationMode = 'lossless' | 'reconstruct'
+
+/** 选择旧目录后、真正写入前返回的只读迁移盘点。 */
+export interface LegacyMigrationPlan {
+  sourceName: string
+  suggestedName: string
+  mode: LegacyMigrationMode
+  dataCpt?: string
+  jsx: string[]
+  legacyCpts: string[]
+  mjs: string[]
+  sql: string[]
+  datasets: Array<Pick<Dataset, 'name' | 'kind' | 'connection' | 'params' | 'sql'>>
+  warnings: string[]
+}
+
+/** 执行迁移后的可审查结果；不会把历史生成的 MJS/CPT 认作 RC 受管产物。 */
+export interface LegacyMigrationResult {
+  project: Project
+  mode: LegacyMigrationMode
+  imported: { datasets: number; jsxPages: string[]; evidenceCpts: string[]; sqlDocs: string[]; mjsDocs: string[] }
+  dataBuild: BuildResult
+  agentPrompt: string
+}
+
 // ── 接口（数据集）契约 ──────────────────────────────────────────
 
 export type ParamType = 'string' | 'integer' | 'double' | 'formula'

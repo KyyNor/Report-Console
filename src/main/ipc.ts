@@ -8,6 +8,7 @@ import * as conns from './connectionsService'
 import * as mysql from './mysqlService'
 import * as projects from './projectsService'
 import * as pages from './pagesService'
+import * as legacyMigration from './legacyMigrationService'
 import { DISCUSSION_READ_ONLY_TOOLS, piToolDefs, piToolExec } from './agent/piBridge'
 import { listBuiltinSkills } from './agent/skills'
 import { promptScenarios } from '@shared/agentPrompt'
@@ -126,6 +127,13 @@ export function registerIpc(): void {
     return project
   })
   handle('projects:open', (a) => projects.openProject((a as { dir: string }).dir))
+  // 旧 fr-flow v3 目录迁移：先只读盘点，用户确认后才创建 RC 项目与复制迁移证据。
+  handle('projects:inspectLegacy', (a) => legacyMigration.inspectLegacyProject((a as { source: string }).source))
+  handle('projects:migrateLegacy', async (a) => {
+    const result = await legacyMigration.migrateLegacyProject(a as Parameters<typeof legacyMigration.migrateLegacyProject>[0])
+    checkpoints.ensureBaseline(result.project.name)
+    return result
+  })
   handle('projects:exportZip', (a) => projects.exportProjectZip((a as { project: string }).project, (a as { dir: string }).dir))
   // 打包弹窗的体量预估：直接构建一次 zip 拿真实大小（项目为源码级内容，构建毫秒级）
   handle('projects:zipInfo', (a) => {

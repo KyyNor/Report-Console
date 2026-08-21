@@ -563,7 +563,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             <div className="blk">
               <div className="blk-t"><Icon n="box" />产物归属</div>
               <div className="kv">
-                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
+                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/{ctx.project?.dataCptPath}</span>
                 <span className="k2">数据集连接</span><span className="v2">{ds.connection}</span>
                 <span className="k2">最近构建</span><span className="v2">{fmtTime(st?.build)}</span>
               </div>
@@ -588,7 +588,7 @@ function IfPanel({ ctx, ds, st, acts }: { ctx: SelCtx; ds: Dataset; st?: Dataset
             <div className="blk">
               <div className="blk-t"><Icon n="box" />项目产物（一项目一页 · 页内多连接）</div>
               <div className="kv">
-                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/data/{ctx.project?.name}_data.cpt</span>
+                <span className="k2">_data.cpt</span><span className="v2" style={{ color: 'var(--c-report)' }}>{ctx.project?.name}/{ctx.project?.dataCptPath}</span>
                 <span className="k2">说明</span><span className="v2">每个 TableData 各自携带 DatabaseName（连接名）</span>
               </div>
             </div>

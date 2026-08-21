@@ -9,7 +9,7 @@ import { getDb } from './db'
 import { compileJsx, generateMobilePageCpt, generatePageCpt } from './cpt/displayWriter'
 import { checkApiDataParameters, checkFineReportAjaxCompatibility, checkMobilePageCpt, checkPageCpt, hasError } from './cpt/checker'
 import { previewMobilePageUrl, previewPageUrl } from './frClient'
-import { addManagedPage, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPage, type ManagedPage } from './projectManifest'
+import { addManagedPage, dataCptForProject, manifestForProject, pageForProject, projectRoot, removeManagedPage, reportletFile, resolveProjectFile, updateManagedPage, type ManagedPage } from './projectManifest'
 import { replaceUniqueText } from './textPatch'
 import type { PageMeta, PagePlatform, BuildResult } from '@shared/types'
 import pageTemplateRaw from './templates/base_cpt_page.cpt?raw'
@@ -160,7 +160,11 @@ export async function buildPage(projectName: string, pageName: string): Promise<
   log.push(`.mjs 已落盘：${page.mjs}`)
 
   const template = page.platform === 'mobile' ? mobilePageTemplateRaw : pageTemplateRaw
-  const cpt = page.platform === 'mobile' ? generateMobilePageCpt(template, clean) : generatePageCpt(template, clean)
+  // 数据 CPT 可以位于项目树任意位置；构建时注入完整 report_path，不能从页面目录猜测。
+  const dataCptPath = reportletFile(projectName, dataCptForProject(projectName))
+  const cpt = page.platform === 'mobile'
+    ? generateMobilePageCpt(template, clean, dataCptPath)
+    : generatePageCpt(template, clean, dataCptPath)
   const findings = [
     ...(page.platform === 'mobile' ? checkMobilePageCpt(cpt, template) : checkPageCpt(cpt, template)),
     ...checkApiDataParameters(jsx),

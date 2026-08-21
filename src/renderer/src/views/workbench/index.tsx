@@ -28,7 +28,7 @@ type ModalState =
 
 import { KIND_TAG } from './kinds'
 
-export default function WorkbenchView(): React.ReactElement {
+export default function WorkbenchView({ settingsRevision = 0 }: { settingsRevision?: number }): React.ReactElement {
   const toast = useToast()
   const [menuNode, openMenu] = useMenuState()
   const [projects, setProjects] = useState<Project[]>([])
@@ -92,7 +92,7 @@ export default function WorkbenchView(): React.ReactElement {
     }
   }, [toast])
 
-  useEffect(() => { void loadProjects() }, [loadProjects])
+  useEffect(() => { void loadProjects() }, [loadProjects, settingsRevision])
   useEffect(() => {
     if (cur) void loadResources(cur)
     // 冒烟深链：?sel=1 自动选中第一个资源（核对选中态样式）

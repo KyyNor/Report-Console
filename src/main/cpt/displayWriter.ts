@@ -47,33 +47,52 @@ export async function compileJsx(jsxSource: string): Promise<CompileResult> {
 export const DEV_ZONE_START = '/* ===== 开发者代码区 START ===== */'
 export const DEV_ZONE_END = '/* ===== 开发者代码区 END ===== */'
 export const MOBILE_DEV_ZONE = '/* @FRM_DEVELOPER_ZONE@ */'
+export const DATA_CPT_PATH_MARKER = '__RC_DATA_CPT_PATH__'
+
+/**
+ * 数据 CPT 的 report_path 由项目清单决定，而非由页面所在目录推导。
+ * 标记在骨架中只能出现一次；路径作为 JSON 字符串嵌入，避免特殊字符破坏 JS。
+ */
+function bindDataCptPath(templateXml: string, dataCptPath: string): string {
+  if (!dataCptPath.trim()) throw new Error('构建页面缺少数据 CPT 路径')
+  if (templateXml.indexOf(DATA_CPT_PATH_MARKER) !== templateXml.lastIndexOf(DATA_CPT_PATH_MARKER)) {
+    throw new Error(`页面骨架必须且只能包含一个数据 CPT 路径标记 ${DATA_CPT_PATH_MARKER}`)
+  }
+  if (!templateXml.includes(DATA_CPT_PATH_MARKER)) {
+    throw new Error(`页面骨架缺少数据 CPT 路径标记 ${DATA_CPT_PATH_MARKER}`)
+  }
+  assertCdataSafe(dataCptPath)
+  return templateXml.replace(DATA_CPT_PATH_MARKER, JSON.stringify(dataCptPath))
+}
 
 /**
  * 把干净代码注入页面骨架的「开发者代码区」，整体包 CDATA 后返回完整 CPT 文本。
  */
-export function generatePageCpt(templateXml: string, cleanCode: string): string {
-  const openIdx = templateXml.indexOf(DEV_ZONE_START)
-  const endIdx = templateXml.indexOf(DEV_ZONE_END)
+export function generatePageCpt(templateXml: string, cleanCode: string, dataCptPath: string): string {
+  const boundTemplate = bindDataCptPath(templateXml, dataCptPath)
+  const openIdx = boundTemplate.indexOf(DEV_ZONE_START)
+  const endIdx = boundTemplate.indexOf(DEV_ZONE_END)
   if (openIdx === -1 || endIdx === -1 || endIdx < openIdx) {
     throw new Error('骨架模板中找不到「开发者代码区」标记')
   }
 
   const injected =
-    templateXml.slice(0, openIdx) +
+    boundTemplate.slice(0, openIdx) +
     DEV_ZONE_START + '\n' +
     cleanCode + '\n' +
     DEV_ZONE_END +
-    templateXml.slice(endIdx + DEV_ZONE_END.length)
+    boundTemplate.slice(endIdx + DEV_ZONE_END.length)
 
   // CDATA 安全：cleanCode 已 assertCdataSafe；模板自身无风险内容
   return injected
 }
 
 /** 移动骨架在 bootBusiness() 内保留单一注入标记，避免破坏异步加载 antd-mobile 的固定结构。 */
-export function generateMobilePageCpt(templateXml: string, cleanCode: string): string {
-  const first = templateXml.indexOf(MOBILE_DEV_ZONE)
-  if (first === -1 || first !== templateXml.lastIndexOf(MOBILE_DEV_ZONE)) {
+export function generateMobilePageCpt(templateXml: string, cleanCode: string, dataCptPath: string): string {
+  const boundTemplate = bindDataCptPath(templateXml, dataCptPath)
+  const first = boundTemplate.indexOf(MOBILE_DEV_ZONE)
+  if (first === -1 || first !== boundTemplate.lastIndexOf(MOBILE_DEV_ZONE)) {
     throw new Error(`移动端骨架必须且只能包含一个注入标记 ${MOBILE_DEV_ZONE}`)
   }
-  return templateXml.replace(MOBILE_DEV_ZONE, cleanCode)
+  return boundTemplate.replace(MOBILE_DEV_ZONE, cleanCode)
 }

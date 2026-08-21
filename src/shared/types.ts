@@ -40,6 +40,7 @@ export interface Project {
   dir: string           // reportlets/{name} 绝对路径
   missingDir: boolean   // 目录被移动/删除
   platform: ProjectPlatform // 项目面向桌面端、移动端或双端；可迁移定义来自 project.yaml
+  dataCptPath: string    // project.yaml.managed.data[0].cpt（项目内相对路径）
   connections: string[] // 绑定的连接名
   counts: { ifs: number; sps: number; pgs: number; docs: number }
 }

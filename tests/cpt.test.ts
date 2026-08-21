@@ -11,6 +11,7 @@ const TPL_DIR = resolve(__dirname, '../src/main/templates')
 const dataTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_data.cpt'), 'utf-8')
 const pageTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_page.cpt'), 'utf-8')
 const mobilePageTemplate = readFileSync(resolve(TPL_DIR, 'base_cpt_page_mobile.cpt'), 'utf-8')
+const dataCptPath = 'demo/data/demo_data.cpt'
 
 // python 工具链对同一契约的真实产物（侦察阶段生成）
 const GOLDEN_PY = '/tmp/frtoolchain-test/frdemo_data.cpt'
@@ -142,13 +143,12 @@ describe('jsTransform', () => {
 describe('displayWriter + checker', () => {
   it('完整页面构建流程并过质量门', async () => {
     const jsx = readFileSync(resolve(TPL_DIR, 'starters/list.jsx'), 'utf-8')
-      .replace(/CHANGE_ME_data\.cpt/, 'demo_data.cpt')
       .replace(/CHANGE_ME_qry/, 'book_qry')
       .replace(/CHANGE_ME_total/, 'book_total')
     const { clean, hooksTransformed } = await compileJsx(jsx)
     expect(hooksTransformed).toBeGreaterThan(0)
     expect(clean).not.toContain('//')
-    const cpt = generatePageCpt(pageTemplate, clean)
+    const cpt = generatePageCpt(pageTemplate, clean, dataCptPath)
     // CDATA 完整
     expect(cpt).toContain('<Content><![CDATA[')
     expect(cpt.indexOf('开发者代码区 START')).toBeGreaterThan(0)
@@ -160,12 +160,14 @@ describe('displayWriter + checker', () => {
     const js = extractJsFromCpt(cpt)
     expect(js).toContain('book_qry')
     expect(js).toContain('var PATH')
+    expect(js).toContain(`dataCptPath: "${dataCptPath}"`)
+    expect(js).toContain('getDataTemplate()')
   })
 
   it('占位符残留 / Unicode 转义 / 自创标签被拦截', async () => {
     const { clean } = await compileJsx('var x = 1;')
     // 模拟占位符残留
-    const bad1 = generatePageCpt(pageTemplate, clean + '\nvar leak = "_MJS_S000001_";')
+    const bad1 = generatePageCpt(pageTemplate, clean + '\nvar leak = "_MJS_S000001_";', dataCptPath)
     expect(checkPageCpt(bad1, pageTemplate).some((f) => f.rule === 'mjs_placeholder_remnant')).toBe(true)
     // 模拟自创标签
     const bad2 = cptInject(pageTemplate, clean) + '\n<CustomWidget/>'
@@ -175,7 +177,7 @@ describe('displayWriter + checker', () => {
 
   it('PATH 遮盖检测', async () => {
     const { clean } = await compileJsx('var PATH = { foo: 1 };\nvar x = 2;')
-    const cpt = generatePageCpt(pageTemplate, clean)
+    const cpt = generatePageCpt(pageTemplate, clean, dataCptPath)
     const findings = checkPageCpt(cpt, pageTemplate)
     expect(findings.some((f) => f.rule === 'js_path_resolution' && f.message.includes('遮盖'))).toBe(true)
   })
@@ -183,16 +185,16 @@ describe('displayWriter + checker', () => {
   it('移动端骨架注入并执行移动专属质量门', async () => {
     const jsx = readFileSync(resolve(TPL_DIR, 'starters/mobile.jsx'), 'utf-8')
     const { clean } = await compileJsx(jsx)
-    const cpt = generateMobilePageCpt(mobilePageTemplate, clean)
+    const cpt = generateMobilePageCpt(mobilePageTemplate, clean, dataCptPath)
     expect(cpt).not.toContain('/* @FRM_DEVELOPER_ZONE@ */')
     expect(checkMobilePageCpt(cpt, mobilePageTemplate).filter((f) => f.severity === 'error')).toEqual([])
 
     const desktop = await compileJsx('var Button = antd.Button; function Root(){ return <Button>bad</Button>; } ReactDOM.createRoot(document.getElementById("app-root")).render(<Root/>);')
-    const bad = generateMobilePageCpt(mobilePageTemplate, desktop.clean)
+    const bad = generateMobilePageCpt(mobilePageTemplate, desktop.clean, dataCptPath)
     expect(checkMobilePageCpt(bad, mobilePageTemplate).some((f) => f.rule === 'js_uses_antd_mobile' && f.severity === 'error')).toBe(true)
 
     const unsafeLayout = await compileJsx('function Root(){ return <div style={{height:"100vh",zIndex:1200}}>bad</div>; } ReactDOM.createRoot(document.getElementById("app-root")).render(<Root/>);')
-    const unsafeCpt = generateMobilePageCpt(mobilePageTemplate, unsafeLayout.clean)
+    const unsafeCpt = generateMobilePageCpt(mobilePageTemplate, unsafeLayout.clean, dataCptPath)
     const layoutFindings = checkMobilePageCpt(unsafeCpt, mobilePageTemplate)
     expect(layoutFindings.some((f) => f.rule === 'js_mobile_no_100vh' && f.severity === 'error')).toBe(true)
     expect(layoutFindings.some((f) => f.rule === 'js_mobile_z_index' && f.severity === 'error')).toBe(true)
@@ -241,7 +243,7 @@ describe('displayWriter + checker', () => {
 })
 
 function cptInject(tpl: string, code: string): string {
-  return generatePageCpt(tpl, code)
+  return generatePageCpt(tpl, code, dataCptPath)
 }
 
 describe('checkDataCpt', () => {

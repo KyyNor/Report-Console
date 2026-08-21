@@ -1,9 +1,8 @@
 /*
   列表页脚手架 — 搜索 + 表格 + 分页（通过 /api/data 调数据层）
-  使用前改三处：DATA_CPT / QRY_NAME / TOTAL_NAME，以及 columns 列定义
+  使用前改两处：QRY_NAME / TOTAL_NAME，以及 columns 列定义
 */
 
-var DATA_CPT = 'CHANGE_ME_data.cpt';
 var QRY_NAME = 'CHANGE_ME_qry';
 var TOTAL_NAME = 'CHANGE_ME_total';
 
@@ -25,7 +24,7 @@ function Root() {
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({
-                report_path: PATH.getDataTemplate(DATA_CPT),
+                report_path: PATH.getDataTemplate(),
                 datasource_name: QRY_NAME,
                 page_number: -1,
                 page_size: -1,
@@ -48,7 +47,7 @@ function Root() {
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({
-                report_path: PATH.getDataTemplate(DATA_CPT),
+                report_path: PATH.getDataTemplate(),
                 datasource_name: TOTAL_NAME,
                 page_number: -1,
                 page_size: -1,

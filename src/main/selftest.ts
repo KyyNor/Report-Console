@@ -216,7 +216,6 @@ FROM frdemo_book WHERE 1=1 ${KW('title', 'p_keyword')} ORDER BY id DESC LIMIT \$
     }
     const tpl = pages.readPage('frdemo', 'book_list')
     const customized = tpl
-      .replace(/CHANGE_ME_data\.cpt/g, 'frdemo_data.cpt')
       .replace(/CHANGE_ME_qry/g, 'book_qry')
       .replace(/CHANGE_ME_total/g, 'book_total')
     pages.savePage('frdemo', 'book_list', customized, { overwrite: true })

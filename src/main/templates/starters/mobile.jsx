@@ -35,7 +35,7 @@ var App = function() {
 
     // ============================================
     //  示例：调用 /api/data 拉列表
-    //  生产时改 datasource_name / parameters / report_path 文件名
+    //  生产时改 datasource_name / parameters；report_path 由构建器按项目清单注入
     //  默认未启用，在 useEffect 里取消注释即可
     // ============================================
     function fetchList() {
@@ -45,7 +45,7 @@ var App = function() {
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({
-                report_path: PATH.getDataTemplate('{module}_data.cpt'),
+                report_path: PATH.getDataTemplate(),
                 datasource_name: '{module}_qry',
                 page_number: -1,
                 page_size: -1,

@@ -211,7 +211,7 @@ connection 必须是项目已绑定的连接名（跨库字典选对应连接）
     write_page: tool({
       description: `写入 project.yaml 已声明的新页面 JSX 源码（具体项目内路径由清单决定）。同名页面源码已存在时默认拒绝，先 read_page 后用 patch_page 修改；仅用户明确要求整份替换时才传 overwrite=true。
 页面运行约定：直接使用全局 React/ReactDOM/antd/dayjs/$/PATH（禁止 import、禁止重新声明 PATH、不要自行创建 app-root）。
-调接口统一走 PATH.apiBase + '/api/data'，report_path 用 PATH.getDataTemplate('xx_data.cpt')。${API_DATA_REQUEST_CONTRACT}`,
+调接口统一走 PATH.apiBase + '/api/data'，report_path 必须用无参 PATH.getDataTemplate()；它由构建器按 project.yaml 的数据 CPT 配置注入，禁止传文件名、手工拼接或按页面目录推导。${API_DATA_REQUEST_CONTRACT}`,
       parameters: z.object({
         project: z.string(),
         page: z.string(),

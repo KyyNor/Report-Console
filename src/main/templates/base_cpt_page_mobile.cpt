@@ -55,8 +55,10 @@
                 return '/' + parts[1] + '/' + parts[2];
             } catch (e) { return ''; }
         })(),
-        getDataTemplate: function(filename) {
-            return this.currentDir.replace('/pages/', '/data/') + filename;
+        // 由构建器从 project.yaml.managed.data[0].cpt 注入；不能根据页面目录推导。
+        dataCptPath: __RC_DATA_CPT_PATH__,
+        getDataTemplate: function() {
+            return this.dataCptPath;
         },
         getTemplatePath: function(filename) {
             return this.currentDir + filename;

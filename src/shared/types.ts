@@ -40,8 +40,36 @@ export interface Project {
   dir: string           // reportlets/{name} 绝对路径
   missingDir: boolean   // 目录被移动/删除
   platform: ProjectPlatform // 项目面向桌面端、移动端或双端；可迁移定义来自 project.yaml
+  dataCptPath: string    // project.yaml.managed.data[0].cpt（项目内相对路径）
   connections: string[] // 绑定的连接名
   counts: { ifs: number; sps: number; pgs: number; docs: number }
+}
+
+// ── fr-flow v3 历史项目迁移 ────────────────────────────────────
+
+export type LegacyMigrationMode = 'lossless' | 'reconstruct'
+
+/** 选择旧目录后、真正写入前返回的只读迁移盘点。 */
+export interface LegacyMigrationPlan {
+  sourceName: string
+  suggestedName: string
+  mode: LegacyMigrationMode
+  dataCpt?: string
+  jsx: string[]
+  legacyCpts: string[]
+  mjs: string[]
+  sql: string[]
+  datasets: Array<Pick<Dataset, 'name' | 'kind' | 'connection' | 'params' | 'sql'>>
+  warnings: string[]
+}
+
+/** 执行迁移后的可审查结果；不会把历史生成的 MJS/CPT 认作 RC 受管产物。 */
+export interface LegacyMigrationResult {
+  project: Project
+  mode: LegacyMigrationMode
+  imported: { datasets: number; jsxPages: string[]; evidenceCpts: string[]; sqlDocs: string[]; mjsDocs: string[] }
+  dataBuild: BuildResult
+  agentPrompt: string
 }
 
 // ── 接口（数据集）契约 ──────────────────────────────────────────

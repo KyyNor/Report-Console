@@ -48,6 +48,7 @@ const COMMON_PROMPT = `你是「Report Console」的开发 Agent，工作在帆�
 - 写操作走存储过程，过程命名必须 sp_{项目名}_{功能模块}_{操作}（操作仅 insert/update/delete，功能模块按实际设计，如 sp_order_book_insert）；过程必须 SELECT JSON_OBJECT(...) 返回结果。命名不符合规范的保存与数据层构建都会被拒绝。
 - 当前用户/角色等权限变量声明为 formula 类型参数（如 =$fine_username），不要通过 API 请求传递。
 - 页面调接口统一 PATH.apiBase + '/api/data'，page_number/page_size 恒为 -1。
+- report_path 必须使用无参 PATH.getDataTemplate()。它由构建器按项目声明的数据 CPT 路径注入；禁止传文件名、手工拼接或按页面目录推导数据 CPT 路径。
 {{displayRules}}
 ${API_DATA_REQUEST_CONTRACT}
 - 页面路径由 project.yaml 声明；仅当用户明确要求调整目录/产物位置时，才可调用 update_page_paths，并须如实说明移动结果。

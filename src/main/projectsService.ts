@@ -76,6 +76,7 @@ export function listProjects(): Project[] {
       dir,
       missingDir: getSettings().reportletsPath ? !existsSync(dir) : true,
       platform: projectPlatform(name),
+      dataCptPath: projectDataCptPath(name),
       connections: projectConnections(r.id as number),
       counts: {
         ifs: r.cIfs as number,
@@ -89,6 +90,10 @@ export function listProjects(): Project[] {
 
 function projectPlatform(project: string): ProjectPlatform {
   try { return manifestForProject(project).platform } catch { return 'desktop' }
+}
+
+function projectDataCptPath(project: string): string {
+  try { return dataCptForProject(project) } catch { return `data/${project}_data.cpt` }
 }
 
 function countPages(project: string): number {

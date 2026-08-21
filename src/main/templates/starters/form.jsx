@@ -4,7 +4,6 @@
   - 保存成功后 postMessage 通知父页面刷新
 */
 
-var DATA_CPT = 'CHANGE_ME_data.cpt';
 var BY_ID_NAME = 'CHANGE_ME_by_id';
 var SAVE_NAME = 'CHANGE_ME_insert';
 
@@ -38,7 +37,7 @@ function Root() {
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
-                    report_path: PATH.getDataTemplate(DATA_CPT),
+                    report_path: PATH.getDataTemplate(),
                     datasource_name: BY_ID_NAME,
                     page_number: -1,
                     page_size: -1,
@@ -63,7 +62,7 @@ function Root() {
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({
-                report_path: PATH.getDataTemplate(DATA_CPT),
+                report_path: PATH.getDataTemplate(),
                 datasource_name: editId ? SAVE_NAME.replace('insert', 'update') : SAVE_NAME,
                 page_number: -1,
                 page_size: -1,

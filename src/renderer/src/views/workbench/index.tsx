@@ -6,15 +6,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { fmtBytes, useToast } from '../../components/ui'
 import { call } from '../../api'
-import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, StatusPayload, DbConnection, BuildResult } from '@shared/types'
+import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatform, DocMeta, TraditionalCptMeta, StatusPayload, DbConnection, BuildResult, LegacyMigrationResult } from '@shared/types'
 import RightPanel, { type WBData, type WBActs } from './RightPanel'
 import {
   ProjectWizardModal, DatasetEditModal, ApplyProcModal, CallProcModal, LinkProcModal, NewProcModal,
-  DocNameModal, ProjectSettingsModal, PackProjectModal, type LinkableProc
+  DocNameModal, ProjectSettingsModal, PackProjectModal, LegacyMigrationModal, type LinkableProc
 } from './modals'
 
 type ModalState =
   | { k: 'wizard' }
+  | { k: 'legacyMigration' }
   | { k: 'dataset'; init: Partial<Dataset> & { name: string } }
   | { k: 'applyproc'; name: string; connection: string; linkedFrom?: string }
   | { k: 'callproc'; name: string; connection: string }
@@ -41,7 +42,7 @@ export default function WorkbenchView(): React.ReactElement {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [modal, setModal] = useState<ModalState>(null)
   const [agentMode, setAgentMode] = useState(true)
-  const [agentCtx, setAgentCtx] = useState<{ project: string; resource?: string; nonce?: number } | null>(null)
+  const [agentCtx, setAgentCtx] = useState<{ project: string; resource?: string; nonce?: number; seed?: string } | null>(null)
 
   // 项目资源
   const [datasets, setDatasets] = useState<Dataset[]>([])
@@ -311,6 +312,7 @@ export default function WorkbenchView(): React.ReactElement {
                 <p>还没有项目。项目是顶层的组织单元：绑定一个 reportlets 目录与多个数据库连接。</p>
                 <button className="big" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" /><span><b>新建项目</b><span>名称 · 目录 · 勾选连接 · 写入 project.yaml</span></span></button>
                 <button className="big" onClick={() => void openLocalProject()}><Icon n="folderOpen" /><span><b>打开本地项目</b><span>选择含 project.yaml 的目录，注册进本机</span></span></button>
+                <button className="big" onClick={() => setModal({ k: 'legacyMigration' })}><Icon n="scan" /><span><b>迁移 fr-flow v3</b><span>扫描旧 JSX / _data.cpt / CPT，建立新的 RC 项目</span></span></button>
                 <ScanButton onScaned={loadProjects} />
               </div>
             )}
@@ -341,6 +343,7 @@ export default function WorkbenchView(): React.ReactElement {
               <div className="pj-actions">
                 <button className="newpj" onClick={() => setModal({ k: 'wizard' })}><Icon n="plus" size={14} />新建项目</button>
                 <button className="newpj" onClick={() => void openLocalProject()}><Icon n="folderOpen" size={14} />打开项目</button>
+                <button className="newpj" onClick={() => setModal({ k: 'legacyMigration' })}><Icon n="scan" size={14} />迁移旧项目</button>
               </div>
             )}
           </div>
@@ -534,6 +537,21 @@ export default function WorkbenchView(): React.ReactElement {
             setModal(null)
             await loadProjects()
             selectProject(name)
+          }}
+        />
+      )}
+      {modal?.k === 'legacyMigration' && (
+        <LegacyMigrationModal
+          connections={conns} reportletsPath={status?.reportletsPath ?? ''} onClose={() => setModal(null)}
+          onMigrated={async (result: LegacyMigrationResult) => {
+            toast(`已迁移 ${result.project.name}：接口 ${result.imported.datasets} · JSX 页面 ${result.imported.jsxPages.length}；已进入 Agent`, result.dataBuild.ok ? 'ok' : 'err')
+            setModal(null)
+            await loadProjects()
+            setCur(result.project.name)
+            await loadResources(result.project.name)
+            setSel(null)
+            setAgentCtx({ project: result.project.name, seed: result.agentPrompt, nonce: Date.now() + Math.random() })
+            setAgentMode(true)
           }}
         />
       )}

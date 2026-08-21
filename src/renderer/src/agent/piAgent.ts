@@ -14,6 +14,7 @@ import {
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { buildSystemPrompt } from '@shared/agentPrompt'
+import { getLlmModelProfile } from '@shared/llmProfiles'
 import { call } from '../api'
 import type { AgentMode, AppSettings, ProjectPlatform } from '@shared/types'
 import { initSessionStorage, restoreLatestSession, saveSessionSnapshot, newSessionId, titleFromMessages, type SaveSnapshot } from './piSessions'
@@ -53,18 +54,16 @@ async function buildPlatformTools(scope: AgentScope): Promise<AgentTool<any>[]> 
 }
 
 /** 设置 → 自定义 provider（OpenAI / Anthropic 兼容网关）+ Model */
-function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createModels>; model: Model<Api> } {
+function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createModels>; model: Model<Api>; reasoning: boolean } {
   const isAnthropic = s.llmProvider === 'anthropic'
   const providerId = isAnthropic ? 'rc-anthropic' : 'rc-openai'
   const baseUrl = (isAnthropic ? (s.llmBaseUrl || ANTHROPIC_DEFAULT) : (s.llmBaseUrl || OPENAI_DEFAULT)).replace(/\/+$/, '')
   const api = isAnthropic ? 'anthropic-messages' : 'openai-completions'
   const modelId = s.llmModel || (isAnthropic ? 'claude-sonnet-4-5' : 'gpt-4o-mini')
-  // reasoning 是能力声明不是开关：一律声明为 true，让 thinkingLevel（off/级别）驱动 pi-ai
-  // 按端点格式显式发送启用/禁用参数。参数格式靠 baseUrl 自动探测（GLM/ZAI → thinking:{type}），
-  // 但硅基流动探测不到、默认 openai 格式在关闭时不发任何参数 —— Qwen3.5 按服务端默认静默思考，
-  // 思考中的工具调用会退化成思考流里的 XML 文本（2026-08-21 会话取证），故显式挂 qwen 格式
-  // 让 enable_thinking=false 落进请求体；硅基流动无 effort 级别参数，一并关掉 reasoning_effort。
-  const isSiliconFlow = !isAnthropic && baseUrl.includes('siliconflow')
+  // 参考 Prime Agent：端点默认项与模型能力分层。未知/高级自定义模型不注入厂商专有思考字段，
+  // 只有经过验证的「预设 × 模型」档案才声明 reasoning / compat，避免一个网关内各模型互相污染。
+  const modelProfile = getLlmModelProfile(s.llmPreset, modelId)
+  const reasoning = modelProfile ? Boolean(modelProfile.reasoning) : s.llmThinkingEnabled
 
   const model: Model<Api> = {
     id: modelId,
@@ -72,8 +71,9 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
     api,
     provider: providerId,
     baseUrl,
-    reasoning: true,
-    compat: isSiliconFlow ? { thinkingFormat: 'qwen', supportsReasoningEffort: false } : undefined,
+    reasoning,
+    compat: modelProfile?.compat,
+    thinkingLevelMap: modelProfile?.thinkingLevelMap,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     // 窗口来自设置页（getSettings 保证为正整数）：圆环分母与 80% 压缩阈值都按它算。
@@ -97,7 +97,7 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
 
   const models = createModels()
   models.setProvider(provider)
-  return { models, model }
+  return { models, model, reasoning }
 }
 
 export interface PiAgentHandle {
@@ -127,7 +127,7 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
   const tools = await buildPlatformTools(scope)
   await initSessionStorage()
 
-  const { models, model } = buildCustomModel(s)
+  const { models, model, reasoning } = buildCustomModel(s)
 
   // 恢复最近会话（messages/model/thinkingLevel 一并还原；无历史走全新会话）
   const restored = fresh ? null : await restoreLatestSession(scope.project)
@@ -145,8 +145,8 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
     initialState: {
       systemPrompt: buildSystemPrompt(scope.project, scope.platform, scope.mode),
       model,
-      // 配置页控制开关与级别；reasoning 恒为 true（能力声明），off 也会显式向端点发送禁用参数。
-      thinkingLevel: s.llmThinkingEnabled ? s.llmThinkingLevel : 'off',
+      // 已验证模型按其能力档案映射；高级自定义模型仍沿用用户选择，但不自动添加厂商私有字段。
+      thinkingLevel: reasoning && s.llmThinkingEnabled ? s.llmThinkingLevel : 'off',
       tools,
       messages: (restored?.data.messages ?? []) as never[]
     }

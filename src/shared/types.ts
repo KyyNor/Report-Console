@@ -1,3 +1,5 @@
+import type { LlmPresetId } from './llmProfiles'
+
 /**
  * 共享类型定义（main / renderer / agent 工具共用）· v2 项目制
  */
@@ -249,6 +251,10 @@ export interface AppSettings {
   frServerUrl: string
   reportletsPath: string
   llmProvider: 'openai' | 'anthropic'
+  /** 预设服务商；custom 表示完全由高级模式提供协议与端点。 */
+  llmPreset: LlmPresetId
+  /** 显示协议 / Base URL / 自定义模型等低层字段。 */
+  llmAdvancedMode: boolean
   llmBaseUrl: string
   llmApiKey: string
   llmModel: string

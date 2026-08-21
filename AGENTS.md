@@ -120,6 +120,15 @@ tests/cpt.test.ts       vitest，与 Python 工具链产物做黄金结构对照
 - **上游结构变更防护**：缺文件/缺 key 列/缺配置列直接报错退出（提示先 `--inspect` 校准）；上游出现配置未覆盖的新文件会 WARNING 跳过，不静默入库。
 - **运行时检索**：`agent/designlib.ts` 是合并检索工具（Okapi BM25，英文分词 + 中文二元组 + 少量中英扩展；长字段默认 300 字符截断），Agent 侧入口是 `search_design_lib` 工具（只读、全局，讨论模式亦可用）。改检索核心或同步纯函数：跑 `npm test`（tests/designLib.test.ts）。
 
+## Agent 模型 Provider 档案（参考 Prime Agent）
+
+国内模型接入采用「**Provider 端点预设 + 模型能力档案 + 高级自定义**」三层，而不是按单一 OpenAI 兼容协议一把梭。实现位于 `src/shared/llmProfiles.ts`，设置页是唯一配置入口。
+
+- **参考来源（用于溯源）**：Prime Agent 的 [`docs/models.md`](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/models.md) 与其 `models.json`。重点参考其 provider defaults、按模型覆盖 `compat`、及按模型映射思考等级的结构；本项目未复制其全部 provider 清单或运行时加载机制。
+- **预设范围**：仅维护常用中国站的智谱 Coding Plan、火山引擎 Coding Plan、DeepSeek 官方、硅基流动、MiMo、MiniMax、Kimi。端点、线协议和候选模型属于 provider 默认项；`reasoning`、thinking format、developer/system 角色、上下文和思考等级映射只能在具体模型档案中声明。
+- **保守回退**：预设内没有登记的模型，及高级模式的自定义模型，不继承任何厂商私有思考字段；仍可由用户在高级模式配置协议、Base URL、模型 ID、上下文窗口和思考开关。新增或调整档案前，应以目标模型的官方文档和真实请求日志验证。
+- **排障原则**：工具调用必须始终走 API 原生 `tools/tool_calls`；模型输出 XML 工具标签属于上游模型未遵从协议，应记录并按模型降级/禁用思考处理，不得把 XML 解析成平台工具调用。
+
 ## 测试与验证要求
 
 - 改 `src/main/cpt/**` 或骨架模板：必须跑 `npm test`（黄金对照保证与既有 Python 产物结构等价），并视改动补用例。

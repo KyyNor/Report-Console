@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon'
 import { useToast } from '../components/ui'
 import { call } from '../api'
 import type { AppSettings } from '@shared/types'
+import { getLlmModelProfile, getLlmProviderProfile, LLM_PROVIDER_PROFILES, type LlmPresetId } from '@shared/llmProfiles'
 
 export default function SettingsView({ onSaved }: { onSaved?: () => void }): React.ReactElement {
   const toast = useToast()
@@ -17,9 +18,10 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
     })()
   }, [])
 
-  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled' | 'llmContextWindow' | 'mailSmtpTls' | 'mailSmtpPort' | 'mailChunkMiB'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const set = (k: Exclude<keyof AppSettings, 'llmThinkingEnabled' | 'llmAdvancedMode' | 'llmContextWindow' | 'mailSmtpTls' | 'mailSmtpPort' | 'mailChunkMiB'>, v: string) => setForm((f) => (f ? { ...f, [k]: v } : f))
   const setCtx = (v: string) => setForm((f) => (f ? { ...f, llmContextWindow: Number(v.replace(/\D/g, '')) || 0 } : f))
   const setThinkingEnabled = (v: boolean) => setForm((f) => (f ? { ...f, llmThinkingEnabled: v } : f))
+  const setAdvancedMode = (v: boolean) => setForm((f) => (f ? { ...f, llmAdvancedMode: v } : f))
   const setMailTls = (v: boolean) => setForm((f) => (f ? { ...f, mailSmtpTls: v } : f))
   const setMailPort = (v: string) => setForm((f) => (f ? { ...f, mailSmtpPort: Number(v.replace(/\D/g, '')) || 0 } : f))
   const setMailChunk = (v: string) => setForm((f) => (f ? { ...f, mailChunkMiB: Number(v.replace(/\D/g, '')) || 0 } : f))
@@ -69,6 +71,42 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
 
   if (!form) return <div className="page"><div className="page-body"><div className="nores">加载中…</div></div></div>
 
+  const preset = getLlmProviderProfile(form.llmPreset)
+  const modelProfile = getLlmModelProfile(form.llmPreset, form.llmModel)
+  const modelIsCustom = Boolean(preset && !modelProfile)
+  const selectPreset = (id: LlmPresetId) => {
+    if (id === 'custom') {
+      setForm((f) => (f ? { ...f, llmPreset: id, llmAdvancedMode: true } : f))
+      return
+    }
+    const next = getLlmProviderProfile(id)
+    if (!next) return
+    const initial = next.models[0]
+    setForm((f) => (f ? {
+      ...f,
+      llmPreset: id,
+      llmProvider: next.api,
+      llmBaseUrl: next.baseUrl,
+      llmModel: initial.id,
+      llmContextWindow: initial.contextWindow,
+      llmThinkingEnabled: Boolean(initial.reasoning),
+      llmThinkingLevel: 'low'
+    } : f))
+  }
+  const selectModel = (id: string) => {
+    if (id === '__custom__') {
+      setForm((f) => (f ? { ...f, llmModel: '' } : f))
+      return
+    }
+    const next = getLlmModelProfile(form.llmPreset, id)
+    setForm((f) => (f ? {
+      ...f,
+      llmModel: id,
+      llmContextWindow: next?.contextWindow ?? f.llmContextWindow,
+      llmThinkingEnabled: Boolean(next?.reasoning)
+    } : f))
+  }
+
   return (
     <div className="page">
       <div className="page-head">
@@ -93,47 +131,72 @@ export default function SettingsView({ onSaved }: { onSaved?: () => void }): Rea
         </div>
 
         <div className="pcard-row">
-          <div className="pcard-h"><Icon n="ai" />Agent 模型（OpenAI / Anthropic 兼容）</div>
+          <div className="pcard-h"><Icon n="ai" />Agent 模型（国内服务预设 / 高级自定义）</div>
           <div style={{ padding: '14px 16px' }}>
             <div className="fld">
-              <label>协议</label>
-              <select value={form.llmProvider} onChange={(e) => set('llmProvider', e.target.value)}>
-                <option value="openai">OpenAI 兼容（/v1/chat/completions）</option>
-                <option value="anthropic">Anthropic 兼容（/v1/messages）</option>
+              <label>服务商</label>
+              <select value={form.llmPreset} onChange={(e) => selectPreset(e.target.value as LlmPresetId)}>
+                {LLM_PROVIDER_PROFILES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                <option value="custom">自定义兼容端点</option>
               </select>
-            </div>
-            <div className="fld">
-              <label>Base URL</label>
-              <input type="text" value={form.llmBaseUrl} spellCheck={false} placeholder="https://api.openai.com/v1" onChange={(e) => set('llmBaseUrl', e.target.value)} />
-              <div className="fh">留空使用官方默认；兼容网关填网关地址</div>
+              <div className="fh">选择预设后自动带入正确端点和已验证模型能力；模型专有参数不会扩散到同一服务商的其他模型。</div>
             </div>
             <div className="fld">
               <label>模型</label>
-              <input type="text" value={form.llmModel} spellCheck={false} placeholder="gpt-4o-mini / claude-sonnet-4-5 / 自部署模型名" onChange={(e) => set('llmModel', e.target.value)} />
-            </div>
-            <div className="fld">
-              <label>上下文窗口（token）</label>
-              <input type="text" inputMode="numeric" value={form.llmContextWindow || ''} spellCheck={false} placeholder="128000" onChange={(e) => setCtx(e.target.value)} />
-              <div className="fh">按所用模型实际窗口填写（查模型文档）；聊天页的占用圆环与「超过 80% 自动压缩」阈值都以它为分母。</div>
+              {preset ? <select value={modelIsCustom ? '__custom__' : form.llmModel} onChange={(e) => selectModel(e.target.value)}>
+                {preset.models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                <option value="__custom__">自定义模型 ID…</option>
+              </select> : <input type="text" value={form.llmModel} spellCheck={false} placeholder="模型 ID" onChange={(e) => set('llmModel', e.target.value)} />}
+              {modelIsCustom && <input style={{ marginTop: 8 }} type="text" value={form.llmModel} spellCheck={false} placeholder="输入服务商实际模型 ID" onChange={(e) => set('llmModel', e.target.value)} />}
+              <div className="fh">自定义模型使用保守兼容策略；验证过的模型才会启用厂商专有思考参数。</div>
             </div>
             <div className="fld">
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.llmThinkingEnabled} onChange={(e) => setThinkingEnabled(e.target.checked)} style={{ width: 'auto' }} />
-                启用模型思考
+                <input type="checkbox" checked={form.llmAdvancedMode} onChange={(e) => setAdvancedMode(e.target.checked)} style={{ width: 'auto' }} />
+                高级模式（编辑协议、端点与上下文）
               </label>
-              <div className="fh">关闭时会请求兼容模型返回正常文本；GLM/ZAI 会显式收到关闭思考参数。</div>
+              <div className="fh">用于私有网关、套餐端点变更或未收录模型；仍不会开放绕过 Agent 工具安全约束的配置。</div>
             </div>
-            <div className="fld">
-              <label>思考级别</label>
-              <select value={form.llmThinkingLevel} disabled={!form.llmThinkingEnabled} onChange={(e) => set('llmThinkingLevel', e.target.value)}>
-                <option value="minimal">最少</option>
-                <option value="low">低</option>
-                <option value="medium">中</option>
-                <option value="high">高</option>
-                <option value="xhigh">很高</option>
-              </select>
-              <div className="fh">仅在模型/兼容网关支持时生效；保存后新建 Agent 会话即可应用。</div>
-            </div>
+            {form.llmAdvancedMode && <>
+              <div className="fld">
+                <label>协议</label>
+                <select value={form.llmProvider} onChange={(e) => set('llmProvider', e.target.value)}>
+                  <option value="openai">OpenAI 兼容（/v1/chat/completions）</option>
+                  <option value="anthropic">Anthropic 兼容（/v1/messages）</option>
+                </select>
+              </div>
+              <div className="fld">
+                <label>Base URL</label>
+                <input type="text" value={form.llmBaseUrl} spellCheck={false} placeholder="https://api.example.com/v1" onChange={(e) => set('llmBaseUrl', e.target.value)} />
+                <div className="fh">预设端点可因企业网关/套餐不同而调整；修改后请一并确认模型 ID。</div>
+              </div>
+              <div className="fld">
+                <label>上下文窗口（token）</label>
+                <input type="text" inputMode="numeric" value={form.llmContextWindow || ''} spellCheck={false} placeholder="128000" onChange={(e) => setCtx(e.target.value)} />
+                <div className="fh">聊天页的占用圆环与「超过 80% 自动压缩」阈值都以它为分母。</div>
+              </div>
+            </>}
+            {modelProfile?.reasoning || (!modelProfile && form.llmAdvancedMode) ? <>
+              <div className="fld">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.llmThinkingEnabled} onChange={(e) => setThinkingEnabled(e.target.checked)} style={{ width: 'auto' }} />
+                  启用模型思考
+                </label>
+                <div className="fh">预设模型会按档案发送正确的开关字段；高级自定义模型不会猜测厂商私有参数。</div>
+              </div>
+              <div className="fld">
+                <label>思考级别</label>
+                <select value={form.llmThinkingLevel} disabled={!form.llmThinkingEnabled} onChange={(e) => set('llmThinkingLevel', e.target.value)}>
+                  <option value="minimal" disabled={modelProfile?.thinkingLevelMap?.minimal === null}>最少</option>
+                  <option value="low" disabled={modelProfile?.thinkingLevelMap?.low === null}>低</option>
+                  <option value="medium" disabled={modelProfile?.thinkingLevelMap?.medium === null}>中</option>
+                  <option value="high" disabled={modelProfile?.thinkingLevelMap?.high === null}>高</option>
+                  <option value="xhigh" disabled={modelProfile?.thinkingLevelMap?.xhigh === null}>很高</option>
+                </select>
+                <div className="fh">只显示/允许模型档案支持的档位；保存后新建 Agent 会话即可应用。</div>
+              </div>
+            </> : <div className="fh" style={{ marginBottom: 14 }}>当前预设模型未声明可控思考能力，因此不会发送思考专有字段。</div>}
+            {preset && <div className="fh" style={{ marginBottom: 14 }}>{preset.help}</div>}
             <div className="fld">
               <label>API Key</label>
               <input type="password" value={form.llmApiKey} autoComplete="new-password" onChange={(e) => set('llmApiKey', e.target.value)} />

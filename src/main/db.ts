@@ -10,6 +10,7 @@ import { app } from 'electron'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import type { AppSettings } from '@shared/types'
+import { inferLlmPreset, type LlmPresetId } from '@shared/llmProfiles'
 
 let db: Database.Database | null = null
 
@@ -241,6 +242,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   frServerUrl: 'http://localhost:8075',
   reportletsPath: '',
   llmProvider: 'openai',
+  llmPreset: 'custom',
+  llmAdvancedMode: false,
   llmBaseUrl: 'https://api.openai.com/v1',
   llmApiKey: '',
   llmModel: 'gpt-4o-mini',
@@ -265,12 +268,16 @@ export function getSettings(): AppSettings {
   // 旧库可能残留 mysql* 键，读时过滤掉（迁移已转入 connections）
   const { mysqlHost: _h, mysqlPort: _p, mysqlUser: _u, mysqlPassword: _w, mysqlDatabase: _d, ...rest } = map as Record<string, string>
   const validThinkingLevels = new Set<AppSettings['llmThinkingLevel']>(['minimal', 'low', 'medium', 'high', 'xhigh'])
+  const validPresets = new Set<LlmPresetId>(['zhipu_cn', 'volcengine_coding_plan', 'deepseek_cn', 'siliconflow_cn', 'mimo_cn', 'minimax_cn', 'kimi_cn', 'custom'])
   const level = validThinkingLevels.has(rest.llmThinkingLevel as AppSettings['llmThinkingLevel'])
     ? rest.llmThinkingLevel as AppSettings['llmThinkingLevel']
     : DEFAULT_SETTINGS.llmThinkingLevel
   // settings 表按字符串保存：上下文窗口读回时还原为正整数，旧库缺失时回落默认值。
   const ctxRaw = Number(rest.llmContextWindow)
   const contextWindow = Number.isInteger(ctxRaw) && ctxRaw > 0 ? ctxRaw : DEFAULT_SETTINGS.llmContextWindow
+  const preset = validPresets.has(rest.llmPreset as LlmPresetId)
+    ? rest.llmPreset as LlmPresetId
+    : inferLlmPreset(rest.llmBaseUrl ?? DEFAULT_SETTINGS.llmBaseUrl)
   // 邮件发送的端口/分卷大小同理还原为正整数；加密开关还原布尔值
   const portRaw = Number(rest.mailSmtpPort)
   const mailSmtpPort = Number.isInteger(portRaw) && portRaw > 0 ? portRaw : DEFAULT_SETTINGS.mailSmtpPort
@@ -279,6 +286,8 @@ export function getSettings(): AppSettings {
   return {
     ...DEFAULT_SETTINGS,
     ...rest,
+    llmPreset: preset,
+    llmAdvancedMode: rest.llmAdvancedMode === 'true' || preset === 'custom',
     llmContextWindow: contextWindow,
     // settings 表按字符串保存，读取时还原布尔值；旧库没有这些键则使用默认值。
     llmThinkingEnabled: rest.llmThinkingEnabled === undefined ? DEFAULT_SETTINGS.llmThinkingEnabled : rest.llmThinkingEnabled === 'true',

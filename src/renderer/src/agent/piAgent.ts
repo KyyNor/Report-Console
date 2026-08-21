@@ -59,8 +59,12 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
   const baseUrl = (isAnthropic ? (s.llmBaseUrl || ANTHROPIC_DEFAULT) : (s.llmBaseUrl || OPENAI_DEFAULT)).replace(/\/+$/, '')
   const api = isAnthropic ? 'anthropic-messages' : 'openai-completions'
   const modelId = s.llmModel || (isAnthropic ? 'claude-sonnet-4-5' : 'gpt-4o-mini')
-  // ZAI/GLM 即使关闭思考也需要发送 thinking: { type: 'disabled' }，否则可能把正常文本放进 reasoning_content。
-  const isZaiCompatible = !isAnthropic && (baseUrl.includes('open.bigmodel.cn') || baseUrl.includes('api.z.ai'))
+  // reasoning 是能力声明不是开关：一律声明为 true，让 thinkingLevel（off/级别）驱动 pi-ai
+  // 按端点格式显式发送启用/禁用参数。参数格式靠 baseUrl 自动探测（GLM/ZAI → thinking:{type}），
+  // 但硅基流动探测不到、默认 openai 格式在关闭时不发任何参数 —— Qwen3.5 按服务端默认静默思考，
+  // 思考中的工具调用会退化成思考流里的 XML 文本（2026-08-21 会话取证），故显式挂 qwen 格式
+  // 让 enable_thinking=false 落进请求体；硅基流动无 effort 级别参数，一并关掉 reasoning_effort。
+  const isSiliconFlow = !isAnthropic && baseUrl.includes('siliconflow')
 
   const model: Model<Api> = {
     id: modelId,
@@ -68,7 +72,8 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
     api,
     provider: providerId,
     baseUrl,
-    reasoning: isZaiCompatible || s.llmThinkingEnabled,
+    reasoning: true,
+    compat: isSiliconFlow ? { thinkingFormat: 'qwen', supportsReasoningEffort: false } : undefined,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     // 窗口来自设置页（getSettings 保证为正整数）：圆环分母与 80% 压缩阈值都按它算。
@@ -140,7 +145,7 @@ export async function createPiAgent(scope: AgentScope, fresh = false): Promise<P
     initialState: {
       systemPrompt: buildSystemPrompt(scope.project, scope.platform, scope.mode),
       model,
-      // 配置页控制开关与级别；对 GLM 关闭时也保留 reasoning=true，以显式传递 disabled。
+      // 配置页控制开关与级别；reasoning 恒为 true（能力声明），off 也会显式向端点发送禁用参数。
       thinkingLevel: s.llmThinkingEnabled ? s.llmThinkingLevel : 'off',
       tools,
       messages: (restored?.data.messages ?? []) as never[]

@@ -10,7 +10,38 @@ import {
 } from './previewDiagnostics'
 import { applyFormulaResults, fineReportFormulaExpressions, previewDataLogs } from './previewDataLogs'
 import { pageForProject } from './projectManifest'
+import { getSettings } from './db'
 import type { PreviewDataReport } from '@shared/types'
+
+/**
+ * 放宽主窗口的 CORS：Agent 在渲染层直连第三方 OpenAI/Anthropic 兼容网关，
+ * 部分网关（如火山方舟 Coding Plan）返回非法的 access-control-allow-origin: *,*
+ * 或预检未放行 x-api-key 等鉴权头，导致 Chromium 拦截、应用报 Connection error。
+ * 仅对「设置页配置的 LLM 端点」改写跨域响应头，不影响其他任何网络请求，也不影响帆软预览窗口。
+ */
+function relaxCorsForAgent(session: Session): void {
+  const override: Record<string, string[]> = {
+    'access-control-allow-origin': ['*'],
+    'access-control-allow-methods': ['GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS'],
+    'access-control-allow-headers': ['*']
+  }
+  // 只在 main.ts 尚未就绪（窗口先建）时空白，回调触发时设置早已 load 完，这里每次读取确保取到最新配置
+  const llm = () => getSettings()
+  session.webRequest.onHeadersReceived((details, callback) => {
+    let target: string
+    try { target = llm().llmBaseUrl.replace(/\/+$/, '') } catch { target = '' }
+    if (!target || !details.url.startsWith(target)) {
+      callback({})
+      return
+    }
+    const headers = details.responseHeaders ?? {}
+    for (const k of Object.keys(headers)) {
+      if (Object.prototype.hasOwnProperty.call(override, k.toLowerCase())) delete headers[k]
+    }
+    Object.assign(headers, override)
+    callback({ responseHeaders: headers })
+  })
+}
 
 export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -54,6 +85,7 @@ export function createMainWindow(): BrowserWindow {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
+  relaxCorsForAgent(win.webContents.session)
   return win
 }
 

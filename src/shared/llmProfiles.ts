@@ -148,6 +148,19 @@ export function getLlmModelProfile(id: LlmPresetId, modelId: string): LlmModelPr
   return getLlmProviderProfile(id)?.models.find((item) => item.id === modelId)
 }
 
+/**
+ * 按模型 id 跨全部预设查能力档案（不限定当前预设）。
+ * 高级/自定义模式在「当前预设查不到」时用它补上下文窗口等已登记能力，
+ * 不改变厂商专有思考字段的保守回退语义。
+ */
+export function findLlmModelProfileById(modelId: string): LlmModelProfile | undefined {
+  for (const provider of LLM_PROVIDER_PROFILES) {
+    const profile = provider.models.find((item) => item.id === modelId)
+    if (profile) return profile
+  }
+  return undefined
+}
+
 /** 旧版本只保存 URL / 模型；能识别的配置自动迁移到相应预设，其余保留高级自定义。 */
 export function inferLlmPreset(baseUrl: string): LlmPresetId {
   const normalized = baseUrl.replace(/\/+$/, '')

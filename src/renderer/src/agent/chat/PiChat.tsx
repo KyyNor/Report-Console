@@ -25,6 +25,15 @@ const RESOURCE_MUTATING_TOOLS = new Set([
 
 // ── 视图状态：事件 → 快照（rAF 合并，流式增量不逐 token 重渲染） ──
 
+/**
+ * 临时方案（需在可维护性上替代）：消息列表默认只挂最近 N 条，更多历史折叠为
+ * 「展开」按钮分批加载，用「缩小挂载 DOM」规避卡顿。
+ * 注意这是治标：一旦上下文很长、列表整体挂载，输入框会严重卡顿（布局/绘制
+ * 整块重光栅化）。根治方向是消息行级 memo + 虚拟化，而不是阈值截断。
+ */
+const MIN_VISIBLE = 30
+const EXPAND_STEP = 50
+
 interface ChatView {
   messages: AgentMessage[]
   streaming?: AgentMessage
@@ -154,6 +163,23 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
     const el = scrollRef.current
     if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
   }
+
+  // 折叠历史：默认只渲染最近 MIN_VISIBLE 条；展开按 EXPAND_STEP 分批加载更早对话，
+  // 并在顶部插入后按增量回正滚动位置，避免视口跳动。
+  const [visibleCount, setVisibleCount] = useState(MIN_VISIBLE)
+  const prevScroll = useRef({ top: 0, height: 0 })
+  const loadMore = () => {
+    const el = scrollRef.current
+    if (el) prevScroll.current = { top: el.scrollTop, height: el.scrollHeight }
+    setVisibleCount((c) => Math.min(c + EXPAND_STEP, view.messages.length))
+  }
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || prevScroll.current.height === 0) return
+    const delta = el.scrollHeight - prevScroll.current.height
+    if (delta > 0) el.scrollTop = prevScroll.current.top + delta
+    prevScroll.current = { top: 0, height: 0 }
+  }, [visibleCount])
   useLayoutEffect(() => {
     const el = scrollRef.current
     const thread = threadRef.current
@@ -247,7 +273,16 @@ export function PiChat({ handle, placeholder = '描述要做的开发任务，�
               <span>项目管理、接口契约、存储过程、页面构建、SQL 查询与帆软实测均封装为工具，Agent 会在需要时自行调用。</span>
             </div>
           )}
-          {view.messages.map((m, i) => {
+          {view.messages.length > visibleCount && (
+            <div className="rc-more">
+              <button className="btn sm" onClick={loadMore} title="分批加载更早对话，避免一次渲染全部历史">
+                <Icon n="chr" size={12} />展开更早对话（已显示 {visibleCount}/{view.messages.length}）
+              </button>
+            </div>
+          )}
+          {view.messages.slice(-visibleCount).map((m, j) => {
+            // 用全量数组里的原始索引做 key，窗口滑动时已渲染的消息不重建。
+            const i = view.messages.length - visibleCount + j
             if (m.role === 'user') return <UserCard key={`u${i}`} msg={m} />
             if (m.role === 'assistant') {
               return <AssistantCard key={`a${i}`} msg={m} results={results} pending={view.pending} toolLabels={toolLabels} />

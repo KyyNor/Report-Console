@@ -14,7 +14,7 @@ import {
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { buildSystemPrompt } from '@shared/agentPrompt'
-import { getLlmModelProfile } from '@shared/llmProfiles'
+import { findLlmModelProfileById, getLlmModelProfile } from '@shared/llmProfiles'
 import { call } from '../api'
 import type { AgentMode, AppSettings, ProjectPlatform } from '@shared/types'
 import { initSessionStorage, restoreLatestSession, saveSessionSnapshot, newSessionId, titleFromMessages, type SaveSnapshot } from './piSessions'
@@ -64,6 +64,10 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
   // 只有经过验证的「预设 × 模型」档案才声明 reasoning / compat，避免一个网关内各模型互相污染。
   const modelProfile = getLlmModelProfile(s.llmPreset, modelId)
   const reasoning = modelProfile ? Boolean(modelProfile.reasoning) : s.llmThinkingEnabled
+  // 当前预设查不到时（高级/自定义模式），按已知模型 id 跨预设补上下文窗口，
+  // 让 DeepSeek V4 Flash 等 1M 模型在自定义端点上同样按 1M 工作；其余能力字段
+  // 仍走保守回退（modelProfile 保持预设内查找，不注入厂商专有思考字段）。
+  const knownWindow = findLlmModelProfileById(modelId)?.contextWindow ?? modelProfile?.contextWindow
 
   const model: Model<Api> = {
     id: modelId,
@@ -76,8 +80,9 @@ function buildCustomModel(s: AppSettings): { models: ReturnType<typeof createMod
     thinkingLevelMap: modelProfile?.thinkingLevelMap,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    // 窗口来自设置页（getSettings 保证为正整数）：圆环分母与 80% 压缩阈值都按它算。
-    contextWindow: s.llmContextWindow,
+    // 窗口优先按已知模型的档案（DeepSeek V4 Flash = 1M）；未知模型才回退到设置页
+    // 字段（getSettings 保证为正整数）。圆环分母与 80% 压缩阈值都按它算。
+    contextWindow: knownWindow ?? s.llmContextWindow,
     maxTokens: 8192
   }
 

@@ -3,7 +3,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
-import { CodeBlk, fmtBytes, fmtTime } from '../../components/ui'
+import { CodeBlk, fmtBytes, fmtTime, Modal } from '../../components/ui'
 import { JsxEditor, SqlEditor, MdEditor } from '../../components/CodeEditor'
 import { getSharedPiAgent, resetSharedPiAgent, type PiAgentHandle } from '../../agent/piAgent'
 import { PiChat, type ChatAttachment } from '../../agent/chat/PiChat'
@@ -378,6 +378,33 @@ const CHECKPOINT_ORIGIN: Record<DevelopmentCheckpoint['origin'], string> = {
   baseline: '基线', agent: 'Agent', manual: '人工', restore: '恢复', recovery: '恢复草稿'
 }
 
+function CheckpointTitleModal({ onClose, onSubmit }: {
+  onClose: () => void
+  onSubmit: (title: string) => Promise<void>
+}): React.ReactElement {
+  const [title, setTitle] = useState('手工检查点')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  return (
+    <Modal
+      title="创建检查点" icon="plus" onClose={onClose}
+      footer={<>
+        <span className="m-note">仅在工作区有变更时创建</span>
+        <button className="btn" onClick={onClose}>取消</button>
+        <button className="btn pri" disabled={busy || !title.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSubmit(title.trim()) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
+          <Icon n="check" />{busy ? '创建中…' : '创建'}
+        </button>
+      </>}
+    >
+      <div className="fld">
+        <label>检查点说明</label>
+        <input type="text" value={title} spellCheck={false} autoFocus onChange={(e) => setTitle(e.target.value)} />
+      </div>
+      {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
+    </Modal>
+  )
+}
+
 function VersionPanel({ project, onRestored }: { project: Project; onRestored?: () => void }): React.ReactElement {
   const [checkpoints, setCheckpoints] = useState<DevelopmentCheckpoint[]>([])
   const [working, setWorking] = useState<CheckpointDiff | null>(null)
@@ -438,9 +465,10 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
 
   const selectedCheckpoint = checkpoints.find((x) => x.id === selected)
   const lineDiff = useMemo(() => fileDiff ? buildUnifiedLineDiff(fileDiff.before, fileDiff.after) : null, [fileDiff])
-  const create = async () => {
-    const title = prompt('检查点说明（仅在工作区有变更时创建）：', '手工检查点')
-    if (title === null) return
+  // 注意：此处不用 window.prompt —— Electron 未实现该 API，调用会抛
+// "prompt() is and will not be supported."，导致创建检查点静默失效。
+const [askTitle, setAskTitle] = useState(false)
+const create = async (title: string) => {
     setBusy(true)
     try {
       const made = await call<DevelopmentCheckpoint | null>('versions:create', { project: project.name, title })
@@ -466,7 +494,7 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
   return <div className="vp">
     <div className="banner info"><Icon n="info" /><div><b>开发检查点</b>保存在 Report Console 本地，不创建 .git、不会修改 SVN。每条版本是对话/操作<b>完成时</b>的快照，恢复即回到该次改动之后的状态（要改动之前，选上一条更早的版本）。仅追踪 project.yaml、受管 JSX、过程定义与 meta/ 源文档；CPT 构建产物、传统 CPT 与数据库不会被回滚。</div></div>
     <div className="vp-actions">
-      <button className="btn" disabled={busy} onClick={() => void create()}><Icon n="plus" />创建检查点</button>
+      <button className="btn" disabled={busy} onClick={() => setAskTitle(true)}><Icon n="plus" />创建检查点</button>
       {selectedCheckpoint && <button className="btn dgr" disabled={busy} onClick={() => void restore()}><Icon n="back" />恢复此版本</button>}
       {selectedCheckpoint && <button className="btn sm" onClick={() => setCompareWorking((x) => !x)}>{compareWorking ? '查看本次变更' : '与工作区比较'}</button>}
     </div>
@@ -498,6 +526,12 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
         </>}
       </div>
     </div>
+    {askTitle && (
+      <CheckpointTitleModal
+        onClose={() => setAskTitle(false)}
+        onSubmit={async (title) => { setAskTitle(false); await create(title) }}
+      />
+    )}
   </div>
 }
 

@@ -221,7 +221,13 @@ export function updateProject(id: number, patch: { comment?: string; connections
 }
 
 export function deleteProject(id: number): void {
-  getDb().prepare('DELETE FROM projects WHERE id=?').run(id)
+  // 必须校验：调用方可能传 undefined（渲染层 curProject 未就绪），
+  // 此时 SQL 变成 WHERE id=NULL，删 0 行却仍返回成功 —— 界面会误报「已删除」。
+  if (!Number.isInteger(id) || id <= 0) throw new Error('缺少项目 id，无法删除')
+  const db = getDb()
+  const row = db.prepare('SELECT name FROM projects WHERE id=?').get(id) as { name: string } | undefined
+  if (!row) throw new Error(`项目不存在或已被删除（id=${id}）`)
+  db.prepare('DELETE FROM projects WHERE id=?').run(id)
 }
 
 /** reportlets 下已部署但未建项目的目录（供扫描导入） */

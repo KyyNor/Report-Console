@@ -10,7 +10,8 @@ import type { Project, Dataset, DatasetStatus, ProcRecord, PageMeta, PagePlatfor
 import RightPanel, { type WBData, type WBActs } from './RightPanel'
 import {
   ProjectWizardModal, DatasetEditModal, ApplyProcModal, CallProcModal, LinkProcModal, NewProcModal,
-  DocNameModal, ProjectSettingsModal, PackProjectModal, LegacyMigrationModal, type LinkableProc
+  DocNameModal, ProjectSettingsModal, PackProjectModal, LegacyMigrationModal, ConfirmDeleteProjectModal,
+  type LinkableProc
 } from './modals'
 
 type ModalState =
@@ -25,6 +26,8 @@ type ModalState =
   | { k: 'docrename'; old: string }
   | { k: 'projsettings' }
   | { k: 'pack'; project: string }
+  | { k: 'confirmdelete' }
+  | { k: 'newpage'; starter: string; platform: PagePlatform }
   | null
 
 import { KIND_TAG } from './kinds'
@@ -262,19 +265,7 @@ export default function WorkbenchView({ settingsRevision = 0 }: { settingsRevisi
     },
     deleteProject: () => {
       if (!cur) return
-      const input = prompt(`删除项目 ${cur}？仅解除管理（契约/关联清空），reportlets 产物保留。\n输入项目名确认：`)
-      if (input === cur) {
-        void (async () => {
-          try {
-            await call('projects:delete', { id: curProject?.id })
-            toast(`已删除项目 ${cur}（产物保留在 ${curProject?.dir}）`, 'ok')
-            setCur(null); setSel(null)
-            await loadProjects()
-          } catch (e) { toast((e as Error).message, 'err') }
-        })()
-      } else if (input !== null) {
-        toast('项目名不匹配，已取消', 'err')
-      }
+      setModal({ k: 'confirmdelete' })
     },
     useAgent: (resource) => {
       if (!cur) return
@@ -657,6 +648,31 @@ export default function WorkbenchView({ settingsRevision = 0 }: { settingsRevisi
           }}
         />
       )}
+      {modal?.k === 'confirmdelete' && curProject && (
+        <ConfirmDeleteProjectModal
+          projectName={curProject.name}
+          dir={curProject.dir}
+          onClose={() => setModal(null)}
+          onConfirm={async () => {
+            const name = curProject.name
+            await call('projects:delete', { id: curProject.id })
+            toast(`已删除项目 ${name}（产物保留在 ${curProject.dir}）`, 'ok')
+            setModal(null); setCur(null); setSel(null)
+            await loadProjects()
+          }}
+        />
+      )}
+      {modal?.k === 'newpage' && (
+        <DocNameModal
+          title="新建页面" initName=""
+          onClose={() => setModal(null)}
+          onSave={async (name) => {
+            if (!/^[a-z][a-z0-9_]*$/.test(name)) throw new Error('页面名仅允许小写字母/数字/下划线')
+            await acts.createPage(name, modal.starter, modal.platform)
+            setModal(null)
+          }}
+        />
+      )}
       {modal?.k === 'pack' && (
         <PackProjectModal
           project={modal.project}
@@ -684,10 +700,7 @@ export default function WorkbenchView({ settingsRevision = 0 }: { settingsRevisi
   }
 
   function askCreatePage(starter: string, platform: PagePlatform): void {
-    const name = prompt(`页面名（小写字母/数字/下划线，${starter} 脚手架）：`)
-    if (!name) return
-    if (!/^[a-z][a-z0-9_]*$/.test(name)) { toast('页面名仅允许小写字母/数字/下划线', 'err'); return }
-    void acts.createPage(name, starter, platform)
+    setModal({ k: 'newpage', starter, platform })
   }
 }
 

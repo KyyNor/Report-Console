@@ -22,6 +22,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }): Reac
     setItems((xs) => [...xs, { id, msg, kind }])
     setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), 3200)
   }, [])
+
+  // 全局兜底：未捕获的异常必须让用户看得见。
+  // Electron 未实现的 API（如 window.prompt）会抛同步 Error，
+  // 未处理的 Promise 拒绝同理 —— 两者若无人接管都会静默失败。
+  useEffect(() => {
+    const describe = (r: unknown): string | null => {
+      if (typeof r === 'string') return r
+      const m = (r as { message?: string } | null)?.message
+      return typeof m === 'string' ? m : null
+    }
+    const onRejection = (e: PromiseRejectionEvent) => {
+      console.error('[unhandledrejection]', e.reason)
+      const msg = describe(e.reason)
+      if (msg) push(msg, 'err')
+    }
+    const onError = (e: ErrorEvent) => {
+      console.error('[window.onerror]', e.error ?? e.message)
+      const msg = describe(e.error) ?? e.message
+      if (msg) push(msg, 'err')
+    }
+    window.addEventListener('unhandledrejection', onRejection)
+    window.addEventListener('error', onError)
+    return () => {
+      window.removeEventListener('unhandledrejection', onRejection)
+      window.removeEventListener('error', onError)
+    }
+  }, [push])
+
   return (
     <ToastCtx.Provider value={push}>
       {children}

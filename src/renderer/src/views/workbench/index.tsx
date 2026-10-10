@@ -665,6 +665,9 @@ export default function WorkbenchView({ settingsRevision = 0 }: { settingsRevisi
       {modal?.k === 'newpage' && (
         <DocNameModal
           title="新建页面" initName=""
+          label="页面名（小写字母开头，仅含小写字母 / 数字 / 下划线）"
+          placeholder="order_list"
+          note="生成 <页面名>.jsx 并登记为项目受管页面；构建后进入 reportlets 产物"
           onClose={() => setModal(null)}
           onSave={async (name) => {
             if (!/^[a-z][a-z0-9_]*$/.test(name)) throw new Error('页面名仅允许小写字母/数字/下划线')

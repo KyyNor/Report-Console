@@ -466,9 +466,9 @@ function VersionPanel({ project, onRestored }: { project: Project; onRestored?: 
   const selectedCheckpoint = checkpoints.find((x) => x.id === selected)
   const lineDiff = useMemo(() => fileDiff ? buildUnifiedLineDiff(fileDiff.before, fileDiff.after) : null, [fileDiff])
   // 注意：此处不用 window.prompt —— Electron 未实现该 API，调用会抛
-// "prompt() is and will not be supported."，导致创建检查点静默失效。
-const [askTitle, setAskTitle] = useState(false)
-const create = async (title: string) => {
+  // "prompt() is and will not be supported."，导致创建检查点静默失效。
+  const [askTitle, setAskTitle] = useState(false)
+  const create = async (title: string) => {
     setBusy(true)
     try {
       const made = await call<DevelopmentCheckpoint | null>('versions:create', { project: project.name, title })

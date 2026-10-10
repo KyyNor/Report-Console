@@ -516,9 +516,13 @@ END`)
 
 // ── 新建/重命名文档 ─────────────────────────────────────────────
 
-export function DocNameModal({ title, initName, onClose, onSave }: {
+export function DocNameModal({ title, initName, label, placeholder, note, onClose, onSave }: {
   title: string
   initName?: string
+  /** 供非文档场景覆盖文案（如新建页面），省略则用文档语义默认值 */
+  label?: string
+  placeholder?: string
+  note?: string
   onClose: () => void
   onSave: (name: string) => Promise<void>
 }): React.ReactElement {
@@ -529,7 +533,7 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
     <Modal
       title={title} icon="file" onClose={onClose}
       footer={<>
-        <span className="m-note">存于项目 meta/ 目录；Agent 可读取作为开发上下文</span>
+        <span className="m-note">{note ?? '存于项目 meta/ 目录；Agent 可读取作为开发上下文'}</span>
         <button className="btn" onClick={onClose}>取消</button>
         <button className="btn pri" disabled={busy || !name.trim()} onClick={async () => { setBusy(true); setErr(null); try { await onSave(name.trim()) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) } }}>
           <Icon n="check" />确定
@@ -537,8 +541,8 @@ export function DocNameModal({ title, initName, onClose, onSave }: {
       </>}
     >
       <div className="fld">
-        <label>文档名（.md / .txt / .html 需求设计、.sql 过程语句，或 .js / .jsx / .mjs / .css 前端参考）</label>
-        <input type="text" value={name} spellCheck={false} placeholder="01-需求-订单管理.md" onChange={(e) => setName(e.target.value)} />
+        <label>{label ?? '文档名（.md / .txt / .html 需求设计、.sql 过程语句，或 .js / .jsx / .mjs / .css 前端参考）'}</label>
+        <input type="text" value={name} spellCheck={false} placeholder={placeholder ?? '01-需求-订单管理.md'} onChange={(e) => setName(e.target.value)} />
       </div>
       {err && <div className="banner err"><Icon n="cx" /><div>{err}</div></div>}
     </Modal>

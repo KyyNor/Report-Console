@@ -211,13 +211,13 @@ export default function WorkbenchView({ settingsRevision = 0 }: { settingsRevisi
     deletePage: async (page) => {
       try { await call('pages:delete', { project: cur, page }); toast(`已删除页面 ${page}（连带 .mjs/.cpt）`, 'ok'); setSel(null); await refresh() } catch (e) { toast((e as Error).message, 'err') }
     },
+    // 错误不在这里 toast：唯一调用方是「新建页面」弹窗，抛出后由 DocNameModal
+    // 的错误横幅呈现，弹窗保留不关，用户可直接改名字重试。内吞会让弹窗白开。
     createPage: async (page, starter, platform) => {
-      try {
-        await call('pages:create', { project: cur, page, starter, platform })
-        toast(`已创建 ${page}.jsx（${platform === 'mobile' ? '移动端' : starter} 脚手架）`, 'ok')
-        await refresh()
-        setSel(`pg:${page}`)
-      } catch (e) { toast((e as Error).message, 'err') }
+      await call('pages:create', { project: cur, page, starter, platform })
+      toast(`已创建 ${page}.jsx（${platform === 'mobile' ? '移动端' : starter} 脚手架）`, 'ok')
+      await refresh()
+      setSel(`pg:${page}`)
     },
     updatePagePaths: async (page, paths, newName) => {
       try {

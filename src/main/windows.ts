@@ -47,8 +47,11 @@ export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1380,
     height: 880,
-    minWidth: 1024,
-    minHeight: 700,
+    // 下限须与 .cols 的硬下限（app.css）一致，且要能真正放进低分辨率屏幕：
+    // 1366×768 在 150% 缩放下可用宽仅 ≈910 DIP、高 ≈512 DIP，若下限高于此值，
+    // 窗口会被钳到比屏幕还宽，用户既拖不小也够不到右缘（issue #6 场景 B）。
+    minWidth: 900,
+    minHeight: 600,
     title: 'Report Console — 帆软加壳开发控制台',
     icon: app.isPackaged
       ? join(process.resourcesPath, 'icon.png')

@@ -145,13 +145,23 @@ svg.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px
 .iconbtn:hover{background:var(--surface2);color:var(--fg)}
 .iconbtn svg.ic{width:14px;height:14px}
 
-/* ========== 工作台三栏（250 / 396 / 弹性） ========== */
+/* ========== 工作台三栏（220 / 300–396 / 弹性） ==========
+   硬下限 220+300+380=900，与 windows.ts 的 minWidth 对齐（issue #6）。
+   中栏写 minmax(300px,396px) 而非固定 396px：按 Grid 规范 12.7 最大化步骤，
+   带确定增长上限的轨道在有剩余空间时会撑到 396px —— 宽屏观感与原先一致，
+   窄窗时才回缩到 300，避免 900–1046 之间直接贴死硬下限。 */
 .stage{flex:1;display:flex;flex-direction:column;min-width:0}
-.cols{flex:1;min-height:0;display:grid;grid-template-columns:250px 396px minmax(430px,1fr);background:var(--bg)}
+.cols{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(300px,396px) minmax(380px,1fr);background:var(--bg)}
 .colhead{flex:none;display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
 .colhead .t{font-size:13px;font-weight:600;letter-spacing:.02em}
 .colhead .sub{font-size:10.5px;color:var(--faint);font-family:var(--font-mono)}
 .colhead .grow{flex:1}
+
+/* 窄窗：先收左栏与中栏，给右侧操作面板保住可点面积（issue #6）。
+   下限 200+280+340=820，低于 minWidth 900，不会成为新的溢出源。 */
+@media (max-width:1040px){
+  .cols{grid-template-columns:200px minmax(280px,340px) minmax(340px,1fr)}
+}
 
 /* ---- 左栏 · 项目选择器 ---- */
 .col-left{min-height:0;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--border)}
@@ -411,8 +421,11 @@ details.resp pre{margin:0;padding:8px 12px 12px;font:11px/1.6 var(--font-mono);c
 .gstep .gd{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5}
 
 /* ---- Agent 面板（工作台右栏内嵌） ---- */
-.ag-head{flex:none;padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;background:var(--surface)}
-.ag-head .ttl{font-size:13.5px;font-weight:700;flex:1;font-family:var(--font-ui)}
+/* 窄栏时整行折行：头部有 7 个元素（标题/模型芯片/模式切换/版本/Data 日志/
+   新建会话/设置），窄栏下挤在一行会溢出并被 .app-frame 裁掉，末尾按钮点不到
+   （issue #6）。flex-wrap 让它们按可用宽度换行，全部功能保留。 */
+.ag-head{flex:none;padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--surface)}
+.ag-head .ttl{font-size:13.5px;font-weight:700;flex:1;white-space:nowrap;font-family:var(--font-ui)}
 .ctx-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;padding:3px 9px;border-radius:999px;
   background:var(--accent-s);color:oklch(40% 0.1 259);font-family:var(--font-mono)}
 .ctx-chip b{font-weight:600}
